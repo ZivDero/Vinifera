@@ -4,11 +4,11 @@
  *
  *  @project       Vinifera
  *
- *  @file          SETUP_HOOKS.CPP
+ *  @file          SDL_GLOBALS.H
  *
  *  @author        CCHyper
  *
- *  @brief         Contains the main function that sets up all hooks.
+ *  @brief         SDL2 globals.
  *
  *  @license       Vinifera is free software: you can redistribute it and/or
  *                 modify it under the terms of the GNU General Public License
@@ -25,43 +25,53 @@
  *                 If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#include "setup_hooks.h"
+#pragma once
+
+#include "always.h"
+#include <SDL.h>
+#include <SDL_syswm.h>
+
 
 /**
- *  Include the hook headers here.
+ *  Should SDL2 be used to create the game window?
  */
-#include "vinifera_newdel.h"
-#include "crt_hooks.h"
-#include "debug_hooks.h"
-#include "vinifera_hooks.h"
-#include "newswizzle_hooks.h"
-#include "extension_hooks.h"
-#include "cncnet4_hooks.h"
-#include "cncnet5_hooks.h"
-#include "sidebarext_hooks.h"
-
-
-#include "sdl_hooks.h"
-void Setup_Hooks()
-{
-    Vinifera_Memory_Hooks();
-
-    CRT_Hooks();
-    Debug_Hooks();
-    Vinifera_Hooks();
-    NewSwizzle_Hooks();
-    Extension_Hooks();
-
-    CnCNet4_Hooks();
-    CnCNet5_Hooks();
-
-    SDL_Hooks();
-}
+extern bool UseSDL2;
 
 /**
- *  Contains hooks that need to be set after we load VINIFERA.INI.
+ *  Create the window without a border?
  */
-void Setup_Conditional_Hooks()
-{
-    SidebarClassExtension_Conditional_Hooks();
-}
+extern bool SDLBorderless;
+
+/**
+ *  Create the window at the size of the display as a borderless window?
+ */
+extern bool SDLBorderlessFullscreen;
+
+extern bool SDLHardwareRenderer;
+
+extern bool SDLClipMouseToWindow;
+
+/**
+ *  The window we'll be rendering to.
+ */
+extern SDL_Window *SDLWindow;
+
+/**
+ *  The window renderer.
+ */
+extern SDL_Renderer *SDLWindowRenderer;
+
+/**
+ *  The surface contained by the window.
+ */
+extern SDL_Surface *SDLWindowSurface;
+
+/**
+ *  The texture contained by the window.
+ */
+extern SDL_Texture *SDLWindowTexture;
+
+/**
+ *  256 color palette.
+ */
+extern SDL_Palette *SDLPalette;
