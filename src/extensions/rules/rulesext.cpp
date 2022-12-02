@@ -483,6 +483,27 @@ bool RulesClassExtension::CombatDamage(CCINIClass & ini)
 
 
 /**
+ *  Process the combat damage related game settings.
+ *
+ *  @author: Rampastring
+ */
+bool RulesClassExtension::CombatDamage(CCINIClass &ini)
+{
+    //EXT_DEBUG_TRACE("RulesClassExtension::CombatDamage - 0x%08X\n", (uintptr_t)(This()));
+
+    static char const * const COMBATDAMAGE = "CombatDamage";
+
+    if (!ini.Is_Present(COMBATDAMAGE)) {
+        return false;
+    }
+
+    IceStrength = ini.Get_Int(COMBATDAMAGE, "IceStrength", IceStrength);
+
+    return true;
+}
+
+
+/**
  *  Process the general main game rules.
  *  
  *  @author: CCHyper

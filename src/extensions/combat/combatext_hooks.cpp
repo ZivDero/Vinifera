@@ -107,6 +107,28 @@ DECLARE_PATCH(_Explosion_Damage_IsWallAbsoluteDestroyer_Patch)
  */
 DECLARE_PATCH(_Explosion_Damage_IsIceDestruction_Patch)
 {
+    GET_REGISTER_STATIC(const WarheadTypeClass*, warhead, edi);
+    GET_STACK_STATIC(int, strength, esp, 0x54);
+
+    if (!ScenExtension->IsIceDestruction) {
+        goto no_ice_destruction;
+    }
+
+    /**
+     *  Stolen bytes/code here.
+     */
+    if (warhead->IsWallDestroyer || warhead->IsConventional) {
+
+/**
+ *  #issue-897
+ *
+ *  Implements IsIceDestruction scenario option for preventing destruction of ice,
+ *  and IceStrength for configuring the chance for ice getting destroyed.
+ *
+ *  @author: Rampastring
+ */
+DECLARE_PATCH(_Explosion_Damage_IsIceDestruction_Patch)
+{
     GET_REGISTER_STATIC(const WarheadTypeClass *, warhead, edi);
     GET_STACK_STATIC(int, strength, esp, 0x54);
 
