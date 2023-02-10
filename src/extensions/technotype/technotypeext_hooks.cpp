@@ -40,6 +40,9 @@
 #include "hooker.h"
 #include "rulesext.h"
 
+#include "hooker.h"
+#include "hooker_macros.h"
+
 
 /**
  *  A fake class for implementing new member functions which allow
@@ -86,6 +89,19 @@ int TechnoTypeClassExt::_Max_Pips() const
     default:
         return max_pips;
     }
+}
+
+
+/**
+ *  #issue-90
+ *
+ *  Disables the bugged bonus range for arcing projectiles.
+ *
+ *  Author: Rampastring
+ */
+DECLARE_PATCH(_TechnoTypeClass_In_Range_Disable_Arcing_Bonus_Range_Patch)
+{
+    JMP(0x0063D6AA);
 }
 
 
