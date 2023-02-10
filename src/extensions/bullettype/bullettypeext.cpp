@@ -42,7 +42,8 @@
 BulletTypeClassExtension::BulletTypeClassExtension(const BulletTypeClass *this_ptr) :
     ObjectTypeClassExtension(this_ptr),
     SpawnDelay(3),           // Default hardcoded value.
-    IsTorpedo(false)
+    IsTorpedo(false),
+    SnapDistance(CELL_LEPTON_W * 2)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("BulletTypeClassExtension::BulletTypeClassExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
@@ -190,6 +191,7 @@ bool BulletTypeClassExtension::Read_INI(CCINIClass &ini)
     }
     
     IsTorpedo = ini.Get_Bool(ini_name, "Torpedo", IsTorpedo);
+    SnapDistance = ini.Get_Int(ini_name, "SnapDistance", SnapDistance);
 
     //if (!ArtINI.Is_Present(graphic_name)) {
     //    return false;

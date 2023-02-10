@@ -71,4 +71,9 @@ BulletTypeClassExtension final : public ObjectTypeClassExtension
          *  If set, this projectile can only be used against targets on water.
          */
         bool IsTorpedo;
+
+        /**
+         *  Defines how far a projectile can snap to reach its target.
+         */
+        int SnapDistance;
 };
