@@ -1139,7 +1139,7 @@ static bool Print_Event_List(FILE *fp, QueueClass<T, I> &list)
                 ev_data_buffer += ev_byte_format;
                 if (i < ev_size-1) ev_data_buffer += " ";
             }
-            std::fprintf(fp, "%04d  %s  Frame: %d  ID: %d  Data: %s\n", index, ev_name, ev->Frame, ev->ID, ev_data_buffer.Peek_Buffer());
+            std::fprintf(fp, "%04d  %s  Frame: %d  ID: %d  Data: %s\n", index, EventClass::Event_Name(ev->Type), ev->Frame, ev->ID, ev_data_buffer);
         }
     }
     return true;
@@ -1280,8 +1280,10 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
 
     /**
      *  Print the most recent CRC values.
+     * 
+     *  Rampastring: print all of 'em
      */
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < 256; ++i) {
         std::fprintf(fp, "CRC[%d]=%x\n", i, CRC[i]);
     }
     std::fprintf(fp, "\n");
