@@ -168,4 +168,10 @@ class RulesClassExtension final : public GlobalExtensionClass<RulesClass>
          *  Determines whether the Tiberium storage logic is enabled.
          */
         bool IsTiberiumStorage;
+
+        /**
+         *  Defines for how many frames buildings do not get flames spawned on them on
+         *  damage state change after once catching fire.
+         */
+        int BuildingFlameSpawnBlockFrames;
 };
