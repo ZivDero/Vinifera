@@ -111,4 +111,11 @@ public:
      *  The type of the naval unit the AI is currently scheduled to build.
      */
     UnitType BuildNavalUnit;
+    
+    /**
+     *  Replacement Weed storage.
+     */
+    VectorClass<int> WeedStorage;
+
+    int StrengthenDestroyedCost;
 };

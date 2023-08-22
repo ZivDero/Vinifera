@@ -47,6 +47,7 @@
 #include "warheadtypeext.h"
 #include "house.h"
 #include "housetype.h"
+#include "houseext.h"
 #include "rules.h"
 #include "rulesext.h"
 #include "tiberium.h"
@@ -1232,6 +1233,7 @@ void TechnoClassExt::_Drop_Tiberium()
  *
  *  @author:  07/08/1995 JLB - Created.
  *            ZivDero - Adjustments for Tiberian Sun.
+ *            Rampastring - Added DTA empowerment mechanic.
  */
 void TechnoClassExt::_Record_The_Kill(TechnoClass* source)
 {
@@ -1262,6 +1264,8 @@ void TechnoClassExt::_Record_The_Kill(TechnoClass* source)
         const auto source_ext = Extension::Fetch(source);
         const auto source_typeext = Extension::Fetch(source->TClass);
 
+        const int technotypecost = TClass->Cost_Of(House);
+
         if (source->TClass->IsTrainable) {
             source->Veterancy.Gain_Experience(source->TClass->Cost_Of(House), points);
 
@@ -1273,6 +1277,28 @@ void TechnoClassExt::_Record_The_Kill(TechnoClass* source)
         }
 
         House->WhoLastHurtMe = source->Owner();
+
+        if (RuleExtension->IsStrengtheningEnabled) {
+            HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(source->House);
+            int value = technotypecost;
+
+            // Buildings have a multiplier to their value.
+            if (What_Am_I() == RTTI_BUILDING) {
+                value = value * RuleExtension->StrengthenBuildingValueMultiplier;
+            }
+
+            houseext->StrengthenDestroyedCost += value;
+
+            /**
+             *  Strengthen the house if they have exceeded the threshold.
+             */
+            while (houseext->StrengthenDestroyedCost > RuleExtension->StrengthenDestroyedValueThreshold) {
+                source->House->FirepowerBias += 0.01;
+                source->House->ArmorBias += 0.01;
+
+                houseext->StrengthenDestroyedCost -= RuleExtension->StrengthenDestroyedValueThreshold;
+            }
+        }
 
         /**
          *  Add up the score for killing this unit
