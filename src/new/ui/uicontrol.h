@@ -309,6 +309,11 @@ class UIControlsClass
          *  Should the sidebar repair, etc. buttons use the old X position, centered on the radar?
          */
         bool IsCenterSidebarButtonsOnRadar;
+
+        /**
+         *  Horizontal left-most pixel position of the message list.
+         */
+        int MessageListPositionX;
 };
 
 extern UIControlsClass *UIControls;
