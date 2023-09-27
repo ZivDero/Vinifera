@@ -581,7 +581,7 @@ void TacticalExtension::Draw_Message(int index, const char *text, ColorSchemeTyp
     //CompositeSurface->Fill_Rect(CompositeSurface->Get_Rect(), fill_rect, color_black);
     CompositeSurface->Fill_Rect_Trans(fill_rect, rgb_black, background_tint);
 
-    Fancy_Text_Print(text, CompositeSurface, &CompositeSurface->Get_Rect(),
+    Simple_Text_Print(text, CompositeSurface, &CompositeSurface->Get_Rect(),
         &text_draw_point, ColorSchemes[color], COLOR_TBLACK, style);
 }
 
