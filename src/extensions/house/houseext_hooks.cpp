@@ -882,7 +882,7 @@ const BuildingTypeClass* AdvAI_Get_Building_To_Build(HouseClass* house)
 
     // If our power budget couldn't afford the building, then build a power plant first instead.
     // Unless it's a refinery that we're building, those are considered more critical.
-    if (buildchoice->Power < 0 && !buildchoice->IsRefinery && (house->Power - house->Drain + buildchoice->Power > house->Power)) {
+    if (buildchoice->Drain > 0 && !buildchoice->IsRefinery && (house->Drain + buildchoice->Drain > house->Power)) {
         BuildingType our_basic_power = BUILDING_NONE;
         BuildingType our_advanced_power = BUILDING_NONE;
 
