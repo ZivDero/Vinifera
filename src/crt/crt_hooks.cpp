@@ -28,6 +28,8 @@
 #include "crt_hooks.h"
 #include <fenv.h>
 #include "vinifera_newdel.h"
+#include "tibsun_globals.h"
+#include "session.h"
 #include "asserthandler.h"
 #include "debughandler.h"
 
@@ -66,26 +68,100 @@ static char * __cdecl vinifera_strdup(const char *string)
 }
 
 
+static unsigned int precision = 0;
+static unsigned int rounding = 0;
+
+
+static void Set_Vinifera_FP_Mode()
+{
+    precision = _PC_24;
+
+    if (Session.Type == GAME_IPX)
+    {
+        // Multiplayer - prioritize stability
+        // Based on extensive testing in DTA, _RC_NEAR seems to significantly reduce frequency of desyncs.
+        rounding = _RC_NEAR;
+    }
+    else 
+    {
+        // Singleplayer - prioritize functionality
+        rounding = _RC_CHOP;
+    }
+
+    _set_controlfp(precision, _MCW_PC);
+    _set_controlfp(rounding, _MCW_RC); // _RC_NEAR in SupCom code
+
+    // Call the game's function to store the FPU mode.
+    _asm { mov edx, 0x006B2314 }
+    _asm { call edx }
+
+    /**
+     *  And this is required for the std c++ lib.
+     */
+    fesetround(rounding == _RC_NEAR ? FE_TONEAREST : FE_TOWARDZERO);
+}
+
+
 /**
  *  Set the FPU mode to match the game (rounding towards zero [chop mode]).
  */
 DECLARE_PATCH(_set_fp_mode)
 {
-    // Call to "store_fpu_codeword"
-    _asm { mov edx, 0x006B2314 };
-    _asm { call edx };
+    // Call to "WWDebug_Printf"
+    _asm { mov edx, 0x004082D0 }
+    _asm { call edx }
 
     /**
-     *  Set the FPU mode to match the game (rounding towards zero [chop mode]).
+     *  Set the FPU mode.
+     *  According to a Supreme Commander developer, this mode is
+     *  necessary for determinism.
+     *  https://gafferongames.com/post/floating_point_determinism/
      */
-    _set_controlfp(_RC_CHOP, _MCW_RC);
-
-    /**
-     *  And this is required for the std c++ lib.
-     */
-    fesetround(FE_TOWARDZERO);
+    Set_Vinifera_FP_Mode();
 
     JMP(0x005FFDB0);
+}
+
+
+static void Check_Vinifera_FP_Mode()
+{
+    // Fetch FP control value
+    if (Session.Type == GAME_IPX) {
+        int fpcontrol = _controlfp(0, 0);
+        if ((fpcontrol & _MCW_PC) != precision)
+        {
+            DEBUG_FATAL("FPU precision mode change detected. Value: 0x%08x\n", fpcontrol);
+            Emergency_Exit(255);
+        }
+
+        if ((fpcontrol & _MCW_RC) != rounding) // _RC_NEAR for SupCom mode
+        {
+            DEBUG_FATAL("FPU rounding mode change detected. Value: 0x%08x\n", fpcontrol);
+            Emergency_Exit(255);
+        }
+    }
+}
+
+DECLARE_PATCH(_LogicClass_AI_Beginning_Set_FP_Mode)
+{
+    _asm { push  ecx }
+
+    Set_Vinifera_FP_Mode();
+
+    // Stolen bytes / code
+    _asm { mov  edx, dword ptr ds:0x00804D28 } // mov edx, LogicInit
+    _asm { pop  ecx }
+    JMP(0x00506AB9);
+}
+
+
+DECLARE_PATCH(_LogicClass_AI_End_Check_FP_Mode)
+{
+    Check_Vinifera_FP_Mode();
+
+    // Rebuild function epilogue
+    _asm { add  esp, 28h }
+    _asm { retn }
 }
 
 
@@ -97,7 +173,11 @@ void CRT_Hooks()
     /**
      *  Call the games fpmath to make sure we init 
      */
-    Patch_Jump(0x005FFDAB, &_set_fp_mode);
+    Patch_Jump(0x005FFD97, &_set_fp_mode);
+
+    // Set the FP mode in the beginning of LogicClass::AI
+    Patch_Jump(0x00506AB3, &_LogicClass_AI_Beginning_Set_FP_Mode);
+    Patch_Jump(0x00507205, &_LogicClass_AI_End_Check_FP_Mode);
 
     /**
      *  dynamic init functions call _msize indirectly.
