@@ -29,12 +29,15 @@
 #include "bullettype.h"
 #include "bullettypeext.h"
 #include "bullet.h"
+#include "anim.h"
+#include "animtype.h"
 #include "building.h"
 #include "techno.h"
 #include "warheadtype.h"
 #include "warheadtypeext.h"
 #include "house.h"
 #include "rules.h"
+#include "session.h"
 #include "fastmath.h"
 #include "iomap.h"
 #include "extension.h"
@@ -44,6 +47,21 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+
+
+/**
+ *  A fake class for implementing new member functions which allow
+ *  access to the "this" pointer of the intended class.
+ *
+ *  @note: This must not contain a constructor or deconstructor!
+ *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
+ */
+static class BulletClassFake final : public BulletClass
+{
+public:
+    void _BulletClass_AI_Replacement(void);
+    int _Shape_Number(void);
+};
 
 
 /**
@@ -269,7 +287,11 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
 
     CellClass& cell = Map[our_coord]; // this is actually used only in the bridge check, 
                                       // but original compiled code had it here already
-    this_ptr->Fly = v149;
+
+    // Projectile_Motion fails when targeting something directly towards negative Y
+    if ((int)this_ptr->Fly.field_88 != 0 && this_ptr->Fly.field_90 < 0) {
+        this_ptr->Fly = v149;
+    }
 
     bool is_forced_to_explode = false;
     bool b_height_v139 = false;
@@ -536,11 +558,186 @@ DECLARE_PATCH(_BulletClass_AI_Jump_To_Custom_Function_If_ROT_Over_Zero)
 
 
 /**
+ *  Main function for DTA's custom implementation of BulletClass::AI,
+ *  designed to be compatible with new floating point calculation mode
+ *  and to work more similarly to Red Alert's.
+ *
+ *  @author: Rampastring (bits taken from Red Alert 1 source code by Electronic Arts)
+ */
+void BulletClassFake::_BulletClass_AI_Replacement(void)
+{
+    ObjectClass::AI();
+
+    if (!IsActive) return;
+
+    // Ballistic objects are handled here.
+    bool forced = false;
+    if (Class->IsDropping && !IsFalling) {
+        forced = true;
+    }
+
+    // Refresh anim logic introduced in Tiberian Sun.
+    if (Class->AnimLow > 0 || Class->AnimHigh > 0) {
+        AnimFrameDelay--;
+
+        if (AnimFrameDelay == 0) {
+            AnimFrame++;
+            AnimFrameDelay = Class->AnimRate;
+
+            if (AnimFrame >= Class->AnimHigh) {
+                AnimFrame = Class->AnimLow;
+            }
+        }
+    }
+
+    BulletTypeClassExtension *bullettypeext = Extension::Fetch<BulletTypeClassExtension>(Class);
+
+    // Handle trailer anim logic introduced in Tiberian Sun.
+    if (Class->Trailer != nullptr) {
+        unsigned spawndelay = bullettypeext->SpawnDelay;
+
+        if (Frame % spawndelay == 0) {
+            new AnimClass(Class->Trailer, Get_Coord(), 1u, 1u, 1536u, 0);
+        }
+    }
+
+    // Only process acceleration every second frame.
+    // The original game does something similar, but it's a bit weird.
+    if (Class->Acceleration > 0 && (Frame & 0x01)) {
+        double speed = Fly.Length_3D();
+        speed += (double)Class->Acceleration;
+
+        if (speed > MaxSpeed) {
+            speed = (double)MaxSpeed;
+        }
+
+        double scalar = speed / Fly.Length_3D();
+        Fly.If_XYZ_0_Set_X_100(); // is there a point to this?
+        Fly.field_88 = Fly.field_88 * scalar;
+        Fly.field_90 = Fly.field_90 * scalar;
+        Fly.field_98 = Fly.field_98 * scalar;
+    }
+
+    /*
+    **	Homing projectiles constantly change facing to face toward the target but
+    **	they only do so every other game frame (improves game speed and makes
+    **	missiles not so deadly).
+    */
+    // if ((Frame & 0x01) && Class->ROT != 0 && Target_Legal(TarCom)) {
+    //     PrimaryFacing.Set_Desired(Direction256(Coord, ::As_Coord(TarCom)));
+    // }
+
+    Coordinate our_coord = Center_Coord();
+    Coordinate target_coord;
+
+    if (TarCom != nullptr)
+    {
+        target_coord = TarCom->Center_Coord();
+    }
+    else
+    {
+        // original TS code
+        // fetch default invalid coords
+        // target_coord = Coordinate(0, 0, 0);
+
+        /**
+         *  #issue-19
+         *
+         *  Let's just continue flying straight instead of assigning invalid coords.
+         */
+        target_coord = Center_Coord() +
+            Coordinate(Fly.field_88, Fly.field_90, Fly.field_98);
+    }
+
+    // Calculate vector from target to us
+    Coordinate distancevector = our_coord - target_coord;
+
+    // This ROT handling is entirely custom. Let's see how it'll work out.
+    // The TS code is hard to make sense of.
+    int x1 = our_coord.X;
+    int x2 = 0;
+    int y1 = our_coord.Y;
+    int y2 = 0;
+
+    if (our_coord.X > target_coord.X) {
+
+    }
+}
+
+
+// Custom replacement for BulletClass::Shape_Number
+int BulletClassFake::_Shape_Number()
+{
+    static const double halfpi = 1.570796326794897;
+    static const double magic = -10430.06004058427;
+    static int facing_to_frame_table[32] = { 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 31, 30, 29 };
+
+    int facing = 0;
+
+    if (!Class->IsFaceless)
+    {
+        // Something in the FP math fails with the synchronous FP mode when X is close to 0, work around it
+        if ((int)Fly.field_88 == 0) {
+           if (Fly.field_90 > 0) {
+                facing = 12;
+           }
+           else
+           {
+               facing = 28;
+           }
+        }
+        else {
+            float atan = FastMath::Atan2(-this->Fly.field_90, this->Fly.field_88); // note inversed Y
+            facing = (int)((atan - halfpi) * magic); // the game's _ftol is not defined in TS++
+            facing = facing_to_frame_table[(((facing >> 10) + 1) >> 1) & 0x1F];
+        }
+    }
+
+    if (Class->AnimLow != 0 || Class->AnimHigh != 0)
+    {
+        facing = AnimFrame;
+    }
+
+    return facing;
+}
+
+
+static void _BulletClass_AI_Custom_Implementation(BulletClass* this_ptr)
+{
+    BulletClassFake* converted = reinterpret_cast<BulletClassFake*>(this_ptr);
+    converted->_BulletClass_AI_Replacement();
+}
+
+
+DECLARE_PATCH(_BulletClass_AI_Intercept)
+{
+    GET_REGISTER_STATIC(BulletClass*, this_ptr, ebp);
+    static BulletTypeClassExtension* bullettypeext;
+
+    bullettypeext = Extension::Fetch<BulletTypeClassExtension>(this_ptr->Class);
+
+    if (bullettypeext->UseCustomProjectileLogic) {
+
+        _BulletClass_AI_Custom_Implementation(this_ptr);
+        // Jump to end of function
+        JMP_REG(ecx, 0x00445B5A); 
+    }
+
+    // Stolen bytes / code
+    _asm { mov  ecx, ebp }
+    CALL(0x00584C10); // ObjectClass::AI
+    JMP_REG(ecx, 0x00444707); // Jump to IsActive check
+}
+
+/**
  *  Main function for patching the hooks.
  */
 void BulletClassExtension_Hooks()
 {
+    // Patch_Jump(0x00444702, &_BulletClass_AI_Intercept);
+
     Patch_Jump(0x00446652, &_BulletClass_Logic_ShakeScreen_Patch);
     Patch_Jump(0x004447BF, &_BulletClass_AI_SpawnDelay_Patch);
     Patch_Jump(0x00444A3E, &_BulletClass_AI_Jump_To_Custom_Function_If_ROT_Over_Zero);
+    Patch_Jump(0x00445B70, &BulletClassFake::_Shape_Number);
 }
