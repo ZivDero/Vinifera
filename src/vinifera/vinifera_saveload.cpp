@@ -467,7 +467,7 @@ bool Vinifera_Get_All(IStream *pStm, bool load_net)
     if (!Vinifera_Load_Header(pStm)) {
         DEBUG_ERROR("\t***** FAILED!\n");
         ShowCursor(TRUE);
-        MessageBoxA(MainWindow, "Failed to load Vinifera save-file header!\n", "Vinifera", MB_OK|MB_ICONEXCLAMATION);
+        MessageBoxA(MainWindow, "Failed to load Vinifera save-file header!\r\n\r\nAre you trying to load a save from an older version of DTA?\r\n\r\nLoading saves from previous versions is not supported.", "Vinifera", MB_OK|MB_ICONEXCLAMATION);
         Vinifera_Generate_Mini_Dump();
         Fatal("Failed to load Vinifera save-file header!\n");
         return false;
