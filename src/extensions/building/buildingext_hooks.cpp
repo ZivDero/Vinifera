@@ -1431,6 +1431,7 @@ Cell Get_Best_Defense_Placement_Position(BuildingClass* building)
         return Find_Best_Building_Placement_Cell(basearea, building, Near_ConYard_Placement_Position_Value);
     }
 
+    // Place some defenses around the center of our base to defend against cheese and flank attacks.
     if (enemy == nullptr || Percent_Chance(30)) {
         return Find_Best_Building_Placement_Cell(basearea, building, Near_Base_Center_Placement_Position_Value);
     }
