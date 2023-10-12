@@ -911,6 +911,216 @@ const BuildingTypeClass* AdvAI_Get_Building_To_Build(HouseClass* house)
 
 
 /**
+ *  Checks if AdvAI should raise money.
+ *  If it should, then raises money.
+ *
+ *  Author: Rampastring
+ */
+void AdvAI_Raise_Money(HouseClass* house)
+{
+    // We should raise money if we are low on funds and have zero refineries.
+
+    if (house->Credits > 100) {
+        return;
+    }
+
+    BuildingType our_refinery = BUILDING_NONE;
+
+    for (int i = 0; i < Rule->BuildRefinery.Count(); i++) {
+        BuildingTypeClass* refinery = Rule->BuildRefinery[i];
+        if (AdvAI_Can_Build_Building(house, refinery, true)) {
+            our_refinery = (BuildingType)refinery->Get_Heap_ID();
+        }
+    }
+
+    if (our_refinery == BUILDING_NONE) {
+        return;
+    }
+
+    int refinery_count = house->ActiveBQuantity.Count_Of(our_refinery);
+
+    if (refinery_count > 0) {
+        return;
+    }
+
+    // Look for buildings to sell.
+    DEBUG_INFO("AdvAI: Attempting to raise money.\n");
+
+    BuildingClass* bestbuilding = nullptr;
+    int bestcost = INT_MIN;
+
+    for (int i = 0; i < Buildings.Count(); i++) {
+        BuildingClass* building = Buildings[i];
+
+        if (!building->IsActive || building->IsInLimbo || building->House != house || building->Class->IsConstructionYard) {
+            continue;
+        }
+
+        if (building->Mission == MISSION_CONSTRUCTION || building->MissionQueue == MISSION_CONSTRUCTION) {
+
+            // Don't sell something that we've just built.
+            continue;
+        }
+
+        if (building->Mission == MISSION_DECONSTRUCTION || building->MissionQueue == MISSION_DECONSTRUCTION) {
+
+            // We are already in the process of selling something.
+            return;
+        }
+
+        // Prefer selling the most expensive stuff first.
+        // Give a lower priority to super-weapon buildings, however.
+        // They'll be expensive to replace later on.
+        int cost = building->Class->Cost;
+        if (building->Class->SuperWeapon != SPECIAL_NONE && building->Class->SuperWeapon2 != SPECIAL_NONE) {
+            cost = cost / 3;
+        }
+
+        if (cost > bestcost) {
+            bestbuilding = building;
+        }
+    }
+
+    // If we found something to sell, then sell it.
+    if (bestbuilding != nullptr) {
+        DEBUG_INFO("AdvAI: Found a building to sell.\n");
+        bestbuilding->Sell_Back(1);
+    }
+}
+
+
+/**
+ *  Perfoms some general economy maintenance.
+ *  Raises money if necessary.
+ *
+ *  Author: Rampastring
+ */
+void AdvAI_Economy_Upkeep(HouseClass* house)
+{
+    AdvAI_Raise_Money(house);
+
+    // Don't sell refineries on Easy mode.
+    if (house->Difficulty == DIFF_HARD) {
+        return;
+    }
+
+    BuildingType our_refinery = BUILDING_NONE;
+
+    for (int i = 0; i < Rule->BuildRefinery.Count(); i++) {
+        BuildingTypeClass* refinery = Rule->BuildRefinery[i];
+        if (AdvAI_Can_Build_Building(house, refinery, true)) {
+            our_refinery = (BuildingType)refinery->Get_Heap_ID();
+        }
+    }
+
+    if (our_refinery == BUILDING_NONE) {
+        return;
+    }
+
+    int refinery_count = house->ActiveBQuantity.Count_Of(our_refinery);
+
+    int harvester_count = 0;
+    for (int i = 0; i < Rule->HarvesterUnit.Count(); i++) {
+        UnitTypeClass* harvtype = Rule->HarvesterUnit[i];
+        harvester_count += house->ActiveUQuantity.Count_Of((UnitType)harvtype->Get_Heap_ID());
+    }
+
+    // Also take free-unit harvs into account.
+    // WARNING: this assumes that free-unit harvs are not listed in HarvesterUnit,
+    // as the situation is in DTA at the time of writing this.
+    UnitTypeClass* freeunit = BuildingTypes[our_refinery]->FreeUnit;
+    harvester_count += house->ActiveUQuantity.Count_Of((UnitType)freeunit->Get_Heap_ID());
+
+    int to_sell_count = refinery_count - harvester_count;
+    if (to_sell_count <= 0) {
+        return;
+    }
+
+    DEBUG_INFO("AdvAI: Looking for a refinery to sell because we have %d excess.\n", to_sell_count);
+
+    // Sell the refinery that is closest to our primary enemy.
+    // If we have extra refineries, we have lost harvesters, and harvesters are most likely
+    // lost near the expansion that is closest to our primary enemy.
+    // If we have no primary enemy, then sell one near our base center.
+    // It probably won't go horribly wrong anyway.
+
+    HouseClass* enemy = nullptr;
+    if (house->Enemy != HOUSE_NONE) {
+        enemy = HouseClass::As_Pointer(house->Enemy);
+    }
+
+    Cell centerpoint;
+
+    if (enemy != nullptr) {
+        centerpoint = enemy->Base_Center();
+    }
+    else {
+        centerpoint = house->Base_Center();
+    }
+
+    BuildingClass* farthest_refinery = nullptr;
+    int closest_distance = INT_MAX;
+
+    for (int i = 0; i < Buildings.Count(); i++) {
+        BuildingClass* building = Buildings[i];
+
+        if (!building->IsActive || building->IsInLimbo || building->House != house || !building->Class->IsRefinery) {
+            continue;
+        }
+
+        if (building->Mission == MISSION_CONSTRUCTION || building->MissionQueue == MISSION_CONSTRUCTION) {
+            // If a refinery is in process of being constructed, it hasn't got the spawn its FreeUnit
+            // harvester yet.
+            DEBUG_INFO("AdvAI: We have a refinery in construction phase, skip.\n");
+            return;
+        }
+
+        if (building->Mission == MISSION_DECONSTRUCTION || building->MissionQueue == MISSION_DECONSTRUCTION) {
+            
+            // We are already in the process of selling a refinery, don't sell more
+            // until it's finished.
+            DEBUG_INFO("AdvAI: We are already selling a refinery, skip.\n");
+            return;
+        }
+
+        int distance = ::Distance(centerpoint, Coord_Cell(building->Center_Coord()));
+        if (distance < closest_distance) {
+            closest_distance = distance;
+            farthest_refinery = building;
+        }
+    }
+
+    if (farthest_refinery != nullptr) {
+        DEBUG_INFO("AdvAI: Found a Refinery to sell.\n");
+        farthest_refinery->Sell_Back(1);
+    }
+}
+
+
+/**
+ *  Checks for sleeping harvesters. If found, puts them to Harvest mode.
+ *
+ *  Author: Rampastring
+ */
+void AdvAI_Awaken_Sleeping_Harvesters(HouseClass* house)
+{
+    for (int i = 0; i < Units.Count(); i++) {
+        UnitClass* unit = Units[i];
+
+        if (!unit->IsActive || unit->IsInLimbo || unit->House != house || !unit->Class->IsToHarvest) {
+            continue;
+        }
+
+        if (unit->Mission == MISSION_SLEEP || unit->Mission == MISSION_GUARD) {
+            DEBUG_INFO("AdvAI: Waking up a sleeping harvester.\n");
+            unit->Assign_Mission(MISSION_HARVEST);
+            unit->Commence();
+        }
+    }
+}
+
+
+/**
  *  Sells extra construction yards of the specific house until there is one one left.
  *
  *  Author: Rampastring
@@ -936,6 +1146,11 @@ void AdvAI_Sell_Extra_ConYards(HouseClass* house)
 
         if (building->Mission == MISSION_DECONSTRUCTION || building->MissionQueue == MISSION_DECONSTRUCTION) {
             sold_count++;
+
+            if (sold_count >= to_sell_count) {
+                break;
+            }
+
             continue;
         }
 
@@ -958,17 +1173,33 @@ void AdvAI_Sell_Extra_ConYards(HouseClass* house)
  */
 int Vinifera_HouseClass_AI_Building(HouseClass* this_ptr)
 {
-    if (this_ptr->BuildStructure != BUILDING_NONE) return TICKS_PER_SECOND;
-
-    if (this_ptr->ConstructionYards.Count() <= 0) return TICKS_PER_SECOND;
+    // First, do some basic maintenance.
 
     // If we have more than 1 ConYard without Rules allowing it, sell some of them off
     // to avoid the "Extreme AI" syndrome.
+    // This would be better done on a higher level (not within building selection),
+    // but for the easiness of hacking, we currently have it here.
     if (this_ptr->ConstructionYards.Count() > 1 && !RuleExtension->IsAdvancedAIMultiConYard) {
         AdvAI_Sell_Extra_ConYards(this_ptr);
     }
 
-    HouseClassExtension *houseext = Extension::Fetch<HouseClassExtension>(this_ptr);
+    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(this_ptr);
+
+    if (Frame > houseext->LastExcessRefineryCheckFrame + 500) {
+        houseext->LastExcessRefineryCheckFrame = Frame;
+        AdvAI_Economy_Upkeep(this_ptr);
+    }
+
+    if (Frame > houseext->LastSleepingHarvesterCheckFrame + 1000) {
+        houseext->LastSleepingHarvesterCheckFrame = Frame;
+        AdvAI_Awaken_Sleeping_Harvesters(this_ptr);
+    }
+
+    // Next, we decide what to build.
+    // If we already have something to build, do nothing.
+    if (this_ptr->BuildStructure != BUILDING_NONE) return TICKS_PER_SECOND;
+
+    if (this_ptr->ConstructionYards.Count() <= 0) return TICKS_PER_SECOND;
 
     if (RuleExtension->IsUseAdvancedAI) {
 
@@ -986,7 +1217,11 @@ int Vinifera_HouseClass_AI_Building(HouseClass* this_ptr)
         DEBUG_INFO("AI %d selected building %s to build. Frame: %d\n", this_ptr->Get_Heap_ID(), tobuild->IniName, Frame);
 
         this_ptr->BuildStructure = (BuildingType)(tobuild->Get_Heap_ID());
-        return TICKS_PER_SECOND * 5; // Limit it a bit for better performance and fairness
+
+        // Limit the tick rate a bit for better performance and fairness.
+        // Also, add some randomization to reduce the "all AIs place buildings at the same time"
+        // effect, avoiding a lag spike.
+        return TICKS_PER_SECOND * 5 + Random_Pick(0, 3);
 
     } else {
         BaseNodeClass* node = this_ptr->Base.Next_Buildable();

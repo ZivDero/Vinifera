@@ -90,4 +90,14 @@ HouseClassExtension final : public AbstractClassExtension
          *  timer when it has built a barracks.
          */
         bool HasBuiltFirstBarracks;
+
+        /**
+         *  Records when the AI last checked for excess refineries.
+         */
+        int LastExcessRefineryCheckFrame;
+
+        /**
+         *  Records when the AI last checked for sleeping harvesters.
+         */
+        int LastSleepingHarvesterCheckFrame;
 };
