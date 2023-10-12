@@ -29,6 +29,17 @@
 #include "vinifera_globals.h"
 #include "tibsun_globals.h"
 #include "tibsun_functions.h"
+#include "anim.h"
+#include "animtype.h"
+#include "infantry.h"
+#include "unit.h"
+#include "aircraft.h"
+#include "building.h"
+#include "particle.h"
+#include "mouse.h"
+#include "map.h"
+#include "layer.h"
+#include "logic.h"
 #include "iomap.h"
 #include "tactical.h"
 #include "house.h"
@@ -176,6 +187,109 @@ static bool Main_Loop_Intercept()
 }
 
 /**
+ *  Customized game CRC compute function.
+ */
+void _DTA_Compute_Game_CRC(void)
+{
+    GameCRC = 0;
+    
+    for (int i = 0; i < Infantry.Count(); i++) {
+        InfantryClass* infp = Infantry[i];
+        Coordinate coord = infp->Get_Coord();
+    
+        Add_CRC(&GameCRC, coord.X);
+        Add_CRC(&GameCRC, coord.Y);
+        Add_CRC(&GameCRC, (unsigned long)(infp->PrimaryFacing.Current().Get_Raw()));
+    }
+    
+    for (int i = 0; i < Units.Count(); i++) {
+        UnitClass* unit = Units[i];
+        Coordinate coord = unit->Get_Coord();
+    
+        Add_CRC(&GameCRC, coord.X);
+        Add_CRC(&GameCRC, coord.Y);
+        Add_CRC(&GameCRC, (unsigned long)(unit->PrimaryFacing.Current().Get_Raw()));
+        Add_CRC(&GameCRC, (unsigned long)(unit->SecondaryFacing.Current().Get_Raw()));
+    }
+    
+    for (int i = 0; i < Buildings.Count(); i++) {
+        BuildingClass* building = Buildings[i];
+    
+        Coordinate coord = building->Get_Coord();
+    
+        Add_CRC(&GameCRC, coord.X);
+        Add_CRC(&GameCRC, coord.Y);
+        Add_CRC(&GameCRC, (unsigned long)(building->PrimaryFacing.Current().Get_Raw()));
+    }
+    
+    for (int i = 0; i < Aircrafts.Count(); i++) {
+        AircraftClass* aircraft = Aircrafts[i];
+    
+        Coordinate coord = aircraft->Get_Coord();
+    
+        Add_CRC(&GameCRC, coord.X);
+        Add_CRC(&GameCRC, coord.Y);
+        Add_CRC(&GameCRC, (unsigned long)(aircraft->PrimaryFacing.Current().Get_Raw()));
+    }
+    
+    //------------------------------------------------------------------------
+    //	Map Layers
+    //------------------------------------------------------------------------
+    for (int i = 0; i < LAYER_COUNT; i++) {
+        for (int j = 0; j < Map.Layer[i].Count(); j++) {
+            ObjectClass* objp = Map.Layer[i][j];
+    
+            if (objp->What_Am_I() == RTTI_ANIM) {
+                AnimClass* anim = reinterpret_cast<AnimClass*>(objp);
+
+                // If ID = -2, it's a player-specific animation (such as a mouse click effect)
+                if (anim->Fetch_ID() == -2)
+                    continue;
+            }
+
+            Add_CRC(&GameCRC, (int)objp->What_Am_I());
+
+            if (objp->What_Am_I() == RTTI_ANIM || objp->What_Am_I() == RTTI_PARTICLE) {
+                // Work-around: don't desync due to different anim or particle coords
+                continue;
+            }
+    
+            Coordinate coord = objp->Get_Coord();
+            Add_CRC(&GameCRC, coord.X);
+            Add_CRC(&GameCRC, coord.Y);
+        }
+    }
+
+    //------------------------------------------------------------------------
+    //	Logic Layer
+    //------------------------------------------------------------------------
+    for (int i = 0; i < Logic.Count(); i++) {
+        ObjectClass* objp = Logic[i];
+
+        if (objp->What_Am_I() == RTTI_ANIM) {
+            AnimClass* anim = reinterpret_cast<AnimClass*>(objp);
+
+            // If ID = -2, it's a player-specific animation (such as a mouse click effect)
+            if (anim->Fetch_ID() == -2)
+                continue;
+        }
+
+        Add_CRC(&GameCRC, (int)objp->What_Am_I());
+
+        if (objp->What_Am_I() == RTTI_ANIM || objp->What_Am_I() == RTTI_PARTICLE) {
+            // Work-around: don't desync due to different anim or particle coords
+            continue;
+        }
+
+        Coordinate coord = objp->Get_Coord();
+        Add_CRC(&GameCRC, coord.X);
+        Add_CRC(&GameCRC, coord.Y);
+    }
+
+    Add_CRC(&GameCRC, Scen->RandomNumber());
+}
+
+/**
  *  Main function for patching the hooks.
  */
 void MainLoop_Hooks()
@@ -184,4 +298,5 @@ void MainLoop_Hooks()
     Patch_Call(0x00462A9C, &Main_Loop_Intercept);
     Patch_Call(0x005A0B85, &Main_Loop_Intercept);
     Patch_Jump(0x005B10F0, &_Queue_Options_Frame_Step_Check_Patch);
+    Patch_Jump(0x005B5550, &_DTA_Compute_Game_CRC);
 }
