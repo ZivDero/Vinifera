@@ -986,16 +986,18 @@ int inline Modify_Rating_By_Terrain_Passability(Cell cell, BuildingClass* buildi
     bool passable_above = true;
     bool passable_below = true;
 
+    SpeedType speed = building->Class->Speed == SPEED_FLOAT ? SPEED_FLOAT : SPEED_FOOT;
+
     if (Map.In_Radar(cell_above_coords)) {
         CellClass& cell_above = Map[cell_above_coords];
-        if (!cell_above.Is_Clear_To_Move(SPEED_FOOT, true, true)) {
+        if (!cell_above.Is_Clear_To_Move(speed, true, true)) {
             passable_above = false;
         }
     }
 
     if (Map.In_Radar(cell_below_coords)) {
         CellClass& cell_below = Map[cell_below_coords];
-        if (!cell_below.Is_Clear_To_Move(SPEED_FOOT, true, true)) {
+        if (!cell_below.Is_Clear_To_Move(speed, true, true)) {
             passable_below = false;
         }
     }
@@ -1014,14 +1016,14 @@ int inline Modify_Rating_By_Terrain_Passability(Cell cell, BuildingClass* buildi
 
     if (Map.In_Radar(cell_east_coords)) {
         CellClass& cell_above = Map[cell_east_coords];
-        if (!cell_above.Is_Clear_To_Move(SPEED_FOOT, true, true)) {
+        if (!cell_above.Is_Clear_To_Move(speed, true, true)) {
             passable_east = false;
         }
     }
 
     if (Map.In_Radar(cell_west_coords)) {
         CellClass& cell_below = Map[cell_west_coords];
-        if (!cell_below.Is_Clear_To_Move(SPEED_FOOT, true, true)) {
+        if (!cell_below.Is_Clear_To_Move(speed, true, true)) {
             passable_west = false;
         }
     }
@@ -1343,6 +1345,24 @@ int Barracks_Placement_Cell_Value(Cell cell, BuildingClass* building)
     // Maybe a static list of barracks so we could only fetch it once?
 }
 
+int NavalYard_Placement_Cell_Value(Cell cell, BuildingClass* building)
+{
+    HouseClass* owner = building->House;
+    HouseClass* enemy = nullptr;
+
+    if (owner->Enemy != HOUSE_NONE) {
+        enemy = HouseClass::As_Pointer(owner->Enemy);
+    }
+
+    // If we have no enemy, then just place it away from the base center.
+    if (enemy == nullptr) {
+        Cell center = owner->Base_Center();
+        return SHRT_MAX - ::Distance(cell, center);
+    }
+
+    return SHRT_MAX - ::Distance(cell, enemy->Base_Center());
+}
+
 int WarFactory_Placement_Cell_Value(Cell cell, BuildingClass* building)
 {
     // War factories are typically valuable.
@@ -1363,17 +1383,33 @@ int Helipad_Placement_Cell_Value(Cell cell, BuildingClass* building)
  */
 Cell Get_Best_Factory_Placement_Position(BuildingClass* building) 
 {
+    bool isnaval = building->Class->ToBuild == RTTI_UNITTYPE && building->Class->Speed == SPEED_FLOAT;
+
     int adjacency = building->Class->Adjacent + 1;
+
     Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
 
     if (building->Class->ToBuild == RTTI_INFANTRYTYPE)
+    {
         return Find_Best_Building_Placement_Cell(basearea, building, Barracks_Placement_Cell_Value);
-    else if (building->Class->ToBuild == RTTI_UNITTYPE)
+    }
+    else if (building->Class->ToBuild == RTTI_UNITTYPE) 
+    {
+        if (isnaval)
+        {
+            return Find_Best_Building_Placement_Cell(basearea, building, NavalYard_Placement_Cell_Value);
+        }
+
         return Find_Best_Building_Placement_Cell(basearea, building, WarFactory_Placement_Cell_Value);
+    }
     else if (building->Class->ToBuild == RTTI_AIRCRAFTTYPE)
+    {
         return Find_Best_Building_Placement_Cell(basearea, building, Helipad_Placement_Cell_Value);
+    }
     else
+    {
         return Find_Best_Building_Placement_Cell(basearea, building, Near_Base_Center_Placement_Position_Value);
+    }
 }
 
 static Cell attackcell;
