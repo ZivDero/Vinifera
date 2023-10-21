@@ -1242,6 +1242,57 @@ int HouseClassFake::_AI_Building_Replacement()
 
 
 /**
+ *  Fixes an edge case bug where HouseClass::AI_Raise_Money can corrupt
+ *  the house's Base Node vector by writing to the vector at index -1.
+ *
+ *  Author: Rampastring
+ */
+DECLARE_PATCH(_HouseClass_AI_Raise_Money_Fix_Memory_Corruption)
+{
+    GET_REGISTER_STATIC(HouseClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(BuildingType, buildingtype, eax);
+    static int buildable_index;
+
+    buildable_index = this_ptr->Base.Next_Buildable_Index(buildingtype);
+
+    // Stolen bytes / code. Do not insert element to Base Nodes vector
+    // if buildable index is 0.
+    if (buildable_index == 0) {
+        JMP(0x004C10BC);
+    }
+
+    // Bugfix: also do not insert element if buildable index is -1. (or below 0)
+    if (buildable_index < 0) {
+        JMP(0x004C10BC);
+    }
+
+    // Apply node index variable and also save it in eax,
+    // original game code expects this
+    _asm { mov eax, dword ptr buildable_index }
+    _asm { mov [esp+28], eax }
+    JMP_REG(ecx, 0x004C0F9F);
+}
+
+
+#if 0
+/**
+ *  The first base node can sometimes get corrupted for an unknown reason.
+ *  Check for it and fix it if it's the case.
+ */
+void _HouseClass_AI_Building_Check_For_Corrupted_Base_Node(HouseClass* house)
+{
+    if (house->Base.Nodes.Count() > 0) {
+        BuildingType type = house->Base.Nodes[0].Type;
+        if (type < BUILDING_FIRST || type >= BuildingTypes.Count()) {
+            DEBUG_ERROR("Corrupted base node detected for house %d, fixing it. Frame: %d\n", house->ID, Frame);
+            house->Base.Nodes[0].Type = BUILDING_NONE;
+            house->Base.Nodes[0].Where = Cell(0, 0);
+        }
+    }
+}
+#endif
+
+/**
  *  Entry point for DTA's custom AI building selection logic.
  *
  *  Author: Rampastring
@@ -1342,5 +1393,6 @@ void HouseClassExtension_Hooks()
     // Patch_Jump(0x004C10E0, &HouseClassFake::_AI_Building_Replacement);
     Patch_Jump(0x004C10F2, &_HouseClass_AI_Building_Intercept);
     Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
+    Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
 }
