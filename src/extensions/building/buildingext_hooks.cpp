@@ -1571,6 +1571,39 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Seek_Building_Position)
 
 
 /**
+ *  Prevents ships from "exiting" a weapons factory.
+ */
+DECLARE_PATCH(_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory)
+{
+    GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
+    static BuildingTypeClass* buildingtype;
+
+    /**
+     *  This patch is in a part of the target function where we know that the object is FootClass instead of TechnoClass.
+     */
+    GET_REGISTER_STATIC(TechnoClass*, techno, edi);
+
+    if (this_ptr->Class->IsWeaponsFactory && techno->Techno_Type_Class()->Speed == SPEED_FLOAT) {
+
+        /**
+         *  We are a war factory with a production anim and a ship is trying to exit us.
+         *  No continuing beyond this part. Exit the function and return -2 (refund).
+         */
+
+        JMP(0x0042D77E);
+    }
+
+    /**
+     *  Stolen bytes / code.
+     *  Continue object exit process as usual.
+     */
+    buildingtype = this_ptr->Class;
+    _asm { mov eax, dword ptr buildingtype }
+    JMP_REG(ecx, 0x0042C9DF);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void BuildingClassExtension_Hooks()
@@ -1595,4 +1628,5 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0043266C, &_BuildingClass_Mission_Repair_ReloadRate_Patch);
     Patch_Jump(0x0042B6CC, &_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch);
     Patch_Jump(0x0042D3B8, &_BuildingClass_Exit_Object_Seek_Building_Position);
+    Patch_Jump(0x0042C9D9, &_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory);
 }
