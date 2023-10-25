@@ -35,8 +35,9 @@
 #include "houseext.h"
 #include "houseext.h"
 #include "building.h"
-#include "buildingtype.h"
 #include "buildingext.h"
+#include "buildingtype.h"
+#include "buildingtypeext.h"
 #include "unit.h"
 #include "infantry.h"
 #include "technotype.h"
@@ -519,8 +520,9 @@ bool AdvAI_Can_Build_Building(HouseClass* house, BuildingTypeClass* buildingtype
         return false;
     }
 
+    BuildingTypeClassExtension* buildingtypeext = Extension::Fetch<BuildingTypeClassExtension>(buildingtype);
 
-    if (check_prereqs) {
+    if (check_prereqs && !buildingtypeext->IsAdvancedAIIgnoresPrerequisites) {
         for (int i = 0; i < buildingtype->Prerequisite.Count(); i++) {
             int buildingtypeid = buildingtype->Prerequisite[i];
             

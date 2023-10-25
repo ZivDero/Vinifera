@@ -106,4 +106,9 @@ BuildingTypeClassExtension final : public TechnoTypeClassExtension
          *  Is this building eligible for proximity checks by players who are its owner's allies?
          */
         bool IsEligibleForAllyBuilding;
+
+        /**
+         *  Should the Advanced AI ignore prerequisites when considering whether it can build this building?
+         */
+        bool IsAdvancedAIIgnoresPrerequisites;
 };
