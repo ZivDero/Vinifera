@@ -85,7 +85,8 @@ RulesClassExtension::RulesClassExtension(const RulesClass *this_ptr) :
     IsStrengtheningEnabled(false),
     IsUseAdvancedAI(false),
     IsAdvancedAIMultiConYard(false),
-    AdvancedAIMaxExpansionDistance(150)
+    AdvancedAIMaxExpansionDistance(150),
+    AdvancedAIMinimumRefineryCount(2)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("RulesClassExtension::RulesClassExtension - 0x%08X\n", (uintptr_t)(ThisPtr));
 
@@ -435,6 +436,7 @@ bool RulesClassExtension::AI(CCINIClass &ini)
     IsUseAdvancedAI = ini.Get_Bool(AI, "UseAdvancedAI", IsUseAdvancedAI);
     IsAdvancedAIMultiConYard = ini.Get_Bool(AI, "AdvancedAIMultiConYard", IsAdvancedAIMultiConYard);
     AdvancedAIMaxExpansionDistance = ini.Get_Int(AI, "AdvancedAIMaxExpansionDistance", AdvancedAIMaxExpansionDistance);
+    AdvancedAIMinimumRefineryCount = ini.Get_Int(AI, "AdvancedAIMinimumRefineryCount", AdvancedAIMinimumRefineryCount);
 
     return true;
 }

@@ -142,4 +142,9 @@ class RulesClassExtension final : public GlobalExtensionClass<RulesClass>
          *  Specifies the maximum distance that the advanced AI is allowed to expand at.
          */
         int AdvancedAIMaxExpansionDistance;
+
+        /**
+         *  Specifies the minimum number of refineries that the Advanced AI thinks it should build.
+         */
+        int AdvancedAIMinimumRefineryCount;
 };
