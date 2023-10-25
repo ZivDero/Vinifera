@@ -46,6 +46,7 @@
 #include "superext.h"
 #include "supertype.h"
 #include "supertypeext.h"
+#include "optionsext.h"
 #include "rules.h"
 #include "rulesext.h"
 #include "uicontrol.h"
@@ -544,10 +545,24 @@ void TacticalExtension::Draw_Message(int index, const char *text, ColorSchemeTyp
     int font_width = _font->Get_Font_Width();
     int font_height = _font->Get_Font_Height();
 
-    int base_y_pos = TacticalRect.Y + TacticalRect.Height - 150;
+    int base_y_pos = TacticalRect.Y;
+    int base_x_pos = 0;
+
+    if (!OptionsExtension->IsClassicMessagePosition)
+    {
+        base_y_pos += TacticalRect.Height - 150;
+        base_x_pos = UIControls->MessageListPositionX;
+    }
+    else
+    {
+        if (Session.Messages.IsEdit)
+        {
+            base_y_pos += (font_height + 2);
+        }
+    }
+
     int y_pos = base_y_pos + (index * (font_height + 2));
 
-    int base_x_pos = UIControls->MessageListPositionX;
     int margin = 2;
 
     Point2D text_draw_point;
@@ -576,6 +591,10 @@ void TacticalExtension::Draw_Messages()
         Draw_Message(i, msg->Text, msg->Color);
         msg = (TextLabelClass*)msg->Get_Next();
         i++;
+    }
+
+    if (Session.Messages.IsEdit) {
+        Draw_Message(-1, Session.Messages.EditLabel->Text, Session.Messages.EditLabel->Color);
     }
 }
 
