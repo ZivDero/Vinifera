@@ -699,7 +699,7 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
     // If we have too few refineries, build enough to match the minimum.
     // Because this is not for expanding but an emergency situation,
     // cancel any potential expanding.
-    if (house->ActiveBQuantity.Count_Of(our_refinery) < RuleExtension->AdvancedAIMinimumRefineryCount) {
+    if (our_refinery != BUILDING_NONE && house->ActiveBQuantity.Count_Of(our_refinery) < RuleExtension->AdvancedAIMinimumRefineryCount) {
         houseext->NextExpansionPointLocation = Cell(0, 0);
         DEBUG_INFO("AdvAI: Making AI build %s because it only has too few refineries\n", BuildingTypes[our_refinery]->IniName);
         return BuildingTypes[our_refinery];
