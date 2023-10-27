@@ -151,4 +151,9 @@ class TechnoTypeClassExtension : public ObjectTypeClassExtension
          *  Pointer to the cameo image surface.
          */
         BSurface *CameoImageSurface;
+
+        /**
+         *  Optional override for the cost that is used for determining the techno's build time.
+         */
+        int BuildTimeCost;
 };

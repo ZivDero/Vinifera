@@ -37,6 +37,21 @@
 #include "hooker_macros.h"
 
 
+ /**
+  *  A fake class for implementing new member functions which allow
+  *  access to the "this" pointer of the intended class.
+  *
+  *  @note: This must not contain a constructor or deconstructor!
+  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
+  */
+static class BuildingTypeClassFake final : public BuildingTypeClass
+{
+public:
+    int _Raw_Cost();
+    int _Cost_Of(HouseClass* house);
+};
+
+
 /**
  *  Patches in an assertion check for image data.
  * 
@@ -59,6 +74,29 @@ DECLARE_PATCH(_BuildingTypeClass_Get_Image_Data_Assertion_Patch)
 
 
 /**
+ *  Disables weird Westwood logic that links a BuildingType's cost to the cost
+ *  of its FreeUnit or pad aircraft.
+ * 
+ *  Author: Rampastring
+ */
+int BuildingTypeClassFake::_Raw_Cost()
+{
+    return TechnoTypeClass::Raw_Cost();
+}
+
+
+/**
+ *  Disables weird Westwood logic that links a BuildingType's cost to the cost
+ *  of its FreeUnit or pad aircraft.
+ *
+ *  Author: Rampastring
+ */
+int BuildingTypeClassFake::_Cost_Of(HouseClass* house)
+{
+    return TechnoTypeClass::Cost_Of(house);
+}
+
+/**
  *  Main function for patching the hooks.
  */
 void BuildingTypeClassExtension_Hooks()
@@ -69,4 +107,7 @@ void BuildingTypeClassExtension_Hooks()
     BuildingTypeClassExtension_Init();
 
     //Patch_Jump(0x00440365, &_BuildingTypeClass_Get_Image_Data_Assertion_Patch);
+
+    Patch_Jump(0x00440000, &BuildingTypeClassFake::_Raw_Cost);
+    Patch_Jump(0x00440080, &BuildingTypeClassFake::_Cost_Of);
 }
