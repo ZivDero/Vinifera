@@ -27,13 +27,32 @@
  ******************************************************************************/
 #include "technotypeext_hooks.h"
 #include "technotypeext.h"
+#include "objecttypeext.h"
 #include "technotype.h"
+#include "house.h"
+#include "rules.h"
+#include "tibsun_defines.h"
+#include "extension.h"
 #include "fatal.h"
 #include "debughandler.h"
 #include "asserthandler.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
+
+
+ /**
+  *  A fake class for implementing new member functions which allow
+  *  access to the "this" pointer of the intended class.
+  *
+  *  @note: This must not contain a constructor or deconstructor!
+  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
+  */
+static class TechnoTypeClassFake final : public TechnoTypeClass
+{
+public:
+    int _Time_To_Build();
+};
 
 
 /**
@@ -62,9 +81,35 @@ DECLARE_PATCH(_TechnoTypeClass_In_Range_Disable_Arcing_Bonus_Range_Patch)
 
 
 /**
+ *  Allows overriding the cost value that is used for calculating the build time of a TechnoType.
+ *
+ *  Author: Rampastring
+ */
+int TechnoTypeClassFake::_Time_To_Build()
+{
+    // TechnoClass::Time_To_Build calls this, so we only need to hook this function
+
+    TechnoTypeClassExtension* technotypeext = Extension::Fetch<TechnoTypeClassExtension>(this);
+
+    int cost;
+
+    if (technotypeext->BuildTimeCost != 0)
+    {
+        cost = technotypeext->BuildTimeCost;
+    }
+    else
+    {
+        cost = Cost;
+    }
+
+    return (int)(cost * Rule->BuildSpeedBias * 0.9);
+}
+
+/**
  *  Main function for patching the hooks.
  */
 void TechnoTypeClassExtension_Hooks()
 {
     Patch_Jump(0x0063D5A7, &_TechnoTypeClass_In_Range_Disable_Arcing_Bonus_Range_Patch);
+    Patch_Jump(0x0063B8B0, &TechnoTypeClassFake::_Time_To_Build);
 }

@@ -49,6 +49,8 @@ class BuildingTypeClassExt final : public BuildingTypeClass
 {
     public:
         void _Free_Buildup_Image();
+        int _Raw_Cost();
+        int _Cost_Of(HouseClass* house);
 };
 
 
@@ -186,6 +188,29 @@ DECLARE_PATCH(_BuildingTypeClass_Get_Image_Data_Assertion_Patch)
 
 
 /**
+ *  Disables weird Westwood logic that links a BuildingType's cost to the cost
+ *  of its FreeUnit or pad aircraft.
+ * 
+ *  Author: Rampastring
+ */
+int BuildingTypeClassFake::_Raw_Cost()
+{
+    return TechnoTypeClass::Raw_Cost();
+}
+
+
+/**
+ *  Disables weird Westwood logic that links a BuildingType's cost to the cost
+ *  of its FreeUnit or pad aircraft.
+ *
+ *  Author: Rampastring
+ */
+int BuildingTypeClassFake::_Cost_Of(HouseClass* house)
+{
+    return TechnoTypeClass::Cost_Of(house);
+}
+
+/**
  *  Main function for patching the hooks.
  */
 void BuildingTypeClassExtension_Hooks()
@@ -205,4 +230,6 @@ void BuildingTypeClassExtension_Hooks()
     Patch_Jump(0x00444052, &_BuildingTypeClass_SDDTOR_Free_Buildup_Image_Patch);
     Patch_Jump(0x0043FDB0, &_BuildingTypeClass_Init_Free_Buildup_Image_Patch);
     Patch_Jump(0x0043F936, &_BuildingTypeClass_DTOR_Free_Buildup_Image_Patch);
+    Patch_Jump(0x00440000, &BuildingTypeClassFake::_Raw_Cost);
+    Patch_Jump(0x00440080, &BuildingTypeClassFake::_Cost_Of);
 }
