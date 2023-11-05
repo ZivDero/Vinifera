@@ -1139,10 +1139,10 @@ void AdvAI_Sell_Extra_ConYards(HouseClass* house)
 
     int sold_count = 0;
 
-    for (int i = 0; i < Buildings.Count(); i++) {
-        BuildingClass* building = Buildings[i];
+    for (int i = house->ConstructionYards.Count() - 1; i > 0; i--) {
+        BuildingClass* building = house->ConstructionYards[i];
 
-        if (!building->IsActive || building->IsInLimbo || building->House != house || !building->Class->IsConstructionYard) {
+        if (!building->IsActive || building->IsInLimbo) {
             continue;
         }
 
