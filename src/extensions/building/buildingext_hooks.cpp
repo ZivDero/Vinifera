@@ -730,6 +730,60 @@ past_flame_spawn:
 }
 
 
+HouseClass* Find_Closest_Opponent(HouseClass* house)
+{
+    int nearestdistance = INT_MAX;
+    HouseClass* nearesthouse = nullptr;
+
+    for (int i = 0; i < Houses.Count(); i++) {
+        HouseClass* other = Houses[i];
+
+        if (other == house) {
+            continue;
+        }
+
+        if (other->Class->IsMultiplayPassive) {
+            continue;
+        }
+
+        if (house->Is_Ally(other)) {
+            continue;
+        }
+
+        int distance = ::Distance(house->Base_Center(), other->Base_Center());
+
+        if (distance < nearestdistance) {
+            nearestdistance = distance;
+            nearesthouse = other;
+        }
+    }
+
+    return nearesthouse;
+}
+
+
+int Get_Distance_To_Primary_Enemy(Cell cell, HouseClass* house)
+{
+    HouseClass* enemy = nullptr;
+
+    if (house->Enemy != HOUSE_NONE) {
+        enemy = HouseClass::As_Pointer(house->Enemy);
+    }
+
+    if (enemy == nullptr) {
+        enemy = Find_Closest_Opponent(house);
+    }
+
+    int enemydistance = 0;
+
+    if (enemy != nullptr) {
+        enemydistance = ::Distance(cell, enemy->Base_Center());
+    }
+
+    return enemydistance;
+}
+
+
 /**
  *  Stores a record of buildings owned by the house
  *  that is currently placing down a building.
@@ -779,7 +833,8 @@ int Try_Place(BuildingClass* building, Cell cell)
 
         // If we just placed down our first barracks, then set our team timer to 0
         // so we can immediately start producing infantry.
-        if (owner->Difficulty < DIFF_EASY &&
+        // Do not do this on Easy mode to avoid overwhelming the player.
+        if (owner->Difficulty < DIFF_HARD &&
             !ext->HasBuiltFirstBarracks &&
             building->Class->ToBuild == RTTI_INFANTRYTYPE)
         {
@@ -1165,6 +1220,14 @@ int Near_Base_Center_Placement_Position_Value(Cell cell, BuildingClass* building
     return Modify_Rating_By_Allied_Building_Proximity(cell, building, ::Distance(cell, center));
 }
 
+int Near_Base_Center_Defense_Placement_Position_Value(Cell cell, BuildingClass* building)
+{
+    HouseClass* owner = building->House;
+    Cell center = owner->Base_Center();
+    int enemydistance = Get_Distance_To_Primary_Enemy(cell, building->House);
+    return Modify_Rating_By_Allied_Building_Proximity(cell, building, ::Distance(cell, center) * 100 + enemydistance);
+}
+
 int Near_Enemy_Placement_Position_Value(Cell cell, BuildingClass* building)
 {
     HouseClass* owner = building->House;
@@ -1186,11 +1249,39 @@ int Near_Enemy_Placement_Position_Value(Cell cell, BuildingClass* building)
     return Modify_Rating_By_Allied_Building_Proximity(cell, building, ::Distance(cell, enemy->Base_Center()));
 }
 
+
+int Near_Refinery_Placement_Position_Value(Cell cell, BuildingClass* building)
+{
+    BuildingClass* refinery = nullptr;
+    for (int i = 0; i < our_building_count; i++) {
+        if (our_buildings[i]->Class->IsRefinery) {
+            refinery = our_buildings[i];
+            break;
+        }
+    }
+
+    Cell refinerycell = Cell(0, 0);
+    if (refinery != nullptr) {
+        refinerycell = Coord_Cell(refinery->Center_Coord());
+    } else {
+        // Fallback
+        Point2D mapcenter = Map.MapLocalSize.Center_Point();
+        Cell mapcenter_cell = Cell(mapcenter.X, mapcenter.Y);
+        refinerycell = mapcenter_cell;
+    }
+
+    // Secondarily, consider distance to primary enemy.
+    HouseClass* owner = building->House;
+    int enemydistance = Get_Distance_To_Primary_Enemy(cell, owner);
+
+    return Modify_Rating_By_Allied_Building_Proximity(cell, building, ::Distance(cell, refinerycell) * 100 + enemydistance);
+}
+
 int Near_ConYard_Placement_Position_Value(Cell cell, BuildingClass* building)
 {
     Cell conyardcell = Cell(0, 0);
     if (building->House->ConstructionYards.Count() > 0) {
-        conyardcell = building->House->ConstructionYards[0]->Get_Cell();
+        conyardcell = Coord_Cell(building->House->ConstructionYards[0]->Center_Coord());
     } else {
         // Fallback
         Point2D mapcenter = Map.MapLocalSize.Center_Point();
@@ -1198,7 +1289,11 @@ int Near_ConYard_Placement_Position_Value(Cell cell, BuildingClass* building)
         conyardcell = mapcenter_cell;
     }
 
-    return Modify_Rating_By_Allied_Building_Proximity(cell, building, SHRT_MAX - ::Distance(cell, conyardcell));
+    // Secondarily, consider distance to primary enemy.
+    HouseClass* owner = building->House;
+    int enemydistance = Get_Distance_To_Primary_Enemy(cell, owner);
+
+    return Modify_Rating_By_Allied_Building_Proximity(cell, building, ::Distance(cell, conyardcell) * 100 + enemydistance);
 }
 
 int Far_From_Enemy_Placement_Position_Value(Cell cell, BuildingClass* building)
@@ -1356,8 +1451,8 @@ int NavalYard_Placement_Cell_Value(Cell cell, BuildingClass* building)
 
     // If we have no enemy, then just place it away from the base center.
     if (enemy == nullptr) {
-        Cell center = owner->Base_Center();
-        return SHRT_MAX - ::Distance(cell, center);
+Cell center = owner->Base_Center();
+return SHRT_MAX - ::Distance(cell, center);
     }
 
     return SHRT_MAX - ::Distance(cell, enemy->Base_Center());
@@ -1381,7 +1476,7 @@ int Helipad_Placement_Cell_Value(Cell cell, BuildingClass* building)
 /**
  *  Calculates the best factory placement location.
  */
-Cell Get_Best_Factory_Placement_Position(BuildingClass* building) 
+Cell Get_Best_Factory_Placement_Position(BuildingClass* building)
 {
     bool isnaval = building->Class->ToBuild == RTTI_UNITTYPE && building->Class->Speed == SPEED_FLOAT;
 
@@ -1393,7 +1488,7 @@ Cell Get_Best_Factory_Placement_Position(BuildingClass* building)
     {
         return Find_Best_Building_Placement_Cell(basearea, building, Barracks_Placement_Cell_Value);
     }
-    else if (building->Class->ToBuild == RTTI_UNITTYPE) 
+    else if (building->Class->ToBuild == RTTI_UNITTYPE)
     {
         if (isnaval)
         {
@@ -1414,7 +1509,7 @@ Cell Get_Best_Factory_Placement_Position(BuildingClass* building)
 
 static Cell attackcell;
 
-int Near_AttackCell_Cell_Value(Cell cell, BuildingClass* building) 
+int Near_AttackCell_Cell_Value(Cell cell, BuildingClass* building)
 {
     return Modify_Rating_By_Allied_Building_Proximity(cell, building, ::Distance(cell, attackcell));
 }
@@ -1452,7 +1547,19 @@ Cell Get_Best_Defense_Placement_Position(BuildingClass* building)
         return Find_Best_Building_Placement_Cell(basearea, building, Near_AttackCell_Cell_Value);
     }
 
+    // Special behaviour if we are under danger of getting rushed.
+    // Defend our ConYard and refinery.
+    if (houseext->IsUnderStartRushThreat)
+    {
+        if (owner->ActiveBQuantity.Count_Of(building->Class->Type) < 3) {
+            return Find_Best_Building_Placement_Cell(basearea, building, Near_ConYard_Placement_Position_Value);
+        }
+
+        return Find_Best_Building_Placement_Cell(basearea, building, Near_Refinery_Placement_Position_Value);
+    }
+
     // If we are expanding, then it's likely we should build defenses towards the expansion node.
+    // However, only so if we are not under immediate threat.
     if (houseext->NextExpansionPointLocation.X > 0 && houseext->NextExpansionPointLocation.Y > 0 && Percent_Chance(50)) {
         return Find_Best_Building_Placement_Cell(basearea, building, Towards_Expansion_Placement_Cell_Value);
     }
@@ -1467,9 +1574,12 @@ Cell Get_Best_Defense_Placement_Position(BuildingClass* building)
         return Find_Best_Building_Placement_Cell(basearea, building, Near_ConYard_Placement_Position_Value);
     }
 
+    // If we have no designed enemy, look for one.
+    enemy = Find_Closest_Opponent(owner);
+
     // Place some defenses around the center of our base to defend against cheese and flank attacks.
     if (enemy == nullptr || Percent_Chance(30)) {
-        return Find_Best_Building_Placement_Cell(basearea, building, Near_Base_Center_Placement_Position_Value);
+        return Find_Best_Building_Placement_Cell(basearea, building, Near_Base_Center_Defense_Placement_Position_Value);
     }
 
     return Find_Best_Building_Placement_Cell(basearea, building, Near_Enemy_Placement_Position_Value);

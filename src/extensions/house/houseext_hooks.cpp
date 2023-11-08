@@ -41,6 +41,7 @@
 #include "buildingtypeext.h"
 #include "unit.h"
 #include "infantry.h"
+#include "infantrytype.h"
 #include "technotype.h"
 #include "techno.h"
 #include "terrain.h"
@@ -578,6 +579,106 @@ bool AdvAI_Can_Build_Building(HouseClass* house, BuildingTypeClass* buildingtype
 }
 
 
+bool AdvAI_Is_Recently_Attacked(HouseClass* house)
+{
+    return house->LATime + TICKS_PER_MINUTE > Frame;
+}
+
+
+/**
+ *  Checks if AdvAI is under threat of being start rushed.
+ *  Start rushes require specific tactics to counter.
+ *
+ *  Author: Rampastring
+ */
+bool AdvAI_Is_Under_Start_Rush_Threat(HouseClass* house, int enemy_aircraft_count)
+{
+    // If the game has progressed for long enough, it is no longer considered a start rush.
+    if (Frame > 10000) {
+        return false;
+    }
+
+    if (enemy_aircraft_count > 0 || AdvAI_Is_Recently_Attacked(house)) {
+        return true;
+    }
+
+    // Counter infantry rushing. If a human enemy has more infantry than we do, we are at risk.
+
+    static int house_infantry_strength[10];
+    memset(house_infantry_strength, 0, sizeof(int) * ARRAY_SIZE(house_infantry_strength));
+
+    // Go through all infantry on the map and gather infantry strength of all enemy human houses.
+    for (int i = 0; i < Infantry.Count(); i++) {
+        InfantryClass* inf = Infantry[i];
+
+        if (inf->IsInLimbo) {
+            continue;
+        }
+
+        // Also calculate our own infantry strength for comparison.
+        if (inf->House == house) {
+            house_infantry_strength[house->Get_Heap_ID()] += inf->Class->Points;
+            continue;
+        }
+
+        if (inf->House->Class->IsMultiplayPassive) {
+            continue;
+        }
+
+        if (!inf->House->Is_Human_Control()) {
+            continue;
+        }
+
+        if (inf->House->Is_Ally(house)) {
+            continue;
+        }
+
+        if (inf->House->Get_Heap_ID() >= ARRAY_SIZE(house_infantry_strength)) {
+            continue;
+        }
+
+        // Humans can typically micromanage better than the AI, so increase points for human infantry.
+        house_infantry_strength[inf->House->Get_Heap_ID()] += inf->Class->Points * 2;
+    }
+
+    int our_infantry_strength = house_infantry_strength[house->Get_Heap_ID()];
+    for (int i = 0; i < ARRAY_SIZE(house_infantry_strength); i++) {
+
+        if (house_infantry_strength[i] > our_infantry_strength) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+/**
+ *  Calculates the total number of enemy aircraft in the game.
+ *
+ *  Author: Rampastring
+ */
+int AdvAI_Calculate_Enemy_Aircraft_Count(HouseClass* house)
+{
+    int enemy_aircraft_count = 0;
+
+    for (int i = 0; i < Aircrafts.Count(); i++) {
+        AircraftClass* aircraft = Aircrafts[i];
+
+        if (!aircraft->House->Is_Ally(house) && !aircraft->House->Class->IsMultiplayPassive) {
+            enemy_aircraft_count++;
+        }
+    }
+
+    return enemy_aircraft_count;
+}
+
+
+/**
+ *  Gets the building that the Advanced AI should build in its current game situation.
+ *
+ *  Author: Rampastring
+ */
 const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house) 
 {
     HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(house);
@@ -637,21 +738,19 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
         }
     }
 
+    bool is_recently_attacked = house->LATime + TICKS_PER_MINUTE > Frame;
+
     // Check how many aircraft our opponents have.
     // This check could be expensive, but usually there are not very 
     // high numbers of aircraft in the game, so it's probably fine.
-    int enemy_aircraft_count = 0;
+    int enemy_aircraft_count = AdvAI_Calculate_Enemy_Aircraft_Count(house);
 
-    for (int i = 0; i < Aircrafts.Count(); i++) {
-        AircraftClass* aircraft = Aircrafts[i];
-
-        if (!aircraft->House->Is_Ally(house) && !aircraft->House->Class->IsMultiplayPassive) {
-            enemy_aircraft_count++;
-        }
-    }
+    // Check whether we're in threat of being rushed right in the beginning of the game.
+    bool is_under_threat = AdvAI_Is_Under_Start_Rush_Threat(house, enemy_aircraft_count);
+    houseext->IsUnderStartRushThreat = is_under_threat;
 
     // Build refinery if we're expanding and we're not under immediate air rush threat
-    if (enemy_aircraft_count < 1 || Frame > 10000) {
+    if (!is_under_threat) {
         if (our_refinery != BUILDING_NONE && houseext->ShouldBuildRefinery) {
             DEBUG_INFO("AdvAI: Making AI build %s because it has reached an expansion point\n", BuildingTypes[our_refinery]->IniName);
             return BuildingTypes[our_refinery];
@@ -665,7 +764,7 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
     }
 
     // Build power if necessary
-    if (Frame > 5000 && house->Power - house->Drain < 100) {
+    if (!is_under_threat && Frame > 5000 && house->Power - house->Drain < 100) {
         if (our_advanced_power != BUILDING_NONE) {
             DEBUG_INFO("AdvAI: Making AI build %s because it is out of power and can build an adv. power plant\n", BuildingTypes[our_advanced_power]->IniName);
             return BuildingTypes[our_advanced_power];
@@ -695,39 +794,8 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
         }
     }
 
-    // If we are under threat of an immediate early-game air rush, then skip the WF and refinery minimums.
-    // Instead tech up so we can get AA ASAP.
-    if (enemy_aircraft_count < 1 || Frame > 10000) {
-
-        // If we don't have enough weapons factory, then build one.
-        int optimal_wf_count = 1 + (house->ActiveBQuantity.Count_Of(our_refinery) / 4);
-
-        for (int i = 0; i < Rule->BuildWeapons.Count(); i++) {
-            BuildingTypeClass* weaponsfactory = Rule->BuildWeapons[i];
-
-            if (AdvAI_Can_Build_Building(house, weaponsfactory, true)) {
-                int wfcount = house->ActiveBQuantity.Count_Of((BuildingType)weaponsfactory->Get_Heap_ID());
-                if (wfcount < optimal_wf_count) {
-
-                    DEBUG_INFO("AdvAI: Making AI build %s because it does not have enough Weapons Factories. Wanted: %d, current: %d\n",
-                        weaponsfactory->IniName, optimal_wf_count, wfcount);
-
-                    return weaponsfactory;
-                }
-            }
-        }
-
-        // If we have too few refineries, build enough to match the minimum.
-        // Because this is not for expanding but an emergency situation,
-        // cancel any potential expanding.
-        if (our_refinery != BUILDING_NONE && house->ActiveBQuantity.Count_Of(our_refinery) < RuleExtension->AdvancedAIMinimumRefineryCount) {
-            houseext->NextExpansionPointLocation = Cell(0, 0);
-            DEBUG_INFO("AdvAI: Making AI build %s because it only has too few refineries\n", BuildingTypes[our_refinery]->IniName);
-            return BuildingTypes[our_refinery];
-        }
-    }
-
-    // If we don't have enough defenses, then build one
+    // Get defenses and calculate for deficiencies on them before making
+    // further decisions.
     BuildingType our_anti_infantry_defense = BUILDING_NONE;
     BuildingType our_anti_vehicle_defense = BUILDING_NONE;
     BuildingType our_anti_air_defense = BUILDING_NONE;
@@ -763,8 +831,14 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
         optimal_defense_count++;
     }
 
+    // Special check for early infantry rushes.
+    // If we are getting infantry-rushed, build more anti-infantry defenses.
+    if (is_under_threat && enemy_aircraft_count == 0) {
+        optimal_defense_count *= 3;
+    }
+
     // If we are under attack, prioritize defense.
-    if (house->LATime + TICKS_PER_MINUTE > Frame) {
+    if (is_recently_attacked) {
         optimal_defense_count++;
     }
 
@@ -786,7 +860,7 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
     // We're just going to bluntly assume that we need 1 AA defense for every 2 enemy aircraft present.
     int needed_aa_count = enemy_aircraft_count / 2;
     // ...but don't overspend on AA.
-    if (needed_aa_count > optimal_defense_count) {
+    if (needed_aa_count > optimal_defense_count * 2) {
         needed_aa_count = optimal_defense_count;
     }
 
@@ -797,6 +871,38 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
     }
 
     anti_air_deficiency = needed_aa_count - aa_defensecount;
+
+    // If we are under threat of an immediate early-game rush, then skip the WF and refinery minimums.
+    // Instead build defenses or tech up so we can get AA ASAP.
+    if (!is_under_threat || (anti_inf_deficiency == 0 && anti_air_deficiency == 0)) {
+
+        // If we don't have enough weapons factory, then build one.
+        int optimal_wf_count = 1 + (house->ActiveBQuantity.Count_Of(our_refinery) / 4);
+
+        for (int i = 0; i < Rule->BuildWeapons.Count(); i++) {
+            BuildingTypeClass* weaponsfactory = Rule->BuildWeapons[i];
+
+            if (AdvAI_Can_Build_Building(house, weaponsfactory, true)) {
+                int wfcount = house->ActiveBQuantity.Count_Of((BuildingType)weaponsfactory->Get_Heap_ID());
+                if (wfcount < optimal_wf_count) {
+
+                    DEBUG_INFO("AdvAI: Making AI build %s because it does not have enough Weapons Factories. Wanted: %d, current: %d\n",
+                        weaponsfactory->IniName, optimal_wf_count, wfcount);
+
+                    return weaponsfactory;
+                }
+            }
+        }
+
+        // If we have too few refineries, build enough to match the minimum.
+        // Because this is not for expanding but an emergency situation,
+        // cancel any potential expanding.
+        if (our_refinery != BUILDING_NONE && house->ActiveBQuantity.Count_Of(our_refinery) < RuleExtension->AdvancedAIMinimumRefineryCount) {
+            houseext->NextExpansionPointLocation = Cell(0, 0);
+            DEBUG_INFO("AdvAI: Making AI build %s because it only has too few refineries\n", BuildingTypes[our_refinery]->IniName);
+            return BuildingTypes[our_refinery];
+        }
+    }
 
     if (anti_inf_deficiency > 0 && anti_inf_deficiency > anti_vehicle_deficiency && anti_inf_deficiency > anti_air_deficiency) {
         DEBUG_INFO("AdvAI: Making AI build %s because it does not have enough anti-inf defenses. Wanted: %d, deficiency: %d\n",
@@ -1358,7 +1464,7 @@ DECLARE_PATCH(_HouseClass_AI_Building_Intercept)
  *
  *  Author: Rampastring
  */
-void Vinifera_HouseClass_Expert_AI(HouseClass* house) 
+void AdvAI_HouseClass_Expert_AI(HouseClass* house)
 {
     if (house->Class->IsMultiplayPassive) {
         return;
@@ -1369,12 +1475,15 @@ void Vinifera_HouseClass_Expert_AI(HouseClass* house)
         return;
     }
 
-    // Do some basic maintenance.
-
     // If we have more than 1 ConYard without Rules allowing it, sell some of them off
     // to avoid the "Extreme AI" syndrome.
     if (house->ConstructionYards.Count() > 1 && !RuleExtension->IsAdvancedAIMultiConYard) {
         AdvAI_Sell_Extra_ConYards(house);
+    }
+
+    // If we have no enemy, then pick one.
+    if (house->Enemy == HOUSE_NONE) {
+        house->ExpertAITimer = 0;
     }
 
     HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(house);
@@ -1414,6 +1523,26 @@ void Vinifera_HouseClass_Expert_AI(HouseClass* house)
             }
         }
     }
+
+    // If we are under threat of getting rushed early and our ConYard is producing something non-defensive and non-power-granting, abandon it.
+    int enemy_aircraft_count = AdvAI_Calculate_Enemy_Aircraft_Count(house);
+    bool is_under_threat = AdvAI_Is_Under_Start_Rush_Threat(house, enemy_aircraft_count);
+
+    if (is_under_threat) {
+        FactoryClass* buildingfactory = house->Fetch_Factory(RTTI_BUILDING);
+        if (buildingfactory != nullptr) {
+            if (buildingfactory->Get_Object() != nullptr) {
+                BuildingClass* building = reinterpret_cast<BuildingClass*>(buildingfactory->Get_Object());
+
+                if (building->Class->Power <= 0 ||
+                    building->Class->Fetch_Weapon_Info(WEAPON_SLOT_PRIMARY).Weapon == nullptr ||
+                    building->Class->ToBuild != RTTI_INFANTRYTYPE)
+                {
+                    buildingfactory->Abandon();
+                }
+            }
+        }
+    }
 }
 
 
@@ -1425,7 +1554,7 @@ void Vinifera_HouseClass_Expert_AI(HouseClass* house)
 DECLARE_PATCH(_HouseClass_Expert_AI_Advanced_AI_Intercept)
 {
     GET_REGISTER_STATIC(HouseClass*, this_ptr, edi);
-    Vinifera_HouseClass_Expert_AI(this_ptr);
+    AdvAI_HouseClass_Expert_AI(this_ptr);
 
     // Stolen bytes / code
     if (this_ptr->ExpertAITimer.Expired()) {

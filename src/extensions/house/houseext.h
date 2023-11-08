@@ -106,4 +106,10 @@ HouseClassExtension final : public AbstractClassExtension
          *  If it has been done, then there is no need to do it again.
          */
         bool HasPerformedVehicleCharge;
+
+        /**
+         *  Records a value whether the current structure build choice 
+         *  was made under threat of getting rushed early in the game.
+         */
+        bool IsUnderStartRushThreat;
 };
