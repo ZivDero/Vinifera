@@ -922,7 +922,7 @@ void AdvAI_Raise_Money(HouseClass* house)
 {
     // We should raise money if we are low on funds and have zero refineries.
 
-    if (house->Credits > 100) {
+    if (house->Credits > 1000) {
         return;
     }
 
@@ -1027,12 +1027,6 @@ void AdvAI_Economy_Upkeep(HouseClass* house)
         harvester_count += house->ActiveUQuantity.Count_Of((UnitType)harvtype->Get_Heap_ID());
     }
 
-    // Also take free-unit harvs into account.
-    // WARNING: this assumes that free-unit harvs are not listed in HarvesterUnit,
-    // as the situation is in DTA at the time of writing this.
-    UnitTypeClass* freeunit = BuildingTypes[our_refinery]->FreeUnit;
-    harvester_count += house->ActiveUQuantity.Count_Of((UnitType)freeunit->Get_Heap_ID());
-
     int to_sell_count = refinery_count - harvester_count;
     if (to_sell_count <= 0) {
         return;
@@ -1131,7 +1125,7 @@ void AdvAI_Sell_Extra_ConYards(HouseClass* house)
 {
     int to_sell_count = house->ConstructionYards.Count() - 1;
 
-    DEBUG_INFO("AdvAI: AI %d has too many Construction Yards. Selling off %d of them. Frame: %d\n", house->Get_Heap_ID(), to_sell_count, Frame);
+    DEBUG_INFO("AdvAI: AI %d has too many Construction Yards (%d). Selling off %d of them. Frame: %d\n", house->Get_Heap_ID(), to_sell_count, Frame);
 
     if (to_sell_count < 1) {
         return;
@@ -1175,33 +1169,13 @@ void AdvAI_Sell_Extra_ConYards(HouseClass* house)
  */
 int Vinifera_HouseClass_AI_Building(HouseClass* this_ptr)
 {
-    // First, do some basic maintenance.
-
-    // If we have more than 1 ConYard without Rules allowing it, sell some of them off
-    // to avoid the "Extreme AI" syndrome.
-    // This would be better done on a higher level (not within building selection),
-    // but for the easiness of hacking, we currently have it here.
-    if (this_ptr->ConstructionYards.Count() > 1 && !RuleExtension->IsAdvancedAIMultiConYard) {
-        AdvAI_Sell_Extra_ConYards(this_ptr);
-    }
-
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(this_ptr);
-
-    if (Frame > houseext->LastExcessRefineryCheckFrame + 500) {
-        houseext->LastExcessRefineryCheckFrame = Frame;
-        AdvAI_Economy_Upkeep(this_ptr);
-    }
-
-    if (Frame > houseext->LastSleepingHarvesterCheckFrame + 1000) {
-        houseext->LastSleepingHarvesterCheckFrame = Frame;
-        AdvAI_Awaken_Sleeping_Harvesters(this_ptr);
-    }
-
-    // Next, we decide what to build.
+    // Decide what to build.
     // If we already have something to build, do nothing.
     if (this_ptr->BuildStructure != BUILDING_NONE) return TICKS_PER_SECOND;
 
     if (this_ptr->ConstructionYards.Count() <= 0) return TICKS_PER_SECOND;
+
+    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(this_ptr);
 
     if (RuleExtension->IsUseAdvancedAI) {
 
@@ -1334,6 +1308,68 @@ DECLARE_PATCH(_HouseClass_AI_Building_Intercept)
 
 
 /**
+ *  Performs some maintenance for the Advanced AI.
+ *
+ *  Author: Rampastring
+ */
+void Vinifera_HouseClass_Expert_AI(HouseClass* house) 
+{
+    if (house->Class->IsMultiplayPassive) {
+        return;
+    }
+
+    // Only enable our custom logic when using Advanced AI.
+    if (!RuleExtension->IsUseAdvancedAI) {
+        return;
+    }
+
+    // Do some basic maintenance.
+
+    // If we have more than 1 ConYard without Rules allowing it, sell some of them off
+    // to avoid the "Extreme AI" syndrome.
+    if (house->ConstructionYards.Count() > 1 && !RuleExtension->IsAdvancedAIMultiConYard) {
+        AdvAI_Sell_Extra_ConYards(house);
+    }
+
+    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(house);
+
+    // Do some economy upkeep to keep the AI running.
+
+    if (Frame > houseext->LastExcessRefineryCheckFrame + 500) {
+        houseext->LastExcessRefineryCheckFrame = Frame;
+        AdvAI_Economy_Upkeep(house);
+    }
+
+    if (Frame > houseext->LastSleepingHarvesterCheckFrame + 1000) {
+        houseext->LastSleepingHarvesterCheckFrame = Frame;
+        AdvAI_Awaken_Sleeping_Harvesters(house);
+    }
+}
+
+
+/**
+ *  Intercept point for DTA's Advanced AI logic running inside the game's Expert AI function.
+ *
+ *  Author: Rampastring
+ */
+DECLARE_PATCH(_HouseClass_Expert_AI_Advanced_AI_Intercept)
+{
+    GET_REGISTER_STATIC(HouseClass*, this_ptr, edi);
+    Vinifera_HouseClass_Expert_AI(this_ptr);
+
+    // Stolen bytes / code
+    if (this_ptr->ExpertAITimer.Expired()) {
+
+        // Do AIHateDelay processing?
+        JMP(0x004C0666);
+    }
+
+    // Skip "Expert AI timer" (AIHateDelay?) processing
+    JMP(0x004C079C);
+}
+
+
+/**
  *  #issue-994
  *
  *  Fixes a bug where a superweapon was enabled in non-suspended mode
@@ -1394,6 +1430,7 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004CA4A0, &HouseClassFake::_AI_Target_MultiMissile);
     // Patch_Jump(0x004C10E0, &HouseClassFake::_AI_Building_Replacement);
     Patch_Jump(0x004C10F2, &_HouseClass_AI_Building_Intercept);
+    Patch_Jump(0x004C063F, &_HouseClass_Expert_AI_Advanced_AI_Intercept);
     Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
