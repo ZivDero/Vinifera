@@ -46,7 +46,8 @@ HouseClassExtension::HouseClassExtension(const HouseClass *this_ptr) :
     HasBuiltFirstBarracks(false),
     LastExcessRefineryCheckFrame(0),
     LastSleepingHarvesterCheckFrame(0),
-    HasPerformedVehicleCharge(false)
+    HasPerformedVehicleCharge(false),
+    IsUnderStartRushThreat(false)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("HouseClassExtension::HouseClassExtension - 0x%08X\n", (uintptr_t)(This()));
 
