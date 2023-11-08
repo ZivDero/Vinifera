@@ -48,6 +48,7 @@
 #include "super.h"
 #include "unittypeext.h"
 #include "extension.h"
+#include "team.h"
 #include "techno.h"
 #include "super.h"
 #include "rules.h"
@@ -1343,6 +1344,29 @@ void Vinifera_HouseClass_Expert_AI(HouseClass* house)
     if (Frame > houseext->LastSleepingHarvesterCheckFrame + 1000) {
         houseext->LastSleepingHarvesterCheckFrame = Frame;
         AdvAI_Awaken_Sleeping_Harvesters(house);
+    }
+
+    // If we have 0 ConYards and 0 War Factories, it is very unlikely we could get
+    // back into the game. Send all our non-Harvester vehicles into Hunt mode.
+    if (house->ConstructionYards.Count() == 0 && house->UnitFactories == 0 && !houseext->HasPerformedVehicleCharge)
+    {
+        houseext->HasPerformedVehicleCharge = true;
+
+        for (int i = 0; i < Units.Count(); i++)
+        {
+            UnitClass* unit = Units[i];
+
+            if (unit->House == house &&
+                (unit->Class->DeploysInto == nullptr || !unit->Class->DeploysInto->IsConstructionYard) &&
+                !unit->Class->IsToHarvest &&
+                !unit->Class->IsToVeinHarvest)
+            {
+                if (unit->Team != nullptr) {
+                    unit->Team->Remove(unit);
+                    unit->Assign_Mission(MISSION_HUNT);
+                }
+            }
+        }
     }
 }
 

@@ -100,4 +100,10 @@ HouseClassExtension final : public AbstractClassExtension
          *  Records when the AI last checked for sleeping harvesters.
          */
         int LastSleepingHarvesterCheckFrame;
+
+        /**
+         *  Defines whether the AI has already performed a final "desperate vehicle charge".
+         *  If it has been done, then there is no need to do it again.
+         */
+        bool HasPerformedVehicleCharge;
 };
