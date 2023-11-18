@@ -1713,6 +1713,95 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory)
 }
 
 
+
+BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass* exiting_object)
+{
+    int closest_distance = INT_MAX;
+    BuildingClass* closest_match = nullptr;
+
+    for (int i = 0; i < Buildings.Count(); i++)
+    {
+        BuildingClass* bldg = Buildings[i];
+
+        if (bldg->House == this_ptr->House && bldg != this_ptr && bldg->Mission == MISSION_GUARD && !bldg->Factory && bldg->Class->ToBuild == this_ptr->Class->ToBuild)
+        {
+            // Original TS code, left here for reference. Was part of the above condition
+            // if (bldg->Class != this_ptr->Class)
+            //     continue;
+
+            // Do not allow naval yards to push out vehicles and vice-versa
+
+            if (bldg->Class->Speed == SPEED_FLOAT) 
+            {
+                if (exiting_object->Speed != SPEED_FLOAT && exiting_object->Techno_Type_Class()->Speed != SPEED_HOVER)
+                    continue;
+            }
+            else 
+            {
+                if (exiting_object->Techno_Type_Class()->Speed == SPEED_FLOAT) {
+                    continue;
+                }
+            }
+
+            // Check ownable, so only factories of a faction that owns the object can
+            // build the object
+            if ((bldg->Class->Get_Ownable() & exiting_object->Techno_Type_Class()->Get_Ownable()) == 0) {
+                continue;
+            }
+
+            // All checks have passed. Check the distance to find the closest factory to exit from.
+            int distance = ::Distance(this_ptr->Coord, bldg->Coord);
+            if (distance < closest_distance) {
+                closest_distance = distance;
+                closest_match = bldg;
+            }
+        }
+    }
+
+    return closest_match;
+}
+
+
+/**
+ *  Replaces the loop starting from 0x0042CAB9 to improve the alternative
+ *  war factory selection logic when a war factory is busy in 3 ways:
+ * 
+ *  1) The object can now exit from factory buildings of a different type
+ *     than what the object was originally produced from.
+ *  
+ *  2) The above takes speed type into account when finding building to exit from,
+ *     preventing ships from exiting from land-based factories and vice-versa.
+ * 
+ *  3) The logic prefers finding the closest rather than the "first" alternative
+ *  factory building.
+ * 
+ *  @author: Rampastring
+ */
+DECLARE_PATCH(_BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic)
+{
+    GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(FootClass*, exiting_object, edi);
+    static BuildingClass* best_alternative_building;
+
+    best_alternative_building = Find_Best_Alternative_Factory(this_ptr, exiting_object);
+
+    if (best_alternative_building != nullptr) {
+
+        /**
+         *  Exit from the factory we found.
+         */
+        _asm { mov ebp, dword ptr best_alternative_building }
+        JMP_REG(ebx, 0x0042CB28);
+    }
+
+    /**
+     *  We could not find an alternative factory to exit from,
+     *  exit the function and return 1.
+     */
+    JMP(0x0042CB16);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -1739,4 +1828,5 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042B6CC, &_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch);
     Patch_Jump(0x0042D3B8, &_BuildingClass_Exit_Object_Seek_Building_Position);
     Patch_Jump(0x0042C9D9, &_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory);
+    Patch_Jump(0x0042CAB9, &_BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic);
 }
