@@ -48,7 +48,8 @@ UnitTypeClassExtension::UnitTypeClassExtension(const UnitTypeClass *this_ptr) :
     StartIdleFrame(0),
     IdleFrames(0),
     TransformsInto(nullptr),
-    IsTransformRequiresFullCharge(false)
+    IsTransformRequiresFullCharge(false),
+    IsNaval(false)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("UnitTypeClassExtension::UnitTypeClassExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
@@ -198,6 +199,8 @@ bool UnitTypeClassExtension::Read_INI(CCINIClass &ini)
     IsTotable = ini.Get_Bool(ini_name, "Totable", IsTotable);
     TransformsInto = ini.Get_Unit(ini_name, "TransformsInto", TransformsInto);
     IsTransformRequiresFullCharge = ini.Get_Bool(ini_name, "TransformRequiresFullCharge", IsTransformRequiresFullCharge);
+
+    IsNaval = ini.Get_Bool(ini_name, "Naval", IsNaval);
 
     StartTurretFrame = ArtINI.Get_Int(graphic_name, "StartTurretFrame", StartTurretFrame);
     TurretFacings = ArtINI.Get_Int(graphic_name, "TurretFacings", TurretFacings);

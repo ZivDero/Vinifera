@@ -37,6 +37,7 @@
 #include "buildingtypeext.h"
 #include "unit.h";
 #include "unitext.h"
+#include "unittypeext.h"
 #include "technotype.h"
 #include "technotypeext.h"
 #include "aircraft.h"
@@ -1729,11 +1730,24 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
             // if (bldg->Class != this_ptr->Class)
             //     continue;
 
-            // Do not allow naval yards to push out vehicles and vice-versa
+            // Check ownable, so only factories of a faction that owns the object can
+            // build the object
+            if ((bldg->Class->Get_Ownable() & exiting_object->Techno_Type_Class()->Get_Ownable()) == 0) {
+                continue;
+            }
 
+            // Do not allow naval yards to push out vehicles and war factories
+            // to push out ships
             if (bldg->Class->Speed == SPEED_FLOAT) 
             {
-                if (exiting_object->Speed != SPEED_FLOAT && exiting_object->Techno_Type_Class()->Speed != SPEED_HOVER)
+                bool is_naval = true;
+
+                if (exiting_object->What_Am_I() == RTTI_UNIT) {
+                    UnitTypeClassExtension* unitext = Extension::Fetch<UnitTypeClassExtension>(exiting_object);
+                    is_naval = unitext->IsNaval;
+                }
+
+                if (!is_naval)
                     continue;
             }
             else 
@@ -1741,12 +1755,6 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
                 if (exiting_object->Techno_Type_Class()->Speed == SPEED_FLOAT) {
                     continue;
                 }
-            }
-
-            // Check ownable, so only factories of a faction that owns the object can
-            // build the object
-            if ((bldg->Class->Get_Ownable() & exiting_object->Techno_Type_Class()->Get_Ownable()) == 0) {
-                continue;
             }
 
             // All checks have passed. Check the distance to find the closest factory to exit from.

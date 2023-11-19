@@ -96,4 +96,10 @@ UnitTypeClassExtension final : public TechnoTypeClassExtension
          *  If set, transforming to another unit will require this unit to have full charge.
          */
         bool IsTransformRequiresFullCharge;
+
+        /**
+         *  If set, this unit is considered to be a naval unit, meaning it can only be
+         *  produced from water-bound factory buildings.
+         */
+        bool IsNaval;
 };
