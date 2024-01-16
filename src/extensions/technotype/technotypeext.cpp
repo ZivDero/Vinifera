@@ -256,10 +256,10 @@ bool TechnoTypeClassExtension::Read_INI(CCINIClass &ini)
     SoylentValue = ini.Get_Int(ini_name, "Soylent", SoylentValue);
     EnterTransportSound = ini.Get_VocType(ini_name, "EnterTransportSound", EnterTransportSound);
     LeaveTransportSound = ini.Get_VocType(ini_name, "LeaveTransportSound", LeaveTransportSound);
-    VoiceCapture = ini.Get_VocType_List(ini_name, "VoiceCapture", VoiceCapture);
-    VoiceEnter = ini.Get_VocType_List(ini_name, "VoiceEnter", VoiceEnter);
-    VoiceDeploy = ini.Get_VocType_List(ini_name, "VoiceDeploy", VoiceDeploy);
-    VoiceHarvest = ini.Get_VocType_List(ini_name, "VoiceHarvest", VoiceHarvest);
+    VoiceCapture = ini.Get_VocTypes(ini_name, "VoiceCapture", VoiceCapture);
+    VoiceEnter = ini.Get_VocTypes(ini_name, "VoiceEnter", VoiceEnter);
+    VoiceDeploy = ini.Get_VocTypes(ini_name, "VoiceDeploy", VoiceDeploy);
+    VoiceHarvest = ini.Get_VocTypes(ini_name, "VoiceHarvest", VoiceHarvest);
     BuildTimeCost = ini.Get_Int(ini_name, "BuildTimeCost", BuildTimeCost);
 
     IdleRate = ini.Get_Int(ini_name, "IdleRate", IdleRate);

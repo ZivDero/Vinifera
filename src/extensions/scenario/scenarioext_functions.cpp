@@ -987,7 +987,7 @@ void Vinifera_Create_Units(bool official)
 
                         i += technotype->Raw_Cost();
 
-                        if (Scen->SpecialFlags.InitialVeteran) {
+                        if (Scen->SpecialFlags.IsInitialVeteran) {
                             obj->Veterancy.Set_Elite(true);
                         }
 
@@ -1058,4 +1058,7 @@ void Read_Scenario_Read_Basic_Section_Options(CCINIClass &scenario_ini)
      *  Read INI key for the ice destruction option.
      */
     ScenExtension->IsIceDestruction = scenario_ini.Get_Bool(BASIC, "IceDestructionEnabled", ScenExtension->IsIceDestruction);
+
+    ScenExtension->ScorePlayerColor = scenario_ini.Get_RGB(BASIC, "ScorePlayerColor", ScenExtension->ScorePlayerColor);
+    ScenExtension->ScoreEnemyColor = scenario_ini.Get_RGB(BASIC, "ScoreEnemyColor", ScenExtension->ScoreEnemyColor);
 }

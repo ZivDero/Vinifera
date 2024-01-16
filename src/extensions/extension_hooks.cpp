@@ -127,6 +127,7 @@
 #include "mapseedext_hooks.h"
 #include "multiscoreext_hooks.h"
 #include "multimissionext_hooks.h"
+#include "scoreclassext_hooks.h"
 
 #include "skirmishdlg_hooks.h"
 
@@ -263,6 +264,7 @@ void Extension_Hooks()
     EndGameExtension_Hooks();
     MapSeedClassExtension_Hooks();
     MultiScoreExtension_Hooks();
+    ScoreClassExtension_Hooks();
     MultiMissionExtension_Hooks();
 
     /**
