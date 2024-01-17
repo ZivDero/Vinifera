@@ -41,7 +41,9 @@
  */
 BulletTypeClassExtension::BulletTypeClassExtension(const BulletTypeClass *this_ptr) :
     ObjectTypeClassExtension(this_ptr),
-    SpawnDelay(3)           // Default hardcoded value.
+    SpawnDelay(3),           // Default hardcoded value.
+    UseCustomProjectileLogic(true),
+    FaceTargetToFire(false)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("BulletTypeClassExtension::BulletTypeClassExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
@@ -194,6 +196,8 @@ bool BulletTypeClassExtension::Read_INI(CCINIClass &ini)
      *  The following keys are loaded from the ArtINI database.
      */
     SpawnDelay = ArtINI.Get_Int(graphic_name, "SpawnDelay", SpawnDelay);
-    
+    UseCustomProjectileLogic = ini.Get_Bool(ini_name, "UseDTAProjectileLogic", UseCustomProjectileLogic);
+    FaceTargetToFire = ini.Get_Bool(ini_name, "FaceTargetToFire", FaceTargetToFire);
+
     return true;
 }

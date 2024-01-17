@@ -31,6 +31,8 @@
 #include "vinifera_globals.h"
 #include "tibsun_globals.h"
 #include "tibsun_functions.h"
+#include "bullettype.h"
+#include "bullettypeext.h"
 #include "technotype.h"
 #include "technotypeext.h"
 #include "unit.h"
@@ -1091,6 +1093,34 @@ mobile_emp_process:
 
 
 /**
+ *  Patch that allows units with weapons with projectiles with ROT > 0
+ *  to more strictly face their target before firing.
+ */
+DECLARE_PATCH(_UnitClass_Can_Fire_Check_Target_Facing)
+{
+    // Stolen bytes / code
+    _asm { push ebp }
+    _asm { push edx }
+    _asm { push eax }
+
+    static int rot;
+    static BulletTypeClassExtension* bullettypeext;
+    GET_REGISTER_STATIC(BulletTypeClass*, bullettype, ecx);
+
+    bullettypeext = Extension::Fetch<BulletTypeClassExtension>(bullettype);
+    if (bullettypeext->FaceTargetToFire) {
+        rot = 0;
+    } else {
+        rot = bullettype->ROT;
+    }
+
+    _asm { mov ebx, dword ptr ds:rot }
+    _asm { pop eax }
+    JMP_REG(ecx, 0x00656FF3);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void UnitClassExtension_Hooks()
@@ -1115,4 +1145,9 @@ void UnitClassExtension_Hooks()
     Patch_Jump(0x00650BAE, &_UnitClass_Try_To_Deploy_Transform_To_Vehicle_Patch);
     Patch_Jump(0x00656017, &_UnitClass_What_Action_Self_Check_For_Vehicle_Transform_Patch);
     Patch_Jump(0x006543DB, &_UnitClass_Mission_Unload_Transform_To_Vehicle_Patch);
+    Patch_Jump(0x00656FEB, &_UnitClass_Can_Fire_Check_Target_Facing);
+
+    // Require more precision when units face their targets
+    Patch_Byte(0x00656FF9 + 2, 0x04);
+    Patch_Byte(0x00656FFC + 2, 0x04);
 }
