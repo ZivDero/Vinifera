@@ -523,7 +523,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
 
                 if (fuse_check || some_coord_length <= lengthtwice)
                 {
-                    this_ptr->Set_Coord(this_ptr->TarCom->Center_Coord());
+                    // this_ptr->Set_Coord(this_ptr->TarCom->Center_Coord());
                 }
             }
 
