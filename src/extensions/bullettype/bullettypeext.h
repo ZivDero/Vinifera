@@ -66,4 +66,16 @@ BulletTypeClassExtension final : public ObjectTypeClassExtension
          *  The number of frames between trailer anim spawns.
          */
         unsigned SpawnDelay;
+
+        /**
+         *  Defines whether this projectile should use DTA's custom projectile logic.
+         *  TODO not functional at the moment
+         */
+        bool UseCustomProjectileLogic;
+
+        /**
+         *  Defines whether the unit launching this projectile is required to strictly
+         *  face the target before firing.
+         */
+        bool FaceTargetToFire;
 };
