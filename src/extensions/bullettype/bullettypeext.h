@@ -78,4 +78,9 @@ BulletTypeClassExtension final : public ObjectTypeClassExtension
          *  face the target before firing.
          */
         bool FaceTargetToFire;
+
+        /**
+         *  Defines how far a projectile can snap to reach its target.
+         */
+        int SnapDistance;
 };

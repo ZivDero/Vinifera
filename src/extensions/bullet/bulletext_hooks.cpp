@@ -501,30 +501,37 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
                 // v125 = this->TarCom->r.m.o.a.vt->t.r.m.o.a.__some_coords__As_Coord(this->TarCom);
                 Coordinate newtargetcoord = this_ptr->TarCom->Center_Coord();
 
-                Coordinate some_coord = Coordinate(our_coord.X - newtargetcoord.X,
-                    our_coord.Y - newtargetcoord.Y,
-                    ((newtargetcoord.Z + our_coord.Z) / 2) - newtargetcoord.Z);
-                int some_coord_length = some_coord.Length();
+                BulletTypeClassExtension* bullettypeext = Extension::Fetch<BulletTypeClassExtension>(this_ptr->Class);
 
-                /*
-                 * This code path is only hit by ROF <= 0 projectiles
-                if (v134)
-                {
-                    some_coord_length = some_coord_length / 3;
-                }
-                */
-
-                double limit = 128.0;
-                double lengthtwice = this_ptr->Fly.Length_3D() * 2.0;
-                if (lengthtwice >= limit)
-                {
-                    limit = lengthtwice;
+                int distance = ::Distance(newtargetcoord, this_ptr->Center_Coord());
+                if (fuse_check && distance < bullettypeext->SnapDistance) {
+                    this_ptr->Set_Coord(newtargetcoord);
                 }
 
-                if (fuse_check || some_coord_length <= lengthtwice)
-                {
-                    // this_ptr->Set_Coord(this_ptr->TarCom->Center_Coord());
-                }
+                // Coordinate some_coord = Coordinate(our_coord.X - newtargetcoord.X,
+                //     our_coord.Y - newtargetcoord.Y,
+                //     ((newtargetcoord.Z + our_coord.Z) / 2) - newtargetcoord.Z);
+                // int some_coord_length = some_coord.Length();
+                // 
+                // /*
+                //  * This code path is only hit by ROF <= 0 projectiles
+                // if (v134)
+                // {
+                //     some_coord_length = some_coord_length / 3;
+                // }
+                // */
+                // 
+                // double limit = 128.0;
+                // double lengthtwice = this_ptr->Fly.Length_3D() * 2.0;
+                // if (lengthtwice >= limit)
+                // {
+                //     limit = lengthtwice;
+                // }
+                // 
+                // if (fuse_check && some_coord_length <= lengthtwice)
+                // {
+                //     this_ptr->Set_Coord(this_ptr->TarCom->Center_Coord());
+                // }
             }
 
             this_ptr->Bullet_Explodes(is_forced_to_explode);

@@ -43,7 +43,8 @@ BulletTypeClassExtension::BulletTypeClassExtension(const BulletTypeClass *this_p
     ObjectTypeClassExtension(this_ptr),
     SpawnDelay(3),           // Default hardcoded value.
     UseCustomProjectileLogic(true),
-    FaceTargetToFire(false)
+    FaceTargetToFire(false),
+    SnapDistance(CELL_LEPTON_W * 2)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("BulletTypeClassExtension::BulletTypeClassExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
@@ -198,6 +199,7 @@ bool BulletTypeClassExtension::Read_INI(CCINIClass &ini)
     SpawnDelay = ArtINI.Get_Int(graphic_name, "SpawnDelay", SpawnDelay);
     UseCustomProjectileLogic = ini.Get_Bool(ini_name, "UseDTAProjectileLogic", UseCustomProjectileLogic);
     FaceTargetToFire = ini.Get_Bool(ini_name, "FaceTargetToFire", FaceTargetToFire);
+    SnapDistance = ini.Get_Int(ini_name, "SnapDistance", SnapDistance);
 
     return true;
 }
