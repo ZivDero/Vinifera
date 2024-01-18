@@ -1145,6 +1145,6 @@ void UnitClassExtension_Hooks()
     Patch_Jump(0x00656FEB, &_UnitClass_Can_Fire_Check_Target_Facing);
 
     // Require more precision when units face their targets
-    Patch_Byte(0x00656FF9 + 2, 0x04);
-    Patch_Byte(0x00656FFC + 2, 0x04);
+    Patch_Byte(0x00656FF9 + 2, 0x02);
+    Patch_Byte(0x00656FFC + 2, 0x02);
 }
