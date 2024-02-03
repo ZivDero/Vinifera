@@ -1930,6 +1930,45 @@ allow_rally_point:
 
 
 /**
+ *  #issue-1049
+ *
+ *  The AI undeploys deployed Tick Tanks, Artillery and Juggernauts that get attacked by something
+ *  that is out of their range. This is done by assigning MISSION_DECONSTRUCTION, which is used for both
+ *  undeploying and selling.
+ *
+ *  The AI does not check whether the building actually has UndeploysInto= specified as something
+ *  non-null, meaning if the building has UndeploysInto as null, the AI ends up selling the
+ *  buildings.
+ *
+ *  This patch fixes the bug by denying the AI from assigning MISSION_DECONSTRUCTION
+ *  when the building has UndeploysInto as null.
+ *
+ *  @author: Rampastring
+ */
+DECLARE_PATCH(_BuildingClass_Assign_Target_No_Deconstruction_With_Null_UndeploysInto)
+{
+    GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
+    static BuildingTypeClass* buildingtype;
+
+    if (this_ptr->Class->UndeploysInto == nullptr) {
+
+        /**
+         *  This building cannot undeploy. Exit the function.
+         */
+        JMP(0x0042C58C);
+    }
+
+    /**
+     *  Stolen bytes / code.
+     *  Assign MISSION_DECONSTRUCTION and exit.
+     */
+    this_ptr->Assign_Mission(MISSION_DECONSTRUCTION);
+    this_ptr->Commence();
+    JMP(0x0042C63A);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void BuildingClassExtension_Hooks()
@@ -1959,9 +1998,12 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042C9D9, &_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory);
     Patch_Jump(0x0042CAB9, &_BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic);
     Patch_Jump(0x0042CE87, &_BuildingClass_Exit_Object_Allow_Rally_Point_For_Naval_Yard_Patch);
+
     // NOP out "push 1" instruction so we have an easier time injecting code here
     Patch_Byte(0x0042CE7A, 0x90);
     Patch_Byte(0x0042CE7A + 1, 0x90);
     Patch_Jump(0x0042C37F, &_BuildingClass_Set_Rally_To_Point_NavalYard_Check_Patch);
     Patch_Jump(0x0042EF9D, &_BuildingClass_What_Action_Allow_Rally_Point_For_Naval_Yard_Patch);
+
+    Patch_Jump(0x0042C624, &_BuildingClass_Assign_Target_No_Deconstruction_With_Null_UndeploysInto);
 }
