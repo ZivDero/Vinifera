@@ -64,5 +64,17 @@ AircraftClassExtension final : public FootClassExtension
         virtual RTTIType Fetch_RTTI() const override { return RTTI_AIRCRAFT; }
 
     public:
+        /**
+         *  If this aircraft is a reinforcement unit created for purposes of paradropping,
+         *  this flag is set to true.
+         */
+        bool IsParadropReinforcement;
 
+        /**
+         *  Paradropping aircraft get their ammo set to maximum to allow them to retry
+         *  the paradropping in case they do not manage to paradrop all infantry at once.
+         *  But this replenishment must only happen once to avoid potential endless circling
+         *  above the paradrop point.
+         */
+        bool IsParadropAmmoReplenished;
 };

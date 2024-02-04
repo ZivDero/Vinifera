@@ -36,6 +36,7 @@
 #include "unit.h"
 #include "unittype.h"
 #include "unittypeext.h"
+#include "team.h"
 #include "technotype.h"
 #include "technotypeext.h"
 #include "weapontype.h"
@@ -65,6 +66,7 @@ DECLARE_EXTENDING_CLASS_AND_PAIR(AircraftClass)
 public:
     bool _Unlimbo(const Coord& coord, Dir256 dir);
     bool _Cell_Seems_Ok(Cell& cell, bool strict) const;
+    int _Mission_Retreat();
 };
 
 
@@ -189,6 +191,18 @@ bool AircraftClassExt::_Cell_Seems_Ok(Cell& cell, bool strict) const
     }
 
     return true;
+}
+
+
+/**
+ *  Hack to make aircraft also use the FootClass version of MISSION_RETREAT
+ *  instead of a null function.
+ *
+ *  @author: Rampastring
+ */
+int AircraftClassExt::_Mission_Retreat()
+{
+    return FootClass::Mission_Retreat();
 }
 
 
@@ -481,6 +495,60 @@ DECLARE_PATCH(_AircraftClass_Enter_Idle_Mode_Spawner_Patch)
 
 
 /**
+ *  Special hack to make paradrop aircraft exit the map if they are loaners
+ *  and have dropped off all of their cargo.
+ *
+ *  @author: Rampastring
+ */
+void Check_For_Paradrop_Aircraft(AircraftClass* aircraft, AircraftClassExtension* aircraftext)
+{
+    if (aircraftext->IsParadropReinforcement) {
+
+        // If the aircraft has only 1 ammo, then return it to full ammo.
+        // This causes it to retry paradropping until it is successful.
+        if (aircraft->Ammo == 1 && !aircraftext->IsParadropAmmoReplenished) {
+            aircraft->Ammo = aircraft->Class->MaxAmmo;
+            aircraftext->IsParadropAmmoReplenished = true;
+        }
+
+        // Force the aircraft to retreat (exit map) if it has no more passengers or it has no ammo for trying to paradrop them.
+        if (aircraft->Class->Max_Passengers() > 0 &&
+            (!aircraft->Cargo.Is_Something_Attached() || aircraft->Ammo == 0)
+            && aircraft->Mission != MISSION_RETREAT)
+        {
+            aircraft->Assign_Mission(MISSION_RETREAT);
+            aircraft->Commence();
+        }
+    }
+}
+
+
+DECLARE_PATCH(_AircraftClass_AI_Hook_Patch)
+{
+    GET_REGISTER_STATIC(AircraftClass*, this_ptr, ebp);
+    static AircraftClassExtension *aircraftext;
+
+    aircraftext = Extension::Fetch<AircraftClassExtension>(this_ptr);
+    Check_For_Paradrop_Aircraft(this_ptr, aircraftext);
+
+    /**
+     *  Stolen bytes / code.
+     *  Process FootClass AI logic, jump out if we are
+     *  not active afterwards.
+     */
+    this_ptr->FootClass::AI();
+    if (!this_ptr->IsActive) {
+        JMP_REG(ebx, 0x004093DE);
+    }
+
+    /**
+     *  Continue function execution.
+     */
+    JMP(0x0040918A);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void AircraftClassExtension_Hooks()
@@ -511,4 +579,6 @@ void AircraftClassExtension_Hooks()
     Patch_Jump(0x00408940, &AircraftClassExt::_Unlimbo);
     Patch_Jump(0x0040D260, &AircraftClassExt::_Cell_Seems_Ok);
     Patch_Jump(0x0040B3A6, &_AircraftClass_Enter_Idle_Mode_Spawner_Patch);
+    Patch_Jump(0x00409910, &AircraftClassExt::_Mission_Retreat);
+    Patch_Jump(0x0040917A, &_AircraftClass_AI_Hook_Patch);
 }
