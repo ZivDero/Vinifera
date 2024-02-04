@@ -40,7 +40,10 @@
  *  @author: CCHyper
  */
 AircraftClassExtension::AircraftClassExtension(const AircraftClass *this_ptr) :
-    FootClassExtension(this_ptr)
+    FootClassExtension(this_ptr),
+    Spawner(nullptr),
+    IsParadropReinforcement(false),
+    IsParadropAmmoReplenished(false)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("AircraftClassExtension::AircraftClassExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
