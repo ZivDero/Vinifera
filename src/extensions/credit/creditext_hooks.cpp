@@ -46,23 +46,30 @@
 #include "hooker_macros.h"
 
 
-/**
- *  Modifies the color of the "Options" text based on the player's side.
- *
- *  @author: Rampastring, ZivDero
- */
+ /**
+  *  Modifies the color of the "Options" text based on the player's side.
+  *
+  *  @author: Rampastring, ZivDero
+  */
 DECLARE_PATCH(_TabClass_Draw_It_Faction_Specific_Options_Button_Color_Scheme_Patch)
 {
     static ColorSchemeType colorschemetype;
     static ColorScheme* colorscheme;
 
-    colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->UIColor;
-    colorscheme = ColorSchemes[colorschemetype];
+    if (ScenExtension->CachedUIColorSchemeIndex > -1)
+    {
+        colorscheme = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex];
+    }
+    else
+    {
+        colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->UIColor;
+        colorscheme = ColorSchemes[colorschemetype];
+    }
 
-    _asm mov edx, colorscheme 
+    _asm mov edx, colorscheme
     _asm mov ecx, LogicSurface
     _asm mov ecx, [ecx]
-    JMP(0x0060E5B4);
+        JMP(0x0060E5B4);
 }
 
 
@@ -80,8 +87,15 @@ DECLARE_PATCH(_CreditClass_Graphic_Logic_Faction_Specific_Color_Scheme_Patch)
     static ColorSchemeType colorschemetype;
     static ColorScheme* colorscheme;
 
-    colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->UIColor;
-    colorscheme = ColorSchemes[colorschemetype];
+    if (ScenExtension->CachedUIColorSchemeIndex > -1)
+    {
+        colorscheme = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex];
+    }
+    else
+    {
+        colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->UIColor;
+        colorscheme = ColorSchemes[colorschemetype];
+    }
 
     _asm mov eax, colorscheme
     JMP_REG(ecx, 0x004714F0);
@@ -97,8 +111,17 @@ void Draw_Tooltip_Rectangle(DSurface* surface, Rect& drawrect)
 {
     surface->Fill_Rect(drawrect, 0);
 
-    const ColorSchemeType colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->ToolTipColor;
-    const ColorScheme* colorscheme = ColorSchemes[colorschemetype];
+    ColorScheme* colorscheme;
+
+    if (ScenExtension->CachedUIColorSchemeIndex > -1)
+    {
+        colorscheme = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex];
+    }
+    else
+    {
+        ColorSchemeType colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->ToolTipColor;
+        colorscheme = ColorSchemes[colorschemetype];
+    }
 
     RGBClass rgb = colorscheme->HSV.operator RGBClass();
     surface->Draw_Rect(drawrect, DSurface::RGB_To_Pixel(rgb));
@@ -116,7 +139,7 @@ DECLARE_PATCH(_CCToolTip_Draw_Faction_Specific_Color_Scheme_Rect_Patch)
     GET_REGISTER_STATIC(Rect*, drawrect, eax);
 
     Draw_Tooltip_Rectangle(surface, *drawrect);
-    
+
     JMP(0x0044E6D4);
 }
 
@@ -131,8 +154,15 @@ DECLARE_PATCH(_CCToolTip_Draw_Faction_Specific_Color_Scheme_Text_Patch)
     static ColorSchemeType colorschemetype;
     static ColorScheme* colorscheme;
 
-    colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->ToolTipColor;
-    colorscheme = ColorSchemes[colorschemetype];
+    if (ScenExtension->CachedUIColorSchemeIndex > -1)
+    {
+        colorscheme = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex];
+    }
+    else
+    {
+        colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->ToolTipColor;
+        colorscheme = ColorSchemes[colorschemetype];
+    }
 
     _asm mov eax, colorscheme
     JMP_REG(ecx, 0x0044E6F8);
