@@ -66,4 +66,12 @@ class ScenarioClassExtension final : public GlobalExtensionClass<ScenarioClass>
 
         RGBStruct ScorePlayerColor;
         RGBStruct ScoreEnemyColor;
+
+        /**
+         *  Name of a color that is used for the user interface in this scenario.
+         *  If empty, then the default color for the player faction is used.
+         */
+        char UIColorOverrideName[24];
+
+        int CachedUIColorSchemeIndex;
 };

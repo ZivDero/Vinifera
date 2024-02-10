@@ -1061,4 +1061,5 @@ void Read_Scenario_Read_Basic_Section_Options(CCINIClass &scenario_ini)
 
     ScenExtension->ScorePlayerColor = scenario_ini.Get_RGB(BASIC, "ScorePlayerColor", ScenExtension->ScorePlayerColor);
     ScenExtension->ScoreEnemyColor = scenario_ini.Get_RGB(BASIC, "ScoreEnemyColor", ScenExtension->ScoreEnemyColor);
+    scenario_ini.Get_String(BASIC, "UIColorName", ScenExtension->UIColorOverrideName, ARRAY_SIZE(ScenExtension->UIColorOverrideName));
 }
