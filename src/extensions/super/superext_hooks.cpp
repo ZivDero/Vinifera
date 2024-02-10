@@ -87,7 +87,6 @@ void SuperClassFake::_Do_DropPods(Cell* cell)
 					return;
 
 				strcpy(newscripttype->IniName, "PARADROPINF_SCRIPT");
-				// newscripttype->MissionCount = 1;
 				newscripttype->MissionCount = 2;
 				newscripttype->MissionList[0].Mission = SMISSION_ATT_WAYPT;
 				newscripttype->MissionList[0].Data.Value = WAYPT_SPECIAL;
