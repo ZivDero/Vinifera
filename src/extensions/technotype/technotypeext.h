@@ -156,4 +156,9 @@ class TechnoTypeClassExtension : public ObjectTypeClassExtension
          *  Optional override for the cost that is used for determining the techno's build time.
          */
         int BuildTimeCost;
+
+        /**
+         *  Description for the extended sidebar tooltip.
+         */
+        char Description[200];
 };
