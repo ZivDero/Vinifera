@@ -177,6 +177,7 @@ void ScenarioClassExtension::Init_Clear()
 
     UIColorOverrideName[0] = '\0';
     CachedUIColorSchemeIndex = -1;
+    CachedToolTipColorSchemeIndex = -1;
 
     //EXT_DEBUG_TRACE("ScenarioClassExtension::Init_Clear - 0x%08X\n", (uintptr_t)(This()));
 
