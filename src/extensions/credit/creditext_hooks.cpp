@@ -79,6 +79,41 @@ ColorScheme* UI_Color_Scheme_From_Player_House()
 }
 
 
+/**
+ *  Helper function for getting a ColorScheme instance
+ *  based on the player's side. Necessary because the switch-case
+ *  trashes the stack.
+ */
+ColorScheme* ToolTip_Color_Scheme_From_Player_House()
+{
+    // Allow overriding the UI color with a special scenario-defined color.
+    if (ScenExtension != nullptr) {
+        if (ScenExtension->UIColorOverrideName[0] != '\0') {
+            return ColorScheme::As_Pointer(ScenExtension->UIColorOverrideName);
+        }
+    }
+
+    if (PlayerPtr != nullptr)
+    {
+        switch (PlayerPtr->ActLike)
+        {
+        case 0: // GDI
+        case 1: // Nod
+            return ColorScheme::As_Pointer("LightGold");
+            break;
+        case 2: // Allies
+            return ColorScheme::As_Pointer("Gold");
+            break;
+        case 3: // Soviet
+            return ColorScheme::As_Pointer("Gold");
+            break;
+        }
+    }
+
+    return nullptr;
+}
+
+
 void Fetch_UI_Color_Scheme()
 {
     // If the color scheme is null, fetch it.
@@ -91,6 +126,19 @@ void Fetch_UI_Color_Scheme()
             ScenExtension->CachedUIColorSchemeIndex = colorscheme->ID - 1;
         } else {
             ScenExtension->CachedUIColorSchemeIndex = 0;
+        }
+    }
+
+    // If the ToolTip color scheme is null, fetch it.
+    if (ScenExtension != nullptr && ScenExtension->CachedToolTipColorSchemeIndex < 0) {
+        ColorScheme* colorscheme = ToolTip_Color_Scheme_From_Player_House();
+
+        // If we could not find a color scheme based on the player house, then default to the first color in the list.
+        if (colorscheme != nullptr) {
+            ScenExtension->CachedToolTipColorSchemeIndex = colorscheme->ID - 1;
+        }
+        else {
+            ScenExtension->CachedToolTipColorSchemeIndex = 0;
         }
     }
 }
@@ -172,8 +220,8 @@ void Draw_Tooltip_Rectangle(DSurface* surface, Rect& drawrect)
 {
     surface->Fill_Rect(drawrect, 0);
 
-    if (ScenExtension->CachedUIColorSchemeIndex > -1) {
-        RGBClass rgb = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex]->field_308.operator RGBClass();
+    if (ScenExtension->CachedToolTipColorSchemeIndex > -1) {
+        RGBClass rgb = ColorSchemes[ScenExtension->CachedToolTipColorSchemeIndex]->field_308.operator RGBClass();
         surface->Draw_Rect(drawrect, DSurface::RGB_To_Pixel(rgb));
     }
     else {
@@ -197,8 +245,8 @@ DECLARE_PATCH(_CCToolTip_Draw_Faction_Specific_Color_Scheme_Text_Patch)
 {
     static const char* colorname;
 
-    if (ScenExtension->CachedUIColorSchemeIndex > -1) {
-        colorname = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex]->Name;
+    if (ScenExtension->CachedToolTipColorSchemeIndex > -1) {
+        colorname = ColorSchemes[ScenExtension->CachedToolTipColorSchemeIndex]->Name;
     }
     else {
         colorname = "Green";

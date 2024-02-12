@@ -71,4 +71,5 @@ class ScenarioClassExtension final : public GlobalExtensionClass<ScenarioClass>
         char UIColorOverrideName[24];
 
         int CachedUIColorSchemeIndex;
+        int CachedToolTipColorSchemeIndex;
 };
