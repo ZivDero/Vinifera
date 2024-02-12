@@ -206,4 +206,7 @@ void SidebarClassExtension_Hooks()
     // NOP away tooltip length check for formatting
     Patch_Byte(0x0044E486, 0x90);
     Patch_Byte(0x0044E486 + 1, 0x90);
+
+    // Change jle to jl to allow rendering tooltips that are exactly as wide as the sidebar
+    Patch_Byte(0x0044E605 + 1, 0x8C);
 }
