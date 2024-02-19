@@ -306,5 +306,6 @@ void CreditClassExtension_Hooks()
     Patch_Jump(0x0044E682, &_CCToolTip_Draw_Faction_Specific_Color_Scheme_Rect_Patch);
     Patch_Jump(0x0044E6E2, &_CCToolTip_Draw_Faction_Specific_Color_Scheme_Text_Patch);
 
-    Patch_Jump(0x005ADF5A, &_ProgressScreenClass_Draw_Faction_Specific_Color_Scheme_Patch);
+    // Rampastring: Seems to cause the first line to go white for GDI. Disabled until fixed.
+    // Patch_Jump(0x005ADF5A, &_ProgressScreenClass_Draw_Faction_Specific_Color_Scheme_Patch);
 }
