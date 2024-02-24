@@ -40,11 +40,11 @@
 #include "asserthandler.h"
 
 
- /**
-  *  Finds the nearest docking bay for a specific unit.
-  *
-  *  @author: Rampastring
-  */
+/**
+ *  Finds the nearest docking bay for a specific unit.
+ *
+ *  @author: Rampastring
+ */
 void UnitClassExtension_Find_Nearest_Refinery(UnitClass* this_ptr, BuildingClass** building_addr, int* distance_addr, bool include_reserved)
 {
     int nearest_refinery_distance = INT_MAX;
