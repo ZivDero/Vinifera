@@ -111,6 +111,50 @@ return_false:
 
 
 /**
+ *  A fake class for implementing new member functions which allow
+ *  access to the "this" pointer of the intended class.
+ *
+ *  @note: This must not contain a constructor or deconstructor!
+ *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
+ */
+static class TechnoClassFake final : public TechnoClass
+{
+public:
+    int _Cell_Distance_Squared(const AbstractClass* object) const;
+};
+
+
+/**
+ *  Calculates the cell-based distance between this object and another object.
+ *  Cell-based distance does not take leptons into account, only cell coordinates.
+ *
+ *  The original game's distance functions, such as Distance_Squared, also take leptons into
+ *  account, which can lead into overflows that have bad consequences.
+ *  For example, a harvester looking for a refinery on a big 256x256 sized map can believe
+ *  that a refinery on the other side of the map would be next to it.
+ *
+ *  @author: Rampastring
+ */
+int TechnoClassFake::_Cell_Distance_Squared(const AbstractClass* object) const
+{
+    if (!object)
+        return 0;
+
+    Coordinate our_coord = Center_Coord();
+    Coordinate their_coord = object->Center_Coord();
+
+    int our_cell_x = our_coord.X / CELL_LEPTON_W;
+    int their_cell_x = their_coord.X / CELL_LEPTON_W;
+    int our_cell_y = our_coord.Y / CELL_LEPTON_H;
+    int their_cell_y = our_coord.Y / CELL_LEPTON_H;
+
+    int x_distance = our_cell_x - their_cell_x;
+    int y_distance = our_cell_y - their_cell_y;
+    return x_distance * x_distance + y_distance * y_distance;
+}
+
+
+/**
  *  #issue-594
  * 
  *  Implements IsCanRetaliate for TechnoTypes.
@@ -982,4 +1026,5 @@ void TechnoClassExtension_Hooks()
     Patch_Jump(0x0063381A, &_TechnoClass_Record_The_Kill_Strengthen_Killer_Patch);
     Patch_Jump(0x006306B5, &_TechnoClass_Fire_At_Spawn_Aircraft_Patch);
     Patch_Jump(0x00637B83, &_TechnoClass_Draw_Pips_No_Medic_Indicator_In_Shroud_Patch);
+    Patch_Call(0x00637FF5, &TechnoClassFake::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
 }

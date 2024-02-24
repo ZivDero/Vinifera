@@ -62,6 +62,10 @@ int _Format_Window_String_Custom_Implementation(char* string, WWFontClass* font,
     if (!string)
         return(0);
 
+    // If no font was passed in, then we cannot measure the lines.
+    if (!font)
+        return 0;
+
     // While there are more letters left divide the line up.
     while (*string) {
         linelen = 0;
