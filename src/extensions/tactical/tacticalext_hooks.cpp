@@ -34,6 +34,7 @@
 #include "ebolt.h"
 #include  "house.h"
 #include "buildingtype.h"
+#include "mouse.h"
 #include "unittype.h"
 #include "unit.h"
 #include "vinifera_globals.h"
@@ -517,6 +518,29 @@ DECLARE_PATCH(_Tactical_Select_These_Unselect_NonCombatants_Patch)
 
 
 /**
+ *  #issue-1050
+ *
+ *  Fixes a bug where the camera keeps following a followed object
+ *  when a trigger or script tells it to center on a waypoint
+ *  or a team.
+ *
+ *  @author: Rampastring
+ */
+DECLARE_PATCH(_Tactical_Center_On_Location_Unfollow_Object_Patch)
+{
+    Map.Follow_This(nullptr);
+
+    // Rebuild function epilogue
+    _asm { pop  edi }
+    _asm { pop  esi }
+    _asm { pop  ebp }
+    _asm { pop  ebx }
+    _asm { add  esp, 8 }
+    _asm { retn 8 }
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void TacticalExtension_Hooks()
@@ -551,4 +575,6 @@ void TacticalExtension_Hooks()
      */
     Patch_Dword(0x006171C8+1, (TPF_CENTER|TPF_EFNT|TPF_FULLSHADOW));
     Patch_Jump(0x00616FDA, &_Tactical_Draw_Waypoint_Paths_Text_Color_Patch);
+
+    Patch_Jump(0x0060F953, &_Tactical_Center_On_Location_Unfollow_Object_Patch);
 }
