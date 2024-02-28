@@ -1724,15 +1724,17 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
     {
         BuildingClass* bldg = Buildings[i];
 
-        if (bldg->House == this_ptr->House && bldg != this_ptr && bldg->Mission == MISSION_GUARD && !bldg->Factory && bldg->Class->ToBuild == this_ptr->Class->ToBuild)
+        if (bldg->House == this_ptr->House && bldg != this_ptr && bldg->Mission == MISSION_GUARD && !bldg->Factory && bldg->Class->ToBuild == this_ptr->Class->ToBuild && bldg->Is_Powered_On())
         {
             // Original TS code, left here for reference. Was part of the above condition
             // if (bldg->Class != this_ptr->Class)
             //     continue;
 
+            TechnoTypeClass* technotype = exiting_object->Techno_Type_Class();
+
             // Check ownable, so only factories of a faction that owns the object can
             // build the object
-            if ((bldg->Class->Get_Ownable() & exiting_object->Techno_Type_Class()->Get_Ownable()) == 0) {
+            if ((bldg->Class->Get_Ownable() & technotype->Get_Ownable()) == 0) {
                 continue;
             }
 
@@ -1743,7 +1745,7 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
                 bool is_naval = true;
 
                 if (exiting_object->What_Am_I() == RTTI_UNIT) {
-                    UnitTypeClassExtension* unitext = Extension::Fetch<UnitTypeClassExtension>(exiting_object);
+                    UnitTypeClassExtension* unitext = Extension::Fetch<UnitTypeClassExtension>(technotype);
                     is_naval = unitext->IsNaval;
                 }
 
