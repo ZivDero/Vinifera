@@ -146,7 +146,7 @@ int TechnoClassFake::_Cell_Distance_Squared(const AbstractClass* object) const
     int our_cell_x = our_coord.X / CELL_LEPTON_W;
     int their_cell_x = their_coord.X / CELL_LEPTON_W;
     int our_cell_y = our_coord.Y / CELL_LEPTON_H;
-    int their_cell_y = our_coord.Y / CELL_LEPTON_H;
+    int their_cell_y = their_coord.Y / CELL_LEPTON_H;
 
     int x_distance = our_cell_x - their_cell_x;
     int y_distance = our_cell_y - their_cell_y;
