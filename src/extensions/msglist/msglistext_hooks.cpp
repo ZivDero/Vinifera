@@ -101,6 +101,7 @@ DECLARE_PATCH(_MessageListClass_Init_Modify_Width_Patch)
     }
 
     width -= posx;
+    width -= 5;
 
     DEBUG_INFO("MessageListClass::Init(Width: %d)", width);
     this_ptr->Width = width;
