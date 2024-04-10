@@ -1027,4 +1027,7 @@ void TechnoClassExtension_Hooks()
     Patch_Jump(0x006306B5, &_TechnoClass_Fire_At_Spawn_Aircraft_Patch);
     Patch_Jump(0x00637B83, &_TechnoClass_Draw_Pips_No_Medic_Indicator_In_Shroud_Patch);
     Patch_Call(0x00637FF5, &TechnoClassFake::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
+
+    // Do not trigger "Discovered by Player" when an object is destroyed
+    Patch_Jump(0x00633745, (uintptr_t)0x00633762);
 }
