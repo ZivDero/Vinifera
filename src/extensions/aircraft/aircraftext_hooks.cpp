@@ -487,4 +487,8 @@ void AircraftClassExtension_Hooks()
     Patch_Jump(0x0040917A, &_AircraftClass_AI_Spawned_Return_To_Owner_Patch);
     Patch_Jump(0x0040917A, &_AircraftClass_AI_Hook_Patch);
     Patch_Jump(0x00409910, &AircraftClassFake::_Mission_Retreat);
+
+    // Fix bug where aircraft are unable to attack targets in shroud in campaign games
+    // and instead get stuck in mid-air
+    Patch_Jump(0x0040D0C5, (uintptr_t)0x0040D0EA);
 }
