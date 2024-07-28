@@ -536,45 +536,6 @@ DECLARE_PATCH(_SwizzleManagerClass_Process_Tables_Remap_Failed_Error)
 }
 
 
-#ifndef RELEASE
-/**
- *  Disables the Load, Save and Delete buttons in the options menu.
- * 
- *  @author: CCHyper
- */
-DECLARE_PATCH(_SaveLoad_Disable_Buttons)
-{
-    GET_REGISTER_STATIC(HWND, hDlg, ebp);
-
-    EnableWindow(GetDlgItem(hDlg, 1310), FALSE); // Load button
-    EnableWindow(GetDlgItem(hDlg, 1311), FALSE); // Save button
-    EnableWindow(GetDlgItem(hDlg, 1312), FALSE); // Delete button
-
-    JMP(0x004B6DF5);
-}
-
-/**
- *  Disables the Load button on the Firestorm main menu.
- * 
- *  @author: CCHyper
- */
-DECLARE_PATCH(_NewMenuClass_Process_Disable_Load_Button_Firestorm)
-{
-    JMP(0x0057FFAC);
-}
-
-/**
- *  Disables the Load button on the Tiberian Sun main menu.
- * 
- *  @author: CCHyper
- */
-DECLARE_PATCH(_NewMenuClass_Process_Disable_Load_Button_TiberianSun)
-{
-    JMP(0x00580075);
-}
-#endif
-
-
 /**
  *  Patch in the Vinifera data to be saved in the stream.
  * 
