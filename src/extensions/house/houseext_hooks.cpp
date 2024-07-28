@@ -1016,7 +1016,7 @@ const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
     // Build power by default, but only if we have somewhere to expand towards.
     if (houseext->NextExpansionPointLocation.X != 0 && houseext->NextExpansionPointLocation.Y != 0) {
         if (our_basic_power != BUILDING_NONE) {
-            DEBUG_INFO("AdvAI: Making AI build %s because it the AI is expanding.\n",
+            DEBUG_INFO("AdvAI: Making AI build %s because the AI is expanding.\n",
                 BuildingTypes[our_basic_power]->IniName);
             return BuildingTypes[our_basic_power];
         }
@@ -1132,6 +1132,7 @@ void AdvAI_Raise_Money(HouseClass* house)
 
         if (cost > bestcost) {
             bestbuilding = building;
+            bestcost = cost;
         }
     }
 
