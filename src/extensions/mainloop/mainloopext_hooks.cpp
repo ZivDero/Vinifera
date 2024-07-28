@@ -31,6 +31,7 @@
 #include "tibsun_functions.h"
 #include "anim.h"
 #include "animtype.h"
+#include "command.h"
 #include "infantry.h"
 #include "unit.h"
 #include "aircraft.h"
@@ -289,6 +290,56 @@ void _DTA_Compute_Game_CRC(void)
     Add_CRC(&GameCRC, Scen->RandomNumber());
 }
 
+
+void Process_Command_If_Allowed(CommandClass* command)
+{
+    if (!Scen->UserInputLocked || (CommandClass::From_Type(COMMAND_OPTIONS) == command)) {
+        command->Process();
+    }
+}
+
+/**
+ *  #issue-255
+ *
+ *  Fixes the user being able to do keyboard input and as such, affect
+ *  game state while input is locked.
+ *
+ *  @author: Rampastring
+ */
+DECLARE_PATCH(_Main_Loop_Check_Keyboard_Input_Allowed)
+{
+    GET_REGISTER_STATIC(CommandClass*, command, ecx);
+    Process_Command_If_Allowed(command);
+    JMP(0x00508EA8);
+}
+
+DECLARE_PATCH(_Keyboard_Process_Check_Keyboard_Input_Allowed)
+{
+    GET_REGISTER_STATIC(CommandClass*, command, ecx);
+    Process_Command_If_Allowed(command);
+
+    // Rebuild function epilogue, we destroyed one byte of it
+    // by jumping to this hack
+    _asm { pop esi }
+    _asm { pop ebp }
+    _asm { retn }
+}
+
+DECLARE_PATCH(_Sync_Delay_Check_Keyboard_Input_Allowed_Patch1)
+{
+    GET_REGISTER_STATIC(CommandClass*, command, eax);
+    Process_Command_If_Allowed(command);
+    JMP(0x00509659);
+}
+
+DECLARE_PATCH(_Sync_Delay_Check_Keyboard_Input_Allowed_Patch2)
+{
+    GET_REGISTER_STATIC(CommandClass*, command, ecx);
+    Process_Command_If_Allowed(command);
+    JMP(0x0050976C);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -297,6 +348,16 @@ void MainLoop_Hooks()
     Patch_Call(0x00462A8E, &Main_Loop_Intercept);
     Patch_Call(0x00462A9C, &Main_Loop_Intercept);
     Patch_Call(0x005A0B85, &Main_Loop_Intercept);
+
+    // #issue-255
+    // Keyboard patches
+    // Not all are technically not related to main loop,
+    // but it's identical to the main loop patch so we include it here
+    Patch_Jump(0x00508E83, &_Main_Loop_Check_Keyboard_Input_Allowed);
+    Patch_Jump(0x0050945C, &_Keyboard_Process_Check_Keyboard_Input_Allowed);
+    Patch_Jump(0x00509632, &_Sync_Delay_Check_Keyboard_Input_Allowed_Patch1);
+    Patch_Jump(0x00509747, &_Sync_Delay_Check_Keyboard_Input_Allowed_Patch2);
+
     Patch_Jump(0x005B10F0, &_Queue_Options_Frame_Step_Check_Patch);
     Patch_Jump(0x005B5550, &_DTA_Compute_Game_CRC);
 }
