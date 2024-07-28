@@ -108,17 +108,19 @@ DECLARE_PATCH(_set_fp_mode)
 static void Check_Vinifera_FP_Mode()
 {
     // Fetch FP control value
-    int fpcontrol = _controlfp(0, 0);
-    if ((fpcontrol & _MCW_PC) != _PC_24)
-    {
-        DEBUG_FATAL("FPU precision mode change detected. Value: 0x%08x\n", fpcontrol);
-        Emergency_Exit(255);
-    }
+    if (Session.Type == GAME_IPX) {
+        int fpcontrol = _controlfp(0, 0);
+        if ((fpcontrol & _MCW_PC) != _PC_24)
+        {
+            DEBUG_FATAL("FPU precision mode change detected. Value: 0x%08x\n", fpcontrol);
+            Emergency_Exit(255);
+        }
 
-    if ((fpcontrol & _MCW_RC) != _RC_CHOP) // _RC_NEAR
-    {
-        DEBUG_FATAL("FPU rounding mode change detected. Value: 0x%08x\n", fpcontrol);
-        Emergency_Exit(255);
+        if ((fpcontrol & _MCW_RC) != _RC_CHOP) // _RC_NEAR
+        {
+            DEBUG_FATAL("FPU rounding mode change detected. Value: 0x%08x\n", fpcontrol);
+            Emergency_Exit(255);
+        }
     }
 }
 
