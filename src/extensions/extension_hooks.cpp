@@ -49,6 +49,7 @@
 #include "cargoext_hooks.h"
 #include "cellext_hooks.h"
 #include "creditext_hooks.h"
+#include "eventext_hooks.h"
 #include "factoryext_hooks.h"
 #include "houseext_hooks.h"
 #include "housetypeext_hooks.h"
@@ -195,6 +196,7 @@ void Extension_Hooks()
     CargoClassExtension_Hooks();
     CellClassExtension_Hooks();
     CreditClassExtension_Hooks();
+    EventClassExtension_Hooks();
     FactoryClassExtension_Hooks();
     HouseClassExtension_Hooks();
     HouseTypeClassExtension_Hooks();

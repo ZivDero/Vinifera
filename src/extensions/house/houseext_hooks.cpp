@@ -2544,6 +2544,53 @@ void _HouseClass_AI_Building_Check_For_Corrupted_Base_Node(HouseClass* house)
 #endif
 
 
+
+bool Passes_Additional_Validity_Checks(TechnoTypeClass* technotype, HouseClass* house)
+{
+    if (technotype == nullptr) {
+        // TechnoType is null, nothingness cannot be built.
+        return false;
+    }
+
+    if (house->Is_Human_Control() &&
+        (technotype->TechLevel < 0 || technotype->TechLevel > house->Control.TechLevel)) {
+        // TechnoType cannot be built by this human player.
+        return false;
+    }
+
+    return true;
+}
+
+
+/**
+ *  Fixes a cheat in the original game where players were able to build
+ *  unbuildable objects. Also fixes a bug where players could crash the game
+ *  for everyone by attempting to build a nonexistent object.
+ *
+ *  Author: Rampastring
+ */
+DECLARE_PATCH(_HouseClass_Begin_Production_Check_For_Unallowed_Buildables)
+{
+    GET_REGISTER_STATIC(TechnoTypeClass*, technotype, eax);
+    GET_REGISTER_STATIC(HouseClass*, this_ptr, ebp);
+    static BuildingClass* factorybuilding;
+
+    // Restore stolen code / bytes.
+    _asm { mov  edi, eax }
+
+    if (!Passes_Additional_Validity_Checks(technotype, this_ptr)) {
+        // Additional production validity check failed, exit from function.
+        JMP(0x004BE28D);
+    }
+
+    factorybuilding = technotype->Who_Can_Build_Me(false, true, true, this_ptr);
+
+    // Continue original game code.
+    _asm { mov  eax, dword ptr ds:factorybuilding }
+    JMP_REG(edx, 0x004BE22B);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -2603,4 +2650,5 @@ void HouseClassExtension_Hooks()
 
     Patch_Jump(0x004CA4A0, &HouseClassExt::_AI_Target_MultiMissile);
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
+    Patch_Jump(0x004BE218, &_HouseClass_Begin_Production_Check_For_Unallowed_Buildables);
 }
