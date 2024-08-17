@@ -46,8 +46,10 @@
 #include "bulletext_hooks.h"
 #include "bullettypeext_hooks.h"
 #include "campaignext_hooks.h"
+#include "cargoext_hooks.h"
 #include "cellext_hooks.h"
 #include "creditext_hooks.h"
+#include "eventext_hooks.h"
 #include "factoryext_hooks.h"
 #include "houseext_hooks.h"
 #include "housetypeext_hooks.h"
@@ -182,8 +184,10 @@ void Extension_Hooks()
     BulletClassExtension_Hooks();
     BulletTypeClassExtension_Hooks();
     CampaignClassExtension_Hooks();
+    CargoClassExtension_Hooks();
     CellClassExtension_Hooks();
     CreditClassExtension_Hooks();
+    EventClassExtension_Hooks();
     FactoryClassExtension_Hooks();
     HouseClassExtension_Hooks();
     HouseTypeClassExtension_Hooks();
