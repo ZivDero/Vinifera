@@ -1660,12 +1660,6 @@ DECLARE_PATCH(_HouseClass_Begin_Production_Check_For_Unallowed_Buildables)
 }
 
 
-DECLARE_PATCH(_HouseClass_Remove_ConYard_Owner_Check)
-{
-    JMP(0x004BC102);
-}
-
-
 /**
  *  Main function for patching the hooks.
  */
@@ -1687,6 +1681,6 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
     Patch_Jump(0x004BE218, &_HouseClass_Begin_Production_Check_For_Unallowed_Buildables);
-    Patch_Jump(0x004BC023, &_HouseClass_Remove_ConYard_Owner_Check);
+    Patch_Jump(0x004BC023, 0x004BC102); // Skip checking the owner of the MCV when building buildings
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
 }
