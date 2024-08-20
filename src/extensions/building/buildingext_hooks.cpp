@@ -107,8 +107,11 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
 }
 
 
-// Comparison function for sorting sidebar icons (BuildTypes)
-// Author: Rampastring
+/**
+ *  Comparison function for sorting sidebar icons (BuildTypes)
+ *
+ *  @author: Rampastring
+ */
 int __cdecl BuildType_Comparison(const void* p1, const void* p2)
 {
     SidebarClass::StripClass::BuildType* bt1 = (SidebarClass::StripClass::BuildType*)p1;

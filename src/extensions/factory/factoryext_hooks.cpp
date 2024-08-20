@@ -103,7 +103,7 @@ void FactoryClassFake::_Verify_Can_Build()
 	}
 
 	House->Update_Factories(type);
-    Resume_Queue();
+	Resume_Queue();
 }
 
 
