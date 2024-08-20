@@ -57,7 +57,7 @@ public:
 
 /**
  *  Checks if this factory should abandon construction because the objects
- *    in the queue are no longer available to build
+ *  in the queue are no longer available to build
  *
  *  @author: ZivDero
  */
@@ -70,40 +70,45 @@ void FactoryClassFake::_Verify_Can_Build()
 
     const TechnoTypeClass* producing_type = producing_object->Techno_Type_Class();
     const RTTIType type = producing_type->Kind_Of();
+    const bool is_building = type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE;
+
+    bool need_update = false;
 
     // Check the thing we're currently building separately - it needs special handling
-    if (!House->Can_Build(producing_type, false, false))
+    if (!House->Can_Build(producing_type, false, true))
     {
         Abandon();
+        need_update = true;
 
-        if (House == PlayerPtr)
+        // Remove map placement if we're doing that
+        if (is_building && House == PlayerPtr)
         {
-            const int column = type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE ? 0 : 1;
-            Map.Column[column].Flag_To_Redraw();
-
-            // Remove map placement if we're doing that
-            if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
-            {
-                Map.PendingObject = nullptr;
-                Map.PendingObjectPtr = nullptr;
-                Map.PendingHouse = HOUSE_NONE;
-                Map.Set_Cursor_Shape(nullptr);
-            }
+            Map.PendingObject = nullptr;
+            Map.PendingObjectPtr = nullptr;
+            Map.PendingHouse = HOUSE_NONE;
+            Map.Set_Cursor_Shape(nullptr);
         }
     }
 
     // Now make sure there are no invalid objects in the queue
     for (int i = 0; i < QueuedObjects.Count(); i++)
     {
-        if (!House->Can_Build(QueuedObjects[i], false, false))
+        if (!House->Can_Build(QueuedObjects[i], false, true))
         {
             Remove_From_Queue(*QueuedObjects[i]);
+            need_update = true;
             i--;
         }
     }
 
-    House->Update_Factories(type);
-    Resume_Queue();
+    if (need_update)
+    {
+        if (House == PlayerPtr)
+            Map.Column[is_building ? 0 : 1].Flag_To_Redraw();
+
+        House->Update_Factories(type);
+        Resume_Queue();
+    }
 }
 
 
@@ -176,7 +181,7 @@ production_completed:
  *
  *  @author: ZivDero
  */
-DECLARE_PATCH(_Factory_Class_AI_Abandon_If_Cant_Build)
+DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
 {
     GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
 
@@ -201,5 +206,5 @@ DECLARE_PATCH(_Factory_Class_AI_Abandon_If_Cant_Build)
 void FactoryClassExtension_Hooks()
 {
     Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
-    Patch_Jump(0x00496EA7, &_Factory_Class_AI_Abandon_If_Cant_Build);
+    Patch_Jump(0x00496EA7, &_FactoryClass_AI_Abandon_If_Cant_Build);
 }
