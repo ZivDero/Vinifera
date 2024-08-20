@@ -107,6 +107,14 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
 }
 
 
+/**
+ *  Makes the game check whether you can actually build the object before adding it to the sidebar,
+ *  preventing grayed out cameos (except for build limited types)
+ *
+ *  This reimplements the entire BuildingClass::Update_Buildables() function
+ *
+ *  @author: ZivDero
+ */
 void BuildingClassFake::_Update_Buildables()
 {
     if (House == PlayerPtr && !IsInLimbo && IsDiscoveredByPlayer && IsPowerOn)
