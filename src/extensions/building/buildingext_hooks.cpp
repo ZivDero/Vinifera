@@ -66,6 +66,7 @@
 #include "fatal.h"
 #include "asserthandler.h"
 #include "debughandler.h"
+#include "infantrytype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -82,6 +83,7 @@ static class BuildingClassFake final : public BuildingClass
 {
 public:
     bool _Can_Have_Rally_Point();
+    void _Update_Buildables();
 };
 
 
@@ -102,6 +104,59 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
         return true;
 
     return false;
+}
+
+
+void BuildingClassFake::_Update_Buildables()
+{
+    if (House == PlayerPtr && !IsInLimbo && IsDiscoveredByPlayer && IsPowerOn)
+    {
+        switch (Class->ToBuild)
+        {
+        case RTTI_AIRCRAFTTYPE:
+            for (int i = 0; i < AircraftTypes.Count(); i++)
+            {
+                if (PlayerPtr->Can_Build(AircraftTypes[i], false, true) && AircraftTypes[i]->Who_Can_Build_Me(true, true, true, PlayerPtr) != nullptr)
+                {
+                    Map.Add(RTTI_AIRCRAFTTYPE, i);
+                }
+            }
+            break;
+
+        case RTTI_BUILDINGTYPE:
+            for (int i = 0; i < BuildingTypes.Count(); i++)
+            {
+                if (PlayerPtr->Can_Build(BuildingTypes[i], false, true) && BuildingTypes[i]->Who_Can_Build_Me(true, true, true, PlayerPtr) != nullptr)
+                {
+                    Map.Add(RTTI_BUILDINGTYPE, i);
+                }
+            }
+            break;
+
+        case RTTI_INFANTRYTYPE:
+            for (int i = 0; i < InfantryTypes.Count(); i++)
+            {
+                if (PlayerPtr->Can_Build(InfantryTypes[i], false, true) && InfantryTypes[i]->Who_Can_Build_Me(true, true, true, PlayerPtr) != nullptr)
+                {
+                    Map.Add(RTTI_INFANTRYTYPE, i);
+                }
+            }
+            break;
+
+        case RTTI_UNITTYPE:
+            for (int i = 0; i < UnitTypes.Count(); i++)
+            {
+                if (PlayerPtr->Can_Build(UnitTypes[i], false, true) && UnitTypes[i]->Who_Can_Build_Me(true, true, true, PlayerPtr) != nullptr)
+                {
+                    Map.Add(RTTI_UNITTYPE, i);
+                }
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
 }
 
 
@@ -2006,4 +2061,6 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042EF9D, &_BuildingClass_What_Action_Allow_Rally_Point_For_Naval_Yard_Patch);
 
     Patch_Jump(0x0042C624, &_BuildingClass_Assign_Target_No_Deconstruction_With_Null_UndeploysInto);
+
+    Patch_Jump(0x0042D9A0, &BuildingClassFake::_Update_Buildables);
 }
