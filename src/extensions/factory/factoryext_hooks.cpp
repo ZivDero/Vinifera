@@ -33,9 +33,71 @@
 #include "fatal.h"
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "technotype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "mouse.h"
+#include "techno.h"
+
+
+ /**
+  *  A fake class for implementing new member functions which allow
+  *  access to the "this" pointer of the intended class.
+  *
+  *  @note: This must not contain a constructor or deconstructor!
+  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
+  */
+static class FactoryClassFake final : public FactoryClass
+{
+public:
+	void _Verify_Can_Build();
+};
+
+
+void FactoryClassFake::_Verify_Can_Build()
+{
+	const TechnoClass* producing_object = Get_Object();
+
+	if (producing_object == nullptr)
+		return;
+
+	const TechnoTypeClass* producing_type = producing_object->Techno_Type_Class();
+
+	if (producing_type == nullptr)
+		return;
+
+	if (!House->Can_Build(producing_type, false, false))
+	{
+		Abandon();
+
+		if (House == PlayerPtr)
+		{
+			const RTTIType type = producing_type->Kind_Of();
+			const int column = type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE ? 0 : 1;
+			Map.Column[column].Flag_To_Redraw();
+
+			if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
+			{
+				Map.PendingObject = nullptr;
+				Map.PendingObjectPtr = nullptr;
+				Map.PendingHouse = HOUSE_NONE;
+				Map.Set_Cursor_Shape(nullptr);
+			}
+		}
+	}
+
+	for (int i = 0; i < QueuedObjects.Count(); i++)
+	{
+		if (!House->Can_Build(QueuedObjects[i], false, false))
+		{
+			Remove_From_Queue(*QueuedObjects[i]);
+			i--;
+		}
+	}
+
+    Resume_Queue();
+}
 
 
 /**
@@ -102,9 +164,35 @@ production_completed:
 
 
 /**
+ *  Update the queue and remove any items that are no
+ *  longer buildable by the factory owner's house
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_Factory_Class_AI_Abandon_If_Cant_Build)
+{
+	GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
+
+    _asm push esi
+
+	this_ptr->_Verify_Can_Build();
+
+	_asm
+	{
+		pop esi
+		mov al, [esi + 5Ch]
+		test al, al
+	}
+
+	JMP_REG(ebx, 0x00496EAC);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void FactoryClassExtension_Hooks()
 {
 	Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
+	Patch_Jump(0x00496EA7, &_Factory_Class_AI_Abandon_If_Cant_Build);
 }
