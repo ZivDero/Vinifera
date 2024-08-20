@@ -63,20 +63,19 @@ void FactoryClassFake::_Verify_Can_Build()
 		return;
 
 	const TechnoTypeClass* producing_type = producing_object->Techno_Type_Class();
+	const RTTIType type = producing_type->Kind_Of();
 
-	if (producing_type == nullptr)
-		return;
-
+	// Check the thing we're currently building separately - it needs special handling
 	if (!House->Can_Build(producing_type, false, false))
 	{
 		Abandon();
 
 		if (House == PlayerPtr)
 		{
-			const RTTIType type = producing_type->Kind_Of();
 			const int column = type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE ? 0 : 1;
 			Map.Column[column].Flag_To_Redraw();
 
+			// Remove map placement if we're doing that
 			if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
 			{
 				Map.PendingObject = nullptr;
@@ -87,6 +86,7 @@ void FactoryClassFake::_Verify_Can_Build()
 		}
 	}
 
+	// Now make sure there are no invalid objects in the queue
 	for (int i = 0; i < QueuedObjects.Count(); i++)
 	{
 		if (!House->Can_Build(QueuedObjects[i], false, false))
@@ -96,6 +96,7 @@ void FactoryClassFake::_Verify_Can_Build()
 		}
 	}
 
+	House->Update_Factories(type);
     Resume_Queue();
 }
 
