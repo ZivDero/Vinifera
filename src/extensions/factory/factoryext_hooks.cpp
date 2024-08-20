@@ -55,6 +55,12 @@ public:
 };
 
 
+/**
+ *  Checks if this factory should abandon construction because the objects
+ *	in the queue are no longer available to build
+ *
+ *  @author: ZivDero
+ */
 void FactoryClassFake::_Verify_Can_Build()
 {
 	const TechnoClass* producing_object = Get_Object();
