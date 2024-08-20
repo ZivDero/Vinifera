@@ -107,6 +107,38 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
 }
 
 
+// Comparison function for sorting sidebar icons (BuildTypes)
+// Author: Rampastring
+int __cdecl BuildType_Comparison(const void* p1, const void* p2)
+{
+    SidebarClass::StripClass::BuildType* bt1 = (SidebarClass::StripClass::BuildType*)p1;
+    SidebarClass::StripClass::BuildType* bt2 = (SidebarClass::StripClass::BuildType*)p2;
+
+    if (bt1->BuildableType == bt2->BuildableType)
+        return bt1->BuildableID - bt2->BuildableID;
+
+    if (bt1->BuildableType == RTTI_INFANTRYTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_INFANTRYTYPE)
+        return 1;
+
+    if (bt1->BuildableType == RTTI_UNITTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_UNITTYPE)
+        return 1;
+
+    if (bt1->BuildableType == RTTI_AIRCRAFTTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_AIRCRAFTTYPE)
+        return 1;
+
+    return 0;
+}
+
+
 /**
  *  Makes the game check whether you can actually build the object before adding it to the sidebar,
  *  preventing grayed out cameos (except for build limited types)
@@ -129,6 +161,7 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_AIRCRAFTTYPE, i);
                 }
             }
+            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_BUILDINGTYPE:
@@ -139,6 +172,7 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_BUILDINGTYPE, i);
                 }
             }
+            qsort(&Map.Column[0].Buildables, Map.Column[0].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_INFANTRYTYPE:
@@ -149,6 +183,7 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_INFANTRYTYPE, i);
                 }
             }
+            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_UNITTYPE:
@@ -159,6 +194,7 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_UNITTYPE, i);
                 }
             }
+            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         default:
