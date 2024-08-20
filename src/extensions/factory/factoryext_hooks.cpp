@@ -51,59 +51,59 @@
 static class FactoryClassFake final : public FactoryClass
 {
 public:
-	void _Verify_Can_Build();
+    void _Verify_Can_Build();
 };
 
 
 /**
  *  Checks if this factory should abandon construction because the objects
- *	in the queue are no longer available to build
+ *    in the queue are no longer available to build
  *
  *  @author: ZivDero
  */
 void FactoryClassFake::_Verify_Can_Build()
 {
-	const TechnoClass* producing_object = Get_Object();
+    const TechnoClass* producing_object = Get_Object();
 
-	if (producing_object == nullptr)
-		return;
+    if (producing_object == nullptr)
+        return;
 
-	const TechnoTypeClass* producing_type = producing_object->Techno_Type_Class();
-	const RTTIType type = producing_type->Kind_Of();
+    const TechnoTypeClass* producing_type = producing_object->Techno_Type_Class();
+    const RTTIType type = producing_type->Kind_Of();
 
-	// Check the thing we're currently building separately - it needs special handling
-	if (!House->Can_Build(producing_type, false, false))
-	{
-		Abandon();
+    // Check the thing we're currently building separately - it needs special handling
+    if (!House->Can_Build(producing_type, false, false))
+    {
+        Abandon();
 
-		if (House == PlayerPtr)
-		{
-			const int column = type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE ? 0 : 1;
-			Map.Column[column].Flag_To_Redraw();
+        if (House == PlayerPtr)
+        {
+            const int column = type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE ? 0 : 1;
+            Map.Column[column].Flag_To_Redraw();
 
-			// Remove map placement if we're doing that
-			if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
-			{
-				Map.PendingObject = nullptr;
-				Map.PendingObjectPtr = nullptr;
-				Map.PendingHouse = HOUSE_NONE;
-				Map.Set_Cursor_Shape(nullptr);
-			}
-		}
-	}
+            // Remove map placement if we're doing that
+            if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
+            {
+                Map.PendingObject = nullptr;
+                Map.PendingObjectPtr = nullptr;
+                Map.PendingHouse = HOUSE_NONE;
+                Map.Set_Cursor_Shape(nullptr);
+            }
+        }
+    }
 
-	// Now make sure there are no invalid objects in the queue
-	for (int i = 0; i < QueuedObjects.Count(); i++)
-	{
-		if (!House->Can_Build(QueuedObjects[i], false, false))
-		{
-			Remove_From_Queue(*QueuedObjects[i]);
-			i--;
-		}
-	}
+    // Now make sure there are no invalid objects in the queue
+    for (int i = 0; i < QueuedObjects.Count(); i++)
+    {
+        if (!House->Can_Build(QueuedObjects[i], false, false))
+        {
+            Remove_From_Queue(*QueuedObjects[i]);
+            i--;
+        }
+    }
 
-	House->Update_Factories(type);
-	Resume_Queue();
+    House->Update_Factories(type);
+    Resume_Queue();
 }
 
 
@@ -114,59 +114,59 @@ void FactoryClassFake::_Verify_Can_Build()
  */
 DECLARE_PATCH(_FactoryClass_AI_InstantBuild_Patch)
 {
-	GET_REGISTER_STATIC(FactoryClass *, this_ptr, esi);
+    GET_REGISTER_STATIC(FactoryClass *, this_ptr, esi);
 
-	if (Vinifera_DeveloperMode) {
+    if (Vinifera_DeveloperMode) {
 
-		/**
-		 *  If AIInstantBuild is toggled on, make sure this is a non-human AI house.
-		 */
-		if (Vinifera_Developer_AIInstantBuild
-			&& !this_ptr->House->Is_Human_Control() && this_ptr->House != PlayerPtr) {
+        /**
+         *  If AIInstantBuild is toggled on, make sure this is a non-human AI house.
+         */
+        if (Vinifera_Developer_AIInstantBuild
+            && !this_ptr->House->Is_Human_Control() && this_ptr->House != PlayerPtr) {
 
-			this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-			goto production_completed;
-		}
+            this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
+            goto production_completed;
+        }
 
-		/**
-		 *  If InstantBuild is toggled on, make sure the local player is a human house.
-		 */
-		if (Vinifera_Developer_InstantBuild
-			&& this_ptr->House->Is_Human_Control() && this_ptr->House == PlayerPtr) {
+        /**
+         *  If InstantBuild is toggled on, make sure the local player is a human house.
+         */
+        if (Vinifera_Developer_InstantBuild
+            && this_ptr->House->Is_Human_Control() && this_ptr->House == PlayerPtr) {
 
-			this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-			goto production_completed;
-		}
+            this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
+            goto production_completed;
+        }
 
-		/**
-		 *  If the AI has taken control of the player house, it needs a special
-		 *  case to handle the "player" instant build mode.
-		 */
-		if (Vinifera_Developer_InstantBuild) {
-			if (Vinifera_Developer_AIControl && this_ptr->House == PlayerPtr) {
+        /**
+         *  If the AI has taken control of the player house, it needs a special
+         *  case to handle the "player" instant build mode.
+         */
+        if (Vinifera_Developer_InstantBuild) {
+            if (Vinifera_Developer_AIControl && this_ptr->House == PlayerPtr) {
 
-				this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-				goto production_completed;
-			}
-		}
+                this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
+                goto production_completed;
+            }
+        }
 
-	}
+    }
 
-	/**
-	 *  Stolen bytes/code.
-	 */
-	if (this_ptr->StageClass::Fetch_Stage() == FactoryClass::STEP_COUNT) {
-		goto production_completed;
-	}
+    /**
+     *  Stolen bytes/code.
+     */
+    if (this_ptr->StageClass::Fetch_Stage() == FactoryClass::STEP_COUNT) {
+        goto production_completed;
+    }
 
 function_return:
-	JMP(0x00496FA3);
+    JMP(0x00496FA3);
 
     /**
      *  Production Completed, then suspend further production.
      */
 production_completed:
-	JMP(0x00496F73);
+    JMP(0x00496F73);
 }
 
 
@@ -178,20 +178,20 @@ production_completed:
  */
 DECLARE_PATCH(_Factory_Class_AI_Abandon_If_Cant_Build)
 {
-	GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
+    GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
 
     _asm push esi
 
-	this_ptr->_Verify_Can_Build();
+    this_ptr->_Verify_Can_Build();
 
-	_asm
-	{
-		pop esi
-		mov al, [esi + 5Ch]
-		test al, al
-	}
+    _asm
+    {
+        pop esi
+        mov al, [esi + 5Ch]
+        test al, al
+    }
 
-	JMP_REG(ebx, 0x00496EAC);
+    JMP_REG(ebx, 0x00496EAC);
 }
 
 
@@ -200,6 +200,6 @@ DECLARE_PATCH(_Factory_Class_AI_Abandon_If_Cant_Build)
  */
 void FactoryClassExtension_Hooks()
 {
-	Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
-	Patch_Jump(0x00496EA7, &_Factory_Class_AI_Abandon_If_Cant_Build);
+    Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
+    Patch_Jump(0x00496EA7, &_Factory_Class_AI_Abandon_If_Cant_Build);
 }
