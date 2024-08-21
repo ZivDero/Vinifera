@@ -272,9 +272,6 @@ bool TechnoTypeClassExtension::Read_INI(CCINIClass &ini)
     IdleRate = ini.Get_Int(ini_name, "IdleRate", IdleRate);
     IdleRate = ArtINI.Get_Int(graphic_name, "IdleRate", IdleRate);
 
-    RequiredHouses = ini.Get_Owners(ini_name, "RequiredHouses", RequiredHouses);
-    ForbiddenHouses = ini.Get_Owners(ini_name, "ForbiddenHouses", ForbiddenHouses);
-
     /**
      *  Fetch the cameo image surface if it exists.
      */
@@ -282,6 +279,9 @@ bool TechnoTypeClassExtension::Read_INI(CCINIClass &ini)
     if (imagesurface) {
         CameoImageSurface = imagesurface;
     }
+
+    RequiredHouses = ini.Get_Owners(ini_name, "RequiredHouses", RequiredHouses);
+    ForbiddenHouses = ini.Get_Owners(ini_name, "ForbiddenHouses", ForbiddenHouses);
 
     return true;
 }

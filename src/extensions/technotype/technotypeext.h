@@ -158,17 +158,19 @@ class TechnoTypeClassExtension : public ObjectTypeClassExtension
         int BuildTimeCost;
 
         /**
-         *  Description for the extended sidebar tooltip.
+         *  Bitfield of houses that can build this type.
+         *  If `RequiredHouses != -1`, only these houses can build it.
          */
-        char Description[200];
-
-        /**
-        *  Bitfield of houses that can build this type.
-        */
         long RequiredHouses;
 
         /**
-        *  Bitfield of houses that cannot build this type.
-        */
+         *  Bitfield of houses that cannot build this type.
+         *  If `RequiredHouses != -1`, these houses cannot build it under any circumstances.
+         */
         long ForbiddenHouses;
+
+        /**
+         *  Description for the extended sidebar tooltip.
+         */
+        char Description[200];
 };
