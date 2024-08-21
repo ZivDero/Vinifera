@@ -79,6 +79,7 @@ static class HouseClassFake final : public HouseClass
 public:
     bool _AI_Target_MultiMissile(SuperClass* super);
     int _AI_Building_Replacement(void);
+    bool _Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type);
 };
 
 /**
@@ -1661,6 +1662,68 @@ DECLARE_PATCH(_HouseClass_Begin_Production_Check_For_Unallowed_Buildables)
 
 
 /**
+ *  Checks if the TechnoType can be built by this house based on RequiredHouses and ForbiddenHouses, if set.
+ *
+ *  Author: ZivDero
+ */
+bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type)
+{
+    TechnoTypeClassExtension* technotypeext = Extension::Fetch<TechnoTypeClassExtension>(techno_type);
+
+    if (technotypeext->RequiredHouses != -1 &&
+        (technotypeext->RequiredHouses & 1 << Class->House) == 0)
+    {
+        return false;
+    }
+
+    if (technotypeext->ForbiddenHouses != -1 &&
+        (technotypeext->ForbiddenHouses & 1 << Class->House) != 0)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
+/**
+ *  Adds a check to Can_Build to check for RequiredHouses and ForbiddenHouses
+ *
+ *  Author: ZivDero
+ */
+DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
+{
+    enum
+    {
+        ReturnFalse = 0x004BBC9A,
+        Continue = 0x004BBC7D
+    };
+
+    GET_REGISTER_STATIC(TechnoTypeClass*, techno_type, edi);
+    GET_REGISTER_STATIC(HouseClassFake*, this_ptr, ebp);
+    static bool can_build;
+
+    can_build = this_ptr->_Can_Build_Required_Forbidden_Houses(techno_type);
+
+    if (!can_build)
+    {
+        // House didn't pass the Required/Forbidden houses check, return 0
+        JMP(ReturnFalse);
+    }
+
+    // Stolen bytes
+    _asm
+    {
+        mov eax, [esi+14h]
+        mov edx, [edi+32Ch]
+    }
+
+    // Continue Can_Build checks
+    JMP_REG(ecx, Continue);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void HouseClassExtension_Hooks()
@@ -1681,6 +1744,7 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
     Patch_Jump(0x004BE218, &_HouseClass_Begin_Production_Check_For_Unallowed_Buildables);
+    Patch_Jump(0x004BBC74, &_Can_Build_Required_Forbidden_Houses);
     Patch_Jump(0x004BC023, 0x004BC102); // Skip checking the owner of the MCV when building buildings in HouseClass::Can_Build
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
 }
