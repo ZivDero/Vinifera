@@ -228,4 +228,5 @@ void ObjectTypeClassExtension_Hooks()
     Patch_Jump(0x00588D00, &ObjectTypeClassExt::_Assign_Theater_Name);
     Patch_Jump(0x0058891D, &_ObjectTypeClass_Load_Theater_Art_Assign_Theater_Name_Theater_Patch);
     Patch_Jump(0x00587B9C, &_ObjectTypeClass__Who_Can_Build_Me_Naval_Yard_Patch);
+    Patch_Jump(0x00587BFA, 0x00587C0B); // Skip checking the owner of the MCV when building buildings in ObjectTypeClass::Who_Can_Build_Me
 }
