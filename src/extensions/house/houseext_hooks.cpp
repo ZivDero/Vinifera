@@ -1707,15 +1707,18 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
 
     if (!can_build)
     {
+        // House didn't pass the Required/Forbidden houses check, return 0
         JMP(Return0)
     }
 
+    // Stolen bytes
     _asm
     {
         mov eax, [esi+14h]
         mov edx, [edi+32Ch]
     }
 
+    // Continue Can_Build checks
     JMP_REG(ecx, Continue)
 }
 
