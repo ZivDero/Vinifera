@@ -67,7 +67,9 @@ TechnoTypeClassExtension::TechnoTypeClassExtension(const TechnoTypeClass *this_p
     VoiceHarvest(),
     IdleRate(0),
     CameoImageSurface(nullptr),
-    BuildTimeCost(0)
+    BuildTimeCost(0),
+    RequiredHouses(-1),
+    ForbiddenHouses(-1)
 {
     Description[0] = '\0';
 
@@ -280,6 +282,9 @@ bool TechnoTypeClassExtension::Read_INI(CCINIClass &ini)
     if (imagesurface) {
         CameoImageSurface = imagesurface;
     }
+
+    RequiredHouses = ini.Get_Owners(ini_name, "RequiredHouses", RequiredHouses);
+    ForbiddenHouses = ini.Get_Owners(ini_name, "ForbiddenHouses", ForbiddenHouses);
 
     return true;
 }
