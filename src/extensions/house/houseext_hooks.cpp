@@ -1703,37 +1703,20 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
     GET_REGISTER_STATIC(HouseClassFake*, this_ptr, ebp);
     static bool can_build;
 
-    _asm
-    {
-        push esi
-        push edi
-        push ebp
-    }
-
     can_build = this_ptr->_Can_Build_Required_Forbidden_Houses(techno_type);
 
     if (!can_build)
     {
-        _asm
-        {
-            pop ebp
-            pop edi
-            pop esi
-        }
-
         JMP(Return0)
     }
 
     _asm
     {
-        pop ebp
-        pop edi
-        pop esi
         mov eax, [esi+14h]
         mov edx, [edi+32Ch]
     }
 
-    JMP_REG(ebx, Continue)
+    JMP_REG(ecx, Continue)
 }
 
 
