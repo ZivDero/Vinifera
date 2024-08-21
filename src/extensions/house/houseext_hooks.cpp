@@ -1662,7 +1662,7 @@ DECLARE_PATCH(_HouseClass_Begin_Production_Check_For_Unallowed_Buildables)
 
 
 /**
- *  Checks if the TechnoType can be build by this house based on RequiredHouses and ForbiddenHouses, if set.
+ *  Checks if the TechnoType can be built by this house based on RequiredHouses and ForbiddenHouses, if set.
  *
  *  Author: ZivDero
  */
@@ -1686,6 +1686,11 @@ bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass*
 }
 
 
+/**
+ *  Adds a check to Can_Build to check for RequiredHouses and ForbiddenHouses
+ *
+ *  Author: ZivDero
+ */
 DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
 {
     enum
@@ -1696,22 +1701,32 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
 
     GET_REGISTER_STATIC(TechnoTypeClass*, techno_type, edi);
     GET_REGISTER_STATIC(HouseClassFake*, this_ptr, ebp);
+    static bool can_build;
 
     _asm
     {
         push esi
         push edi
+        push ebp
     }
 
-    static bool can_build = this_ptr->_Can_Build_Required_Forbidden_Houses(techno_type);
+    can_build = this_ptr->_Can_Build_Required_Forbidden_Houses(techno_type);
 
     if (!can_build)
     {
+        _asm
+        {
+            pop ebp
+            pop edi
+            pop esi
+        }
+
         JMP(Return0)
     }
 
     _asm
     {
+        pop ebp
         pop edi
         pop esi
         mov eax, [esi+14h]
