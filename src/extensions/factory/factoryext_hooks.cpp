@@ -185,18 +185,16 @@ DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
 {
     GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
 
-    _asm push esi
-
     this_ptr->_Verify_Can_Build();
 
-    _asm
-    {
-        pop esi
-        mov al, [esi + 5Ch]
-        test al, al
+    // Stolen bytes / code.
+    if (this_ptr->IsSuspended) {
+        // Factory is suspended, exit from function.
+        JMP(0x00496FA3);
     }
-
-    JMP_REG(ebx, 0x00496EAC);
+    
+    // Continue factory AI logic.
+    JMP(0x00496EB2);
 }
 
 
