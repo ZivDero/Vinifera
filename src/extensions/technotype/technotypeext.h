@@ -161,4 +161,14 @@ class TechnoTypeClassExtension : public ObjectTypeClassExtension
          *  Description for the extended sidebar tooltip.
          */
         char Description[200];
+
+        /**
+        *  Bitfield of houses that can build this type.
+        */
+        long RequiredHouses;
+
+        /**
+        *  Bitfield of houses that cannot build this type.
+        */
+        long ForbiddenHouses;
 };
