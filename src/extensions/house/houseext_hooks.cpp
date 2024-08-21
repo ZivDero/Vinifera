@@ -1695,7 +1695,7 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
 {
     enum
     {
-        Return0 = 0x004BBC9A,
+        ReturnFalse = 0x004BBC9A,
         Continue = 0x004BBC7D
     };
 
@@ -1708,7 +1708,7 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
     if (!can_build)
     {
         // House didn't pass the Required/Forbidden houses check, return 0
-        JMP(Return0)
+        JMP(ReturnFalse);
     }
 
     // Stolen bytes
@@ -1719,7 +1719,7 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
     }
 
     // Continue Can_Build checks
-    JMP_REG(ecx, Continue)
+    JMP_REG(ecx, Continue);
 }
 
 

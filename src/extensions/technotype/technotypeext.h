@@ -165,7 +165,7 @@ class TechnoTypeClassExtension : public ObjectTypeClassExtension
 
         /**
          *  Bitfield of houses that cannot build this type.
-         *  If `RequiredHouses != -1`, these houses cannot build it under any circumstances.
+         *  If `ForbiddenHouses != -1`, these houses cannot build it under any circumstances.
          */
         long ForbiddenHouses;
 
