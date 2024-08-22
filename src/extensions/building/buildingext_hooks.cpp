@@ -2072,6 +2072,45 @@ DECLARE_PATCH(_BuildingClass_Assign_Target_No_Deconstruction_With_Null_Undeploys
 }
 
 
+bool Is_Allowed_Harvester(BuildingClass* building, UnitClass* harvester)
+{
+    int dockcount = harvester->Class->Dock.Count();
+
+    for (int i = 0; i < dockcount; i++) {
+        if (harvester->Class->Dock[i] == building->Class) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+/**
+ *  Fixes a bug where a harvester is able to dock to a refinery that is not
+ *  listed in the value of the harvester's Dock= key.
+ *
+ *  @author: Rampastring
+ */
+DECLARE_PATCH(_BuildingClass_Receive_Message_Only_Allow_Dockable_Harvester_Patch)
+{
+    GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(UnitClass*, unit, edi);
+
+    if (!Is_Allowed_Harvester(this_ptr, unit)) {
+        JMP(0x0042696C); // Return RADIO_NEGATIVE
+    }
+
+    // Stolen bytes / code
+    if (!this_ptr->Cargo.Is_Something_Attached()) {
+        JMP(0x0042707B); // Return RADIO_ROGER
+    }
+
+    // Continue function execution beyond harvester-to-dock check
+    JMP(0x00426A8C);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -2108,6 +2147,7 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042EF9D, &_BuildingClass_What_Action_Allow_Rally_Point_For_Naval_Yard_Patch);
 
     Patch_Jump(0x0042C624, &_BuildingClass_Assign_Target_No_Deconstruction_With_Null_UndeploysInto);
+    Patch_Jump(0x00426A7E, &_BuildingClass_Receive_Message_Only_Allow_Dockable_Harvester_Patch);
 
     Patch_Jump(0x0042D9A0, &BuildingClassFake::_Update_Buildables);
 }
