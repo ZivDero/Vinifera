@@ -41,17 +41,24 @@
 #include "debughandler.h"
 #include "factory.h"
 #include "fetchres.h"
+#include "mouse.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
 #include "sidebar.h"
+#include "session.h"
 #include "tibsun_functions.h"
+#include "tibsun_globals.h"
 #include "house.h"
 #include "language.h"
+#include "playmovie.h"
+#include "rules.h"
+#include "sidebarext.h"
 #include "super.h"
 #include "techno.h"
 #include "textprint.h"
 #include "vinifera_globals.h"
+#include "voc.h"
 
 
 static const ObjectTypeClass *_SidebarClass_StripClass_obj = nullptr;
@@ -70,6 +77,15 @@ static class SidebarClassFake final : public SidebarClass
 {
 public:
 	static void _Set_SelectClass_Position(int column, int index);
+	bool _Scroll(bool up, int column);
+	bool _Activate(int control);
+	void _Init_Strips();
+	SidebarClassExtension::SidebarTabType _Which_Column(RTTIType type);
+	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
+	bool _Add(RTTIType type, int id);
+	void _Draw_It(bool complete);
+	void _AI(KeyNumType& input, Point2D& xy);
+	void _Recalc();
 };
 
 
@@ -83,13 +99,131 @@ public:
 static class StripClassFake final : public SidebarClass::StripClass
 {
 public:
+
     void _Draw_It(bool complete);
-	static int _Button_Count()
-	{
-		return (SidebarRect.Height - SidebarClass::SidebarBottomShape->Get_Height() - SidebarClass::SidebarShape->Get_Height()) /
-			SidebarClass::SidebarMiddleShape->Get_Height() * 2;
-	}
+	bool _Scroll(bool up);
+	void _Init_IO(int id);
+	void _Activate();
+	void _Deactivate();
 };
+
+
+/**
+ *  Patch for including the extended class members in the creation process.
+ *
+ *  @warning: Do not touch this unless you know what you are doing!
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_SidebarClass_Constructor_Patch)
+{
+	GET_REGISTER_STATIC(SidebarClass*, this_ptr, esi); // "this" pointer.
+
+	/**
+	 *  Create the extended class instance.
+	 */
+	SidebarExtension = Extension::Singleton::Make<SidebarClass, SidebarClassExtension>(this_ptr);
+
+	/**
+	 *  Stolen bytes here.
+	 */
+	_asm
+	{
+		mov eax, this_ptr
+		pop edi
+		pop esi
+		pop ebp
+		pop ebx
+		add esp, 14h
+		ret
+	}
+}
+
+
+/**
+ *  Patch for including the extended class members in the destruction process.
+ *
+ *  @warning: Do not touch this unless you know what you are doing!
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_SidebarClass_Destructor_Patch)
+{
+	//GET_REGISTER_STATIC(SidebarClass*, this_ptr, edi);
+
+	/**
+	 *  Remove the extended class instance.
+	 */
+	Extension::Singleton::Destroy<SidebarClass, SidebarClassExtension>(SidebarExtension);
+
+	/**
+	 *  Stolen bytes here.
+	 */
+    _asm
+	{
+		pop edi
+		pop esi
+		pop ebp
+		pop ebx
+		ret
+	}
+}
+
+
+/**
+ *  Patch for including the extended class members when initialsing the scenario data.
+ *
+ *  @warning: Do not touch this unless you know what you are doing!
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_SidebarClass_Init_Clear_Patch)
+{
+	//GET_REGISTER_STATIC(SidebarClass*, this_ptr, esi);
+
+	SidebarExtension->Init_Clear();
+
+	/**
+	 *  Stolen bytes here.
+	 */
+	_asm xor eax, eax
+
+	JMP_REG(ecx, 0x005F2711)
+}
+
+
+/**
+ *  Patch for including the extended class members when initialsing the scenario data.
+ *
+ *  @warning: Do not touch this unless you know what you are doing!
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_SidebarClass_Init_IO_Patch)
+{
+	//GET_REGISTER_STATIC(SidebarClass*, this_ptr, esi);
+
+	SidebarExtension->Init_IO();
+
+	JMP(0x005F28D1)
+}
+
+
+/**
+ *  Patch for including the extended class members when initialsing the scenario data.
+ *
+ *  @warning: Do not touch this unless you know what you are doing!
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_SidebarClass_Activate_Patch)
+{
+	//GET_REGISTER_STATIC(SidebarClass*, this_ptr, esi);
+
+	SidebarExtension->Activate();
+
+	JMP(0x005F3F44)
+}
 
 
 /**
@@ -256,7 +390,7 @@ void StripClassFake::_Draw_It(bool complete)
 		int maxvisible;
 		if (SidebarSurface && SidebarClass::SidebarShape)
 		{
-			maxvisible = _Button_Count();
+			maxvisible = SidebarClassExtension::Button_Count();
 		}
 		else
 		{
@@ -275,8 +409,8 @@ void StripClassFake::_Draw_It(bool complete)
 			bool darken = false;
 			ShapeFileStruct const* shapefile = nullptr;
 			FactoryClass* factory = nullptr;
-			int index = i + TopIndex;
-			int x = i % 2 == 0 ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X; //X;
+			int index = i + TopIndex / 2;
+			int x = i % 2 == 0 ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X;
 			int y = SidebarClass::COLUMN_ONE_Y + ((i / 2) * OBJECT_HEIGHT);
 
 			bool isready = false;
@@ -511,11 +645,434 @@ void StripClassFake::_Draw_It(bool complete)
 
 void SidebarClassFake::_Set_SelectClass_Position(int column, int index)
 {
-	int x = SidebarRect.X + ((index % 2 == 0) ? COLUMN_ONE_X : COLUMN_TWO_X);
-	int y = SidebarRect.Y + COLUMN_ONE_Y + ((index / 2) * StripClass::OBJECT_HEIGHT);
+	const int x = SidebarRect.X + ((index % 2 == 0) ? COLUMN_ONE_X : COLUMN_TWO_X);
+	const int y = SidebarRect.Y + COLUMN_ONE_Y + ((index / 2) * StripClass::OBJECT_HEIGHT);
 
-	StripClass::SelectButton[column][index].Set_Position(x, y);
-	StripClass::SelectButton[column][index].Flag_To_Redraw();
+	SidebarExtension->SelectButton[column][index].Set_Position(x, y);
+	SidebarExtension->SelectButton[column][index].Flag_To_Redraw();
+}
+
+
+bool SidebarClassFake::_Scroll(bool up, int column)
+{
+	if (*(int*)0x007E492C)
+		return false;
+
+	bool scr = Column[SidebarExtension->TabIndex].Scroll(up);
+	if (!scr)
+		Sound_Effect(Rule->ScoldSound, 1.0, 0);
+
+	if (scr)
+	{
+		IsToRedraw = true;
+		Flag_To_Redraw(false);
+		return true;
+	}
+
+	return false;
+}
+
+
+void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
+{
+	if (!Debug_Map) 
+	{
+		Activate(1);
+	    Point2D newpoint(xy.X - 480, xy.Y);
+	    SidebarExtension->Column[SidebarExtension->TabIndex]->AI(input, newpoint);
+	}
+
+	if (IsSidebarActive)
+	{
+
+		/*
+		**	If there are any buildings in the player's inventory, then allow the repair
+		**	option.
+		*/
+
+		if (PlayerPtr->CurBuildings > 0)
+		{
+			Activate_Repair(true);
+		}
+		else
+		{
+			Activate_Repair(false);
+		}
+
+		if (input == (BUTTON_REPAIR | KN_BUTTON))
+		{
+			Repair_Mode_Control(-1);
+		}
+
+		if (input == (BUTTON_POWER | KN_BUTTON))
+		{
+			Power_Mode_Control(-1);
+		}
+
+		if (input == (BUTTON_WAYPOINT | KN_BUTTON))
+		{
+			Waypoint_Mode_Control(-1, false);
+		}
+
+		if (input == (BUTTON_SELL | KN_BUTTON))
+		{
+			Sell_Mode_Control(-1);
+		}
+	}
+
+	if (!IsRepairMode && Repair.IsOn)
+	{
+		Repair.Turn_Off();
+	}
+
+	if (!IsSellMode && Sell.IsOn)
+	{
+		Sell.Turn_Off();
+	}
+
+	if (!IsPowerMode && Power.IsOn)
+	{
+		Power.Turn_Off();
+	}
+
+	if (!IsWaypointMode && Waypoint.IsOn)
+	{
+		Waypoint.Turn_Off();
+	}
+
+	PowerClass::AI(input, xy);
+}
+
+
+void SidebarClassFake::_Recalc()
+{
+    if (SidebarExtension->Column[SidebarExtension->TabIndex]->Recalc())
+    {
+        IsToRedraw = true;
+		Flag_To_Redraw();
+    }
+}
+
+
+
+bool SidebarClassFake::_Activate(int control)
+{
+	bool old = IsSidebarActive;
+
+	if (Session.Play && Session.Type != GAME_NORMAL && Session.Type != GAME_SKIRMISH)
+		return old;
+
+	/*
+	**	Determine the new state of the sidebar.
+	*/
+	switch (control)
+    {
+	case -1:
+		IsSidebarActive = IsSidebarActive == false;
+		break;
+
+	case 1:
+		IsSidebarActive = true;
+		break;
+
+	default:
+	case 0:
+		IsSidebarActive = false;
+		break;
+	}
+
+	/*
+	**	Only if there is a change in the state of the sidebar will anything
+	**	be done to change it.
+	*/
+	if (IsSidebarActive != old) {
+
+		/*
+		**	If the sidebar is activated but was on the right side of the screen, then
+		**	activate it on the left side of the screen.
+		*/
+		if (IsSidebarActive)
+		{
+			entry_84();
+			IsToRedraw = true;
+			Repair.Zap();
+			Add_A_Button(Repair);
+			Sell.Zap();
+			Add_A_Button(Sell);
+			Power.Zap();
+			Add_A_Button(Power);
+			Waypoint.Zap();
+			Add_A_Button(Waypoint);
+			SidebarExtension->Column[SidebarExtension->TabIndex]->Activate();
+			Background.Zap();
+			Add_A_Button(Background);
+			RadarButton.Zap();
+			Add_A_Button(RadarButton);
+		}
+		else
+		{
+			End_Ingame_Movie();
+			Remove_A_Button(Repair);
+			Remove_A_Button(Sell);
+			Remove_A_Button(Power);
+			Remove_A_Button(Waypoint);
+			Remove_A_Button(Background);
+			for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+				SidebarExtension->Column[i]->Deactivate();
+			Remove_A_Button(RadarButton);
+		}
+
+		/*
+		**	Since the sidebar status has changed, update the map so that the graphics
+		**	will be rendered correctly.
+		*/
+		Flag_To_Redraw(2);
+	}
+
+	return old;
+}
+
+
+void SidebarClassFake::_Init_Strips()
+{
+	SidebarExtension->Init_Strips();
+}
+
+
+SidebarClassExtension::SidebarTabType SidebarClassFake::_Which_Column(RTTIType type)
+{
+    switch (type)
+    {
+    case RTTI_BUILDINGTYPE:
+    case RTTI_BUILDING:
+        return SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
+
+    default:
+		return SidebarClassExtension::SIDEBAR_TAB_UNIT;
+    }
+
+}
+
+
+bool SidebarClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
+{
+    SidebarClassExtension::SidebarTabType column = _Which_Column(type);
+	for (int i = 0; i < SidebarExtension->Column[column]->BuildableCount; i++)
+	{
+	    if (SidebarExtension->Column[column]->Buildables[i].BuildableType == type &&
+			SidebarExtension->Column[column]->Buildables[i].BuildableID == id)
+	    {
+			SidebarExtension->Column[column]->Buildables[i].Factory = factory;
+			SidebarExtension->Column[column]->IsBuilding = true;
+			SidebarExtension->Column[column]->IsToRedraw = true;
+			Map.Flag_To_Redraw();
+            return true;
+	    }
+	}
+
+	return false;
+}
+
+
+bool SidebarClassFake::_Add(RTTIType type, int id)
+{
+	if (!Debug_Map)
+	{
+		SidebarClassExtension::SidebarTabType column = _Which_Column(type);
+
+		if (SidebarExtension->Column[column]->Add(type, id))
+		{
+			Activate(1);
+			IsToRedraw = true;
+			Flag_To_Redraw(false);
+			return true;
+		}
+		return false;
+	}
+
+	return false;
+}
+
+
+void SidebarClassFake::_Draw_It(bool complete)
+{
+	complete |= IsToFullRedraw;
+	Map.field_1214 = Rect();
+	PowerClass::Draw_It(complete);
+
+	DSurface* oldsurface = TempSurface;
+	TempSurface = SidebarSurface;
+
+	Rect rect(0, 0, SidebarSurface->Get_Width(), SidebarSurface->Get_Height());
+
+	if (IsSidebarActive && (IsToRedraw || complete) && !Debug_Map)
+	{
+		if (complete || SidebarExtension->Column[SidebarExtension->TabIndex]->IsToRedraw)
+        {
+			Point2D xy(0, SidebarRect.Y);
+			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
+
+			int button_count = SidebarClassExtension::Button_Count(true);
+			int y = SidebarRect.Y + SidebarShape->Get_Height();
+
+			for (int i = 0; i < button_count; i++, y += SidebarMiddleShape->Get_Height())
+			{
+				xy = Point2D(0, y);
+				CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarMiddleShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
+			}
+
+			xy = Point2D(0, y);
+			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarBottomShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
+
+			xy = Point2D(0, y + SidebarBottomShape->Get_Height());
+			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarAddonShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
+
+			SidebarExtension->Column[SidebarExtension->TabIndex]->IsToRedraw = true;
+        }
+	}
+
+	/*
+	**	Draw the side strip elements by calling their respective draw functions.
+	*/
+	if (IsSidebarActive)
+	{
+	    SidebarExtension->Column[SidebarExtension->TabIndex]->Draw_It(complete);
+	}
+
+	if (Repair.IsDrawn)
+	{
+		RedrawSidebar = true;
+		Repair.IsDrawn = false;
+	}
+
+	if (Sell.IsDrawn)
+	{
+		RedrawSidebar = true;
+		Sell.IsDrawn = false;
+	}
+
+	if (Power.IsDrawn)
+	{
+		RedrawSidebar = true;
+		Power.IsDrawn = false;
+	}
+
+	if (Waypoint.IsDrawn)
+	{
+		RedrawSidebar = true;
+		Waypoint.IsDrawn = false;
+	}
+
+	IsToRedraw = false;
+	IsToFullRedraw = false;
+	Blit_Sidebar(complete);
+	TempSurface = oldsurface;
+}
+
+
+bool StripClassFake::_Scroll(bool up)
+{
+	if (up)
+	{
+		if (!TopIndex)
+			return false ;
+		Scroller -= 2;
+	}
+	else
+	{
+		// We want to make sure the last odd item can be shown
+		int countToShow = BuildableCount + BuildableCount % 2;
+
+		if (TopIndex + SidebarClassExtension::Button_Count() >= countToShow)
+			return false;
+		Scroller += 2;
+	}
+
+	return true;
+}
+
+
+void StripClassFake::_Init_IO(int id)
+{
+	ID = id;
+
+	UpButton[0].IsSticky = true;
+	UpButton[0].ID = BUTTON_UP + id;
+	UpButton[0].field_3C = true;
+	UpButton[0].ShapeDrawer = SidebarDrawer;
+	UpButton[0].Flags = GadgetClass::RIGHTRELEASE | GadgetClass::RIGHTPRESS | GadgetClass::LEFTRELEASE | GadgetClass::LEFTPRESS;
+
+	DownButton[0].IsSticky = true;
+	DownButton[0].ID = BUTTON_UP + id;
+	DownButton[0].field_3C = true;
+	DownButton[0].ShapeDrawer = SidebarDrawer;
+	DownButton[0].Flags = GadgetClass::RIGHTRELEASE | GadgetClass::RIGHTPRESS | GadgetClass::LEFTRELEASE | GadgetClass::LEFTPRESS;
+
+	int button_count = SidebarClassExtension::Button_Count();
+	for (int index = 0; index < button_count; index++)
+	{
+		SelectClass& g = SidebarExtension->SelectButton[ID][index];
+		g.ID = BUTTON_SELECT;
+		g.X = SidebarRect.X + ((index % 2 == 0) ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X);
+		g.Y = SidebarRect.Y + SidebarClass::COLUMN_ONE_Y + ((index / 2) * OBJECT_HEIGHT);
+		g.Width = OBJECT_WIDTH;
+		g.Height = OBJECT_HEIGHT;
+		g.Set_Owner(*this, index);
+	}
+}
+
+
+void StripClassFake::_Activate()
+{
+	UpButton[0].Zap();
+	Map.Add_A_Button(UpButton[0]);
+
+	DownButton[0].Zap();
+	Map.Add_A_Button(DownButton[0]);
+
+	int button_count = SidebarClassExtension::Button_Count();
+	for (int index = 0; index < button_count; index++)
+	{
+		SidebarExtension->SelectButton[ID][index].Zap();
+		Map.Add_A_Button(SidebarExtension->SelectButton[ID][index]);
+	}
+}
+
+
+void StripClassFake::_Deactivate()
+{
+	Map.Remove_A_Button(UpButton[0]);
+	Map.Remove_A_Button(DownButton[0]);
+
+	int button_count = SidebarClassExtension::Button_Count();
+	for (int index = 0; index < button_count; index++)
+	{
+		Map.Remove_A_Button(SelectButton[ID][index]);
+	}
+}
+
+
+DECLARE_PATCH(_SidebarClass_entry_84_Patch)
+{
+	SidebarExtension->Entry_84_Tooltips();
+
+	JMP(0x005F65B5);
+}
+
+
+//5F62E0
+DECLARE_PATCH(_SidebarClass_entry_84_Buttons)
+{
+	GET_REGISTER_STATIC(int, button_index, edi);
+	GET_STACK_STATIC(int, strip_offset, esp, 0x18);
+	static int total_index;
+
+	SidebarClassFake::_Set_SelectClass_Position(strip_offset / 20, button_index);
+	total_index = button_index + strip_offset;
+
+	_asm mov esi, total_index
+
+	JMP(0x005F63D0);
 }
 
 
@@ -538,7 +1095,7 @@ DECLARE_PATCH(_SidebarClass_entry_84_SelectClass_Count)
 {
 	static int button_count;
 
-	button_count = StripClassFake::_Button_Count();
+	button_count = SidebarClassExtension::Button_Count();
 
 	_asm mov eax, button_count
 
@@ -550,7 +1107,7 @@ DECLARE_PATCH(_StripClass_Activate_SelectClass_Count)
 {
 	static int button_count;
 
-	button_count = StripClassFake::_Button_Count();
+	button_count = SidebarClassExtension::Button_Count();
 
 	_asm mov eax, button_count
 
@@ -562,7 +1119,7 @@ DECLARE_PATCH(_StripClass_Deactivate_SelectClass_Count)
 {
 	static int button_count;
 
-	button_count = StripClassFake::_Button_Count();
+	button_count = SidebarClassExtension::Button_Count();
 
 	_asm mov eax, button_count
 
@@ -576,7 +1133,7 @@ DECLARE_PATCH(_StripClass_Init_IO_SelectClass_Count)
 
 	_asm push ecx
 
-	button_count = StripClassFake::_Button_Count();
+	button_count = SidebarClassExtension::Button_Count();
 
 	_asm
     {
@@ -595,7 +1152,7 @@ DECLARE_PATCH(_SidebarClass_Draw_It_Draw_Tab)
 	// Is actually a bool, I don't know how to get 8 bits of EDI
     GET_REGISTER_STATIC(int, complete, edi);
 
-	this_ptr->Column[Vinifera_ActiveSidebarTab].Draw_It(complete);
+	this_ptr->Column[SidebarExtension->TabIndex].Draw_It(complete);
 
 	JMP(0x005F3830);
 }
@@ -606,15 +1163,40 @@ DECLARE_PATCH(_SidebarClass_Draw_It_Draw_Tab)
  */
 void SidebarClassExtension_Hooks()
 {
-    Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
-    Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
-    Patch_Jump(0x005F52AF, &_SidebarClass_StripClass_Custom_Cameo_Image_Patch);
-    Patch_Jump(0x005F4EDD, &_SidebarClass_StripClass_Help_Text_Extended_Tooltip_Patch);
-    Patch_Byte(0x005F4EF7 + 2, 0x14); // Pop one more argument passed to sprintf
+	Patch_Jump(0x005F23AC, &_SidebarClass_Constructor_Patch);
+	Patch_Jump(0x005B8B7D, &_SidebarClass_Destructor_Patch);
+	Patch_Jump(0x005F2683, &_SidebarClass_Init_Clear_Patch);
+	Patch_Jump(0x005F28B8, &_SidebarClass_Init_IO_Patch);
+	Patch_Jump(0x005F620D, &_SidebarClass_entry_84_Patch);
+	//Patch_Jump(0x005F3F2E, &_SidebarClass_Activate_Patch);
 
-    // NOP away tooltip length check for formatting
-    Patch_Byte(0x0044E486, 0x90);
-    Patch_Byte(0x0044E486 + 1, 0x90);
+	Patch_Jump(0x005F3E60, &SidebarClassFake::_Activate);
+	Patch_Jump(0x005F2B00, &SidebarClassFake::_Init_Strips);
+	Patch_Jump(0x005F2C30, &SidebarClassFake::_Which_Column);
+	Patch_Jump(0x005F2C50, &SidebarClassFake::_Factory_Link);
+	Patch_Jump(0x005F2E20, &SidebarClassFake::_Add);
+	Patch_Jump(0x005F2E90, &SidebarClassFake::_Scroll);
+	//Patch_Jump(0x005F30F0, &SidebarClassFake::_Page);
+	Patch_Jump(0x005F3560, &SidebarClassFake::_Draw_It);
+	Patch_Jump(0x005F3C70, &SidebarClassFake::_AI);
+	Patch_Jump(0x005F3E20, &SidebarClassFake::_Recalc);
+
+	Patch_Jump(0x005F42A0, &StripClassFake::_Init_IO);
+	Patch_Jump(0x005F4450, &StripClassFake::_Activate);
+	Patch_Jump(0x005F4560, &StripClassFake::_Deactivate);
+	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
+	Patch_Jump(0x005F46B0, &StripClassFake::_Scroll);
+
+    //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
+    //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
+    //Patch_Jump(0x005F52AF, &_SidebarClass_StripClass_Custom_Cameo_Image_Patch);
+    //Patch_Jump(0x005F4EDD, &_SidebarClass_StripClass_Help_Text_Extended_Tooltip_Patch);
+    //Patch_Byte(0x005F4EF7 + 2, 0x14); // Pop one more argument passed to sprintf
+	//
+    //// NOP away tooltip length check for formatting
+    //Patch_Byte(0x0044E486, 0x90);
+    //Patch_Byte(0x0044E486 + 1, 0x90);
+	//
 
     // Change jle to jl to allow rendering tooltips that are exactly as wide as the sidebar
     Patch_Byte(0x0044E605 + 1, 0x8C);
@@ -622,12 +1204,12 @@ void SidebarClassExtension_Hooks()
     // Patch the argument to HouseClass::Can_Build in SidebarClass::StripClass::Recalc so that prerequisites are checked
     Patch_Byte(0x005F5762, false);
 
-	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
-	Patch_Jump(0x005F6396, &_SidebarClass_entry_84_SelectClass_Positions);
-	Patch_Jump(0x005F634D, &_SidebarClass_entry_84_SelectClass_Count);
-	Patch_Jump(0x005F44CC, &_StripClass_Activate_SelectClass_Count);
-	Patch_Jump(0x005F45B2, &_StripClass_Deactivate_SelectClass_Count);
-	Patch_Jump(0x005F4380, &_StripClass_Init_IO_SelectClass_Count);
-	Patch_Jump(0x005F3818, &_SidebarClass_Draw_It_Draw_Tab);
-	Patch_Jump(0x005F3F39, 0x005F3F44); //SidebarClass::Activate skip activating the second tab
+	
+	//Patch_Jump(0x005F6396, &_SidebarClass_entry_84_SelectClass_Positions);
+	//Patch_Jump(0x005F634D, &_SidebarClass_entry_84_SelectClass_Count);
+	//Patch_Jump(0x005F44CC, &_StripClass_Activate_SelectClass_Count);
+	//Patch_Jump(0x005F45B2, &_StripClass_Deactivate_SelectClass_Count);
+	//Patch_Jump(0x005F4380, &_StripClass_Init_IO_SelectClass_Count);
+	//Patch_Jump(0x005F3818, &_SidebarClass_Draw_It_Draw_Tab);
+	//Patch_Jump(0x005F3F39, 0x005F3F44); //SidebarClass::Activate skip activating the second tab
 }

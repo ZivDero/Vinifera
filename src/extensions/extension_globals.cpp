@@ -27,6 +27,8 @@
  ******************************************************************************/
 #include "extension_globals.h"
 
+#include "sidebarext.h"
+
 
 DynamicVectorClass<UnitClassExtension *> UnitExtensions;
 DynamicVectorClass<AircraftClassExtension *> AircraftExtensions;
@@ -62,6 +64,7 @@ TacticalExtension *TacticalMapExtension = nullptr;
 
 RulesClassExtension *RuleExtension = nullptr;
 ScenarioClassExtension *ScenExtension = nullptr;
+SidebarClassExtension *SidebarExtension = nullptr;
 SessionClassExtension *SessionExtension = nullptr;
 OptionsClassExtension *OptionsExtension = nullptr;
 

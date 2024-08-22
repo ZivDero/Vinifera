@@ -76,6 +76,7 @@
 #include "miscutil.h"
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "sidebarext.h"
 
 
 /**
@@ -740,10 +741,10 @@ const char* SetStructureTabCommandClass::Get_Description() const
 
 bool SetStructureTabCommandClass::Process()
 {
-    Map.Column[Vinifera_ActiveSidebarTab].Deactivate();
-    Vinifera_ActiveSidebarTab = SIDEBAR_TAB_STRUCTURE;
-    Map.Column[Vinifera_ActiveSidebarTab].Activate();
-    Map.Column[Vinifera_ActiveSidebarTab].Flag_To_Redraw();
+    Map.Column[SidebarExtension->TabIndex].Deactivate();
+    SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
+    Map.Column[SidebarExtension->TabIndex].Activate();
+    Map.IsToFullRedraw = true;
 
     return true;
 }
@@ -776,10 +777,10 @@ const char* SetUnitTabCommandClass::Get_Description() const
 
 bool SetUnitTabCommandClass::Process()
 {
-    Map.Column[Vinifera_ActiveSidebarTab].Deactivate();
-    Vinifera_ActiveSidebarTab = SIDEBAR_TAB_UNIT;
-    Map.Column[Vinifera_ActiveSidebarTab].Activate();
-    Map.Column[Vinifera_ActiveSidebarTab].Flag_To_Redraw();
+    Map.Column[SidebarExtension->TabIndex].Deactivate();
+    SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_UNIT;
+    Map.Column[SidebarExtension->TabIndex].Activate();
+    Map.IsToFullRedraw = true;
 
     return true;
 }
