@@ -446,7 +446,6 @@ void StripClassFake::_Draw_It(bool complete)
 				Print_Cameo_Text(name, drawpoint, rect, OBJECT_WIDTH);
 			}
 
-
 			/*
 			**	Draw the number of queued objects
 			*/
@@ -460,8 +459,8 @@ void StripClassFake::_Draw_It(bool complete)
 				{
 					int total = factory->Total_Queued(*obj);
 					if (total > 1 ||
-						total > 0 && factory->Object == nullptr ||
-						factory->Object->Techno_Type_Class() != nullptr && factory->Object->Techno_Type_Class() != obj)
+						total > 0 && (factory->Object == nullptr ||
+						factory->Object->Techno_Type_Class() != nullptr && factory->Object->Techno_Type_Class() != obj))
 					{
 						Point2D drawpoint(x + QUEUE_COUNT_X_OFFSET, y + TEXT_Y_OFFSET);
 						Fancy_Text_Print("%d", SidebarSurface, &rect, &drawpoint, ColorScheme::As_Pointer("LightGrey", 1), COLOR_TBLACK, TPF_RIGHT | TPF_FULLSHADOW | TPF_8POINT, total);
@@ -563,4 +562,6 @@ void SidebarClassExtension_Hooks()
 
     // Patch the argument to HouseClass::Can_Build in SidebarClass::StripClass::Recalc so that prerequisites are checked
     Patch_Byte(0x005F5762, false);
+
+	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
 }
