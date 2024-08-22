@@ -65,6 +65,8 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "sidebarext.h"
+#include "tibsun_functions.h"
 
 
 /**
@@ -80,6 +82,7 @@ public:
     bool _AI_Target_MultiMissile(SuperClass* super);
     int _AI_Building_Replacement(void);
     bool _Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type);
+    ProdFailType _Abandon_Production(RTTIType type, int id);
 };
 
 /**
@@ -1686,6 +1689,95 @@ bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass*
 }
 
 
+ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
+{
+    FactoryClass* fptr;
+
+    switch (type)
+    {
+    case RTTI_UNIT:
+    case RTTI_UNITTYPE:
+        fptr = UnitFactory;
+        break;
+
+    case RTTI_AIRCRAFT:
+    case RTTI_AIRCRAFTTYPE:
+        fptr = AircraftFactory;
+        break;
+
+    case RTTI_BUILDING:
+    case RTTI_BUILDINGTYPE:
+        fptr = BuildingFactory;
+        break;
+
+    case RTTI_INFANTRY:
+    case RTTI_INFANTRYTYPE:
+        fptr = InfantryFactory;
+        break;
+
+    default:
+        return PROD_CANT;
+    }
+
+    /*
+    **	If there is no factory to abandon, then return with a failure code.
+    */
+    if (fptr == nullptr)
+        return PROD_CANT;
+
+    if (fptr->Queued_Object_Count() > 0 && id > 0)
+    {
+        const TechnoTypeClass* technotype = Fetch_Techno_Type(type, id);
+        if (fptr->Remove_From_Queue(*technotype))
+        {
+            SidebarExtension->Column[SidebarExtension->TabIndex]->Flag_To_Redraw();
+            return PROD_OK;
+        }
+    }
+
+    if (id != -1)
+    {
+        ObjectClass* obj = fptr->Get_Object();
+        if (obj == nullptr)
+            return PROD_OK;
+
+        ObjectTypeClass* cls = obj->Class_Of();
+        if (id != cls->Get_Heap_ID())
+            return PROD_OK;
+    }
+
+    /*
+    **	Tell the sidebar that it needs to be redrawn because of this.
+    */
+    if (PlayerPtr == this)
+    {
+        Map.Abandon_Production(type, fptr);
+        if (type == RTTI_BUILDINGTYPE || type == RTTI_BUILDING)
+        {
+            Map.PendingObjectPtr = nullptr;
+            Map.PendingObject = nullptr;
+            Map.PendingHouse = HOUSE_NONE;
+            Map.Set_Cursor_Shape(nullptr);
+        }
+    }
+
+    /*
+    **	Abandon production of the object.
+    */
+    fptr->Abandon();
+    if (fptr->Queued_Object_Count() > 0)
+    {
+        fptr->Resume_Queue();
+        return PROD_OK;
+    }
+
+    Set_Factory(type, nullptr);
+    delete fptr;
+
+    return PROD_OK;
+}
+
+
 /**
  *  Adds a check to Can_Build to check for RequiredHouses and ForbiddenHouses
  *
@@ -1745,6 +1837,7 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
     Patch_Jump(0x004BE218, &_HouseClass_Begin_Production_Check_For_Unallowed_Buildables);
     Patch_Jump(0x004BBC74, &_Can_Build_Required_Forbidden_Houses);
+    Patch_Jump(0x004BE6A0, &HouseClassFake::_Abandon_Production);
     Patch_Jump(0x004BC023, 0x004BC102); // Skip checking the owner of the MCV when building buildings in HouseClass::Can_Build
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
 }

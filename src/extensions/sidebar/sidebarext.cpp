@@ -53,14 +53,14 @@ SidebarClassExtension::SidebarClassExtension(const SidebarClass *this_ptr) :
 {
     //if (this_ptr) EXT_DEBUG_TRACE("SidebarClassExtension::SidebarClassExtension - 0x%08X\n", (uintptr_t)(ThisPtr));
 
-    int button_count = Button_Count(true);
+    int max_visible = Max_Visible(true);
 
     for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
     {
         Column[i] = new SidebarClass::StripClass(NoInitClass());
         Column[i]->X = SidebarClass::COLUMN_ONE_X;
         Column[i]->Y = SidebarClass::COLUMN_ONE_Y;
-        Column[i]->Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * button_count);
+        Column[i]->Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * max_visible);
     }
 }
 
@@ -237,18 +237,18 @@ void SidebarClassExtension::Entry_84_Tooltips()
             }
         }
 
-        int button_count = Button_Count();
+        int max_visible = Max_Visible();
 
-        SidebarClass::StripClass::UpButton[0].Set_Position(SidebarRect.X + SidebarClass::COLUMN_ONE_X + SidebarClass::StripClass::UP_X_OFFSET, SidebarClass::StripClass::OBJECT_HEIGHT * button_count + SidebarRect.Y + SidebarClass::StripClass::UP_Y_OFFSET);
+        SidebarClass::StripClass::UpButton[0].Set_Position(SidebarRect.X + SidebarClass::COLUMN_ONE_X + SidebarClass::StripClass::UP_X_OFFSET, SidebarRect.Y + SidebarClass::StripClass::OBJECT_HEIGHT * max_visible / 2 + SidebarClass::StripClass::UP_Y_OFFSET);
         SidebarClass::StripClass::UpButton[0].Flag_To_Redraw();
         SidebarClass::StripClass::UpButton[0].DrawX = -SidebarRect.X;
-        SidebarClass::StripClass::DownButton[0].Set_Position(SidebarRect.X + SidebarClass::COLUMN_TWO_X + SidebarClass::StripClass::DOWN_X_OFFSET, SidebarClass::StripClass::OBJECT_HEIGHT * button_count + SidebarRect.Y + SidebarClass::StripClass::DOWN_Y_OFFSET);
+        SidebarClass::StripClass::DownButton[0].Set_Position(SidebarRect.X + SidebarClass::COLUMN_TWO_X + SidebarClass::StripClass::DOWN_X_OFFSET, SidebarRect.Y + SidebarClass::StripClass::OBJECT_HEIGHT * max_visible / 2 + SidebarClass::StripClass::DOWN_Y_OFFSET);
         SidebarClass::StripClass::DownButton[0].Flag_To_Redraw();
         SidebarClass::StripClass::DownButton[0].DrawX = -SidebarRect.X;
 
         for (int tab = 0; tab < SIDEBAR_TAB_COUNT; tab++)
         {
-            for (int i = 0; i < button_count; i++)
+            for (int i = 0; i < max_visible; i++)
             {
                 const int x = SidebarRect.X + ((i % 2 == 0) ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X);
                 const int y = SidebarRect.Y + SidebarClass::COLUMN_ONE_Y + ((i / 2) * SidebarClass::StripClass::OBJECT_HEIGHT);
@@ -289,23 +289,23 @@ void SidebarClassExtension::Entry_84_Tooltips()
 
 void SidebarClassExtension::Init_Strips()
 {
-    int button_count = Button_Count(true);
+    int max_visible = Max_Visible(true);
 
     for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
     {
         Column[i] = new SidebarClass::StripClass(NoInitClass());
         Column[i]->X = SidebarClass::COLUMN_ONE_X;
         Column[i]->Y = SidebarClass::COLUMN_ONE_Y;
-        Column[i]->Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * button_count);
+        Column[i]->Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * max_visible);
     }
 }
 
 
 void SidebarClassExtension::Change_Tab(SidebarTabType index)
 {
-    Map.Column[SidebarExtension->TabIndex].Deactivate();
-    SidebarExtension->TabIndex = index;
-    Map.Column[SidebarExtension->TabIndex].Activate();
+    Column[TabIndex]->Deactivate();
+    TabIndex = index;
+    Column[TabIndex]->Activate();
     Map.IsToFullRedraw = true;
 }
 

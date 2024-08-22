@@ -741,11 +741,12 @@ const char* SetStructureTabCommandClass::Get_Description() const
 
 bool SetStructureTabCommandClass::Process()
 {
-    Map.Column[SidebarExtension->TabIndex].Deactivate();
-    SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
-    Map.Column[SidebarExtension->TabIndex].Activate();
-    Map.IsToFullRedraw = true;
+    const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
 
+    if (SidebarExtension->TabIndex == newtab)
+        return false;
+
+    SidebarExtension->Change_Tab(newtab);
     return true;
 }
 
@@ -777,11 +778,12 @@ const char* SetUnitTabCommandClass::Get_Description() const
 
 bool SetUnitTabCommandClass::Process()
 {
-    Map.Column[SidebarExtension->TabIndex].Deactivate();
-    SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_UNIT;
-    Map.Column[SidebarExtension->TabIndex].Activate();
-    Map.IsToFullRedraw = true;
+    const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_UNIT;
 
+    if (SidebarExtension->TabIndex == newtab)
+        return false;
+
+    SidebarExtension->Change_Tab(newtab);
     return true;
 }
 

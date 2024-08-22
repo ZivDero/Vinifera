@@ -66,7 +66,7 @@ public:
         void Init_Strips();
         void Change_Tab(SidebarTabType index);
 
-        static int Button_Count(bool one_strip = false)
+        static int Max_Visible(bool one_strip = false)
         {
             if (SidebarSurface && SidebarClass::SidebarShape)
             {
