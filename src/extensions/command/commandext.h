@@ -325,12 +325,31 @@ public:
     virtual const char* Get_Description() const override;
     virtual bool Process() override;
 
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_H); }
+};
+
+
+/**
+ *  Switches the sidebar to the infantry tab.
+ */
+class SetInfantryTabCommandClass : public ViniferaCommandClass
+{
+public:
+    SetInfantryTabCommandClass() : ViniferaCommandClass() {}
+    virtual ~SetInfantryTabCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
     virtual KeyNumType Default_Key() const override { return KeyNumType(KN_J); }
 };
 
 
 /**
- *  Switches the sidebar to the units tab.
+ *  Switches the sidebar to the unit tab.
  */
 class SetUnitTabCommandClass : public ViniferaCommandClass
 {
@@ -345,6 +364,25 @@ public:
     virtual bool Process() override;
 
     virtual KeyNumType Default_Key() const override { return KeyNumType(KN_K); }
+};
+
+
+/**
+ *  Switches the sidebar to the special tab.
+ */
+class SetSpecialTabCommandClass : public ViniferaCommandClass
+{
+public:
+    SetSpecialTabCommandClass() : ViniferaCommandClass() {}
+    virtual ~SetSpecialTabCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_L); }
 };
 
 

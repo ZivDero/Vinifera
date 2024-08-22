@@ -81,7 +81,6 @@ public:
 	bool _Scroll(bool up, int column);
 	bool _Activate(int control);
 	void _Init_Strips();
-	SidebarClassExtension::SidebarTabType _Which_Column(RTTIType type);
 	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
 	bool _Add(RTTIType type, int id);
 	void _Draw_It(bool complete);
@@ -387,7 +386,7 @@ void StripClassFake::_Draw_It(bool complete)
 			bool darken = false;
 			ShapeFileStruct const* shapefile = nullptr;
 			FactoryClass* factory = nullptr;
-			int index = i + TopIndex / 2;
+			int index = i + TopIndex;
 			int x = i % 2 == 0 ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X;
 			int y = SidebarClass::COLUMN_ONE_Y + ((i / 2) * OBJECT_HEIGHT);
 
@@ -723,7 +722,7 @@ void SidebarClassFake::_Recalc()
 
 bool SidebarClassFake::_Abandon_Production(RTTIType type, FactoryClass* factory)
 {
-    return SidebarExtension->Column[_Which_Column(type)]->Abandon_Production(factory);
+    return SidebarExtension->Column[SidebarClassExtension::Which_Tab(type)]->Abandon_Production(factory);
 }
 
 
@@ -824,24 +823,9 @@ void SidebarClassFake::_Init_Strips()
 }
 
 
-SidebarClassExtension::SidebarTabType SidebarClassFake::_Which_Column(RTTIType type)
-{
-    switch (type)
-    {
-    case RTTI_BUILDINGTYPE:
-    case RTTI_BUILDING:
-        return SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
-
-    default:
-		return SidebarClassExtension::SIDEBAR_TAB_UNIT;
-    }
-
-}
-
-
 bool SidebarClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
 {
-    SidebarClassExtension::SidebarTabType column = _Which_Column(type);
+    SidebarClassExtension::SidebarTabType column = SidebarClassExtension::Which_Tab(type);
 	for (int i = 0; i < SidebarExtension->Column[column]->BuildableCount; i++)
 	{
 	    if (SidebarExtension->Column[column]->Buildables[i].BuildableType == type &&
@@ -863,7 +847,7 @@ bool SidebarClassFake::_Add(RTTIType type, int id)
 {
 	if (!Debug_Map)
 	{
-		SidebarClassExtension::SidebarTabType column = _Which_Column(type);
+		SidebarClassExtension::SidebarTabType column = SidebarClassExtension::Which_Tab(type);
 
 		if (SidebarExtension->Column[column]->Add(type, id))
 		{
@@ -961,7 +945,7 @@ bool StripClassFake::_Scroll(bool up)
 	{
 		if (!TopIndex)
 			return false;
-		Scroller -= 8;
+		Scroller--;
 	}
 	else
 	{
@@ -970,7 +954,7 @@ bool StripClassFake::_Scroll(bool up)
 
 		if (TopIndex + SidebarClassExtension::Max_Visible() >= countToShow)
 			return false;
-		Scroller += 8;
+		Scroller++;
 	}
 
 	return true;
@@ -1032,7 +1016,7 @@ void StripClassFake::_Deactivate()
 	int max_visible = SidebarClassExtension::Max_Visible();
 	for (int index = 0; index < max_visible; index++)
 	{
-		Map.Remove_A_Button(SelectButton[ID][index]);
+		Map.Remove_A_Button(SidebarExtension->SelectButton[ID][index]);
 	}
 }
 
@@ -1238,7 +1222,7 @@ void SidebarClassExtension_Hooks()
 
 	Patch_Jump(0x005F3E60, &SidebarClassFake::_Activate);
 	Patch_Jump(0x005F2B00, &SidebarClassFake::_Init_Strips);
-	Patch_Jump(0x005F2C30, &SidebarClassFake::_Which_Column);
+	Patch_Jump(0x005F2C30, &SidebarClassExtension::Which_Tab);
 	Patch_Jump(0x005F2C50, &SidebarClassFake::_Factory_Link);
 	Patch_Jump(0x005F2E20, &SidebarClassFake::_Add);
 	Patch_Jump(0x005F2E90, &SidebarClassFake::_Scroll);

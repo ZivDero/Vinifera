@@ -249,7 +249,13 @@ void Init_Vinifera_Commands()
     cmdptr = new SetStructureTabCommandClass;
     Commands.Add(cmdptr);
 
+    cmdptr = new SetInfantryTabCommandClass;
+    Commands.Add(cmdptr);
+
     cmdptr = new SetUnitTabCommandClass;
+    Commands.Add(cmdptr);
+
+    cmdptr = new SetSpecialTabCommandClass;
     Commands.Add(cmdptr);
 
     /**

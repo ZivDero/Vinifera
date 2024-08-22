@@ -752,6 +752,43 @@ bool SetStructureTabCommandClass::Process()
 
 
 /**
+ *  Switches the sidebar to the Infantry Tab.
+ *
+ *  @author: ZivDero
+ */
+const char* SetInfantryTabCommandClass::Get_Name() const
+{
+    return "InfantryTab";
+}
+
+const char* SetInfantryTabCommandClass::Get_UI_Name() const
+{
+    return "Infantry Tab";
+}
+
+const char* SetInfantryTabCommandClass::Get_Category() const
+{
+    return Text_String(TXT_INTERFACE);
+}
+
+const char* SetInfantryTabCommandClass::Get_Description() const
+{
+    return "Switch the command bar to the Infantry Tab.";
+}
+
+bool SetInfantryTabCommandClass::Process()
+{
+    const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_INFANTRY;
+
+    if (SidebarExtension->TabIndex == newtab)
+        return false;
+
+    SidebarExtension->Change_Tab(newtab);
+    return true;
+}
+
+
+/**
  *  Switches the sidebar to the Unit Tab.
  *
  *  @author: ZivDero
@@ -779,6 +816,43 @@ const char* SetUnitTabCommandClass::Get_Description() const
 bool SetUnitTabCommandClass::Process()
 {
     const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_UNIT;
+
+    if (SidebarExtension->TabIndex == newtab)
+        return false;
+
+    SidebarExtension->Change_Tab(newtab);
+    return true;
+}
+
+
+/**
+ *  Switches the sidebar to the Special Tab.
+ *
+ *  @author: ZivDero
+ */
+const char* SetSpecialTabCommandClass::Get_Name() const
+{
+    return "SpecialTab";
+}
+
+const char* SetSpecialTabCommandClass::Get_UI_Name() const
+{
+    return "Special Tab";
+}
+
+const char* SetSpecialTabCommandClass::Get_Category() const
+{
+    return Text_String(TXT_INTERFACE);
+}
+
+const char* SetSpecialTabCommandClass::Get_Description() const
+{
+    return "Switch the command bar to the Special Tab.";
+}
+
+bool SetSpecialTabCommandClass::Process()
+{
+    const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_SPECIAL;
 
     if (SidebarExtension->TabIndex == newtab)
         return false;

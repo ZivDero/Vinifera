@@ -38,7 +38,9 @@ public:
     enum SidebarTabType
     {
         SIDEBAR_TAB_STRUCTURE,
+        SIDEBAR_TAB_INFANTRY,
         SIDEBAR_TAB_UNIT,
+        SIDEBAR_TAB_SPECIAL,
 
         SIDEBAR_TAB_COUNT
     };
@@ -65,6 +67,8 @@ public:
         void Entry_84_Tooltips();
         void Init_Strips();
         void Change_Tab(SidebarTabType index);
+
+        static SidebarTabType Which_Tab(RTTIType type);
 
         static int Max_Visible(bool one_strip = false)
         {

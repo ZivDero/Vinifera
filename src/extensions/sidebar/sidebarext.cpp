@@ -309,3 +309,28 @@ void SidebarClassExtension::Change_Tab(SidebarTabType index)
     Map.IsToFullRedraw = true;
 }
 
+SidebarClassExtension::SidebarTabType SidebarClassExtension::Which_Tab(RTTIType type)
+{
+    switch (type)
+    {
+    case RTTI_BUILDINGTYPE:
+    case RTTI_BUILDING:
+        return SIDEBAR_TAB_STRUCTURE;
+
+    case RTTI_INFANTRYTYPE:
+    case RTTI_INFANTRY:
+        return SIDEBAR_TAB_INFANTRY;
+
+    case RTTI_UNITTYPE:
+    case RTTI_UNIT:
+        return SIDEBAR_TAB_UNIT;
+
+    case RTTI_AIRCRAFTTYPE:
+    case RTTI_AIRCRAFT:
+    case RTTI_SUPERWEAPONTYPE:
+    case RTTI_SUPERWEAPON:
+    case RTTI_SPECIAL:
+    default:
+        return SIDEBAR_TAB_SPECIAL;
+    }
+}
