@@ -70,6 +70,7 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "sidebarext.h"
 
 
 /**
@@ -164,7 +165,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_AIRCRAFTTYPE, i);
                 }
             }
-            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_BUILDINGTYPE:
@@ -175,7 +175,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_BUILDINGTYPE, i);
                 }
             }
-            qsort(&Map.Column[0].Buildables, Map.Column[0].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_INFANTRYTYPE:
@@ -186,7 +185,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_INFANTRYTYPE, i);
                 }
             }
-            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_UNITTYPE:
@@ -197,12 +195,13 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_UNITTYPE, i);
                 }
             }
-            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         default:
             break;
         }
+
+        qsort(&SidebarExtension->Column[Class->ToBuild]->Buildables, SidebarExtension->Column[Class->ToBuild]->BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
     }
 }
 
