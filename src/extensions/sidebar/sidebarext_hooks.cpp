@@ -51,6 +51,7 @@
 #include "super.h"
 #include "techno.h"
 #include "textprint.h"
+#include "vinifera_globals.h"
 
 
 static const ObjectTypeClass *_SidebarClass_StripClass_obj = nullptr;
@@ -68,7 +69,7 @@ static BSurface *_SidebarClass_StripClass_CustomImage = nullptr;
 static class SidebarClassFake final : public SidebarClass
 {
 public:
-    //void _Verify_Can_Build();
+	static void _Set_SelectClass_Position(int column, int index);
 };
 
 
@@ -83,6 +84,11 @@ static class StripClassFake final : public SidebarClass::StripClass
 {
 public:
     void _Draw_It(bool complete);
+	static int _Button_Count()
+	{
+		return (SidebarRect.Height - SidebarClass::SidebarBottomShape->Get_Height() - SidebarClass::SidebarShape->Get_Height()) /
+			SidebarClass::SidebarMiddleShape->Get_Height() * 2;
+	}
 };
 
 
@@ -250,8 +256,7 @@ void StripClassFake::_Draw_It(bool complete)
 		int maxvisible;
 		if (SidebarSurface && SidebarClass::SidebarShape)
 		{
-			maxvisible = (SidebarRect.Height - SidebarClass::SidebarBottomShape->Get_Height() - SidebarClass::SidebarShape->Get_Height()) /
-				SidebarClass::SidebarMiddleShape->Get_Height();
+			maxvisible = _Button_Count();
 		}
 		else
 		{
@@ -271,8 +276,8 @@ void StripClassFake::_Draw_It(bool complete)
 			ShapeFileStruct const* shapefile = nullptr;
 			FactoryClass* factory = nullptr;
 			int index = i + TopIndex;
-			int x = X;
-			int y = OBJECT_START_Y + (i * OBJECT_HEIGHT);
+			int x = i % 2 == 0 ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X; //X;
+			int y = SidebarClass::COLUMN_ONE_Y + ((i / 2) * OBJECT_HEIGHT);
 
 			bool isready = false;
 			const char* state = nullptr;
@@ -504,6 +509,98 @@ void StripClassFake::_Draw_It(bool complete)
 }
 
 
+void SidebarClassFake::_Set_SelectClass_Position(int column, int index)
+{
+	int x = SidebarRect.X + ((index % 2 == 0) ? COLUMN_ONE_X : COLUMN_TWO_X);
+	int y = SidebarRect.Y + COLUMN_ONE_Y + ((index / 2) * StripClass::OBJECT_HEIGHT);
+
+	StripClass::SelectButton[column][index].Set_Position(x, y);
+	StripClass::SelectButton[column][index].Flag_To_Redraw();
+}
+
+
+DECLARE_PATCH(_SidebarClass_entry_84_SelectClass_Positions)
+{
+	GET_REGISTER_STATIC(int, button_index, edi);
+	GET_STACK_STATIC(int, strip_offset, esp, 0x18);
+	static int total_index;
+
+	SidebarClassFake::_Set_SelectClass_Position(strip_offset / 20, button_index);
+	total_index = button_index + strip_offset;
+
+	_asm mov esi, total_index
+
+	JMP(0x005F63D0);
+}
+
+
+DECLARE_PATCH(_SidebarClass_entry_84_SelectClass_Count)
+{
+	static int button_count;
+
+	button_count = StripClassFake::_Button_Count();
+
+	_asm mov eax, button_count
+
+	JMP_REG(edx, 0x005F638E);
+}
+
+
+DECLARE_PATCH(_StripClass_Activate_SelectClass_Count)
+{
+	static int button_count;
+
+	button_count = StripClassFake::_Button_Count();
+
+	_asm mov eax, button_count
+
+	JMP_REG(edx, 0x005F4514);
+}
+
+
+DECLARE_PATCH(_StripClass_Deactivate_SelectClass_Count)
+{
+	static int button_count;
+
+	button_count = StripClassFake::_Button_Count();
+
+	_asm mov eax, button_count
+
+	JMP_REG(edx, 0x005F45FA);
+}
+
+
+DECLARE_PATCH(_StripClass_Init_IO_SelectClass_Count)
+{
+	static int button_count;
+
+	_asm push ecx
+
+	button_count = StripClassFake::_Button_Count();
+
+	_asm
+    {
+		mov eax, button_count
+		pop ecx
+	}
+
+	JMP_REG(edx, 0x005F43C6);
+}
+
+
+DECLARE_PATCH(_SidebarClass_Draw_It_Draw_Tab)
+{
+	GET_REGISTER_STATIC(SidebarClass*, this_ptr, ebp);
+
+	// Is actually a bool, I don't know how to get 8 bits of EDI
+    GET_REGISTER_STATIC(int, complete, edi);
+
+	this_ptr->Column[Vinifera_ActiveSidebarTab].Draw_It(complete);
+
+	JMP(0x005F3830);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -526,4 +623,11 @@ void SidebarClassExtension_Hooks()
     Patch_Byte(0x005F5762, false);
 
 	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
+	Patch_Jump(0x005F6396, &_SidebarClass_entry_84_SelectClass_Positions);
+	Patch_Jump(0x005F634D, &_SidebarClass_entry_84_SelectClass_Count);
+	Patch_Jump(0x005F44CC, &_StripClass_Activate_SelectClass_Count);
+	Patch_Jump(0x005F45B2, &_StripClass_Deactivate_SelectClass_Count);
+	Patch_Jump(0x005F4380, &_StripClass_Init_IO_SelectClass_Count);
+	Patch_Jump(0x005F3818, &_SidebarClass_Draw_It_Draw_Tab);
+	Patch_Jump(0x005F3F39, 0x005F3F44); //SidebarClass::Activate skip activating the second tab
 }

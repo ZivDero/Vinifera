@@ -714,6 +714,78 @@ bool ToggleSuperTimersCommandClass::Process()
 
 
 /**
+ *  Switches the sidebar to the Build Tab.
+ *
+ *  @author: ZivDero
+ */
+const char* SetStructureTabCommandClass::Get_Name() const
+{
+    return "StructureTab";
+}
+
+const char* SetStructureTabCommandClass::Get_UI_Name() const
+{
+    return "Buildings Tab";
+}
+
+const char* SetStructureTabCommandClass::Get_Category() const
+{
+    return Text_String(TXT_INTERFACE);
+}
+
+const char* SetStructureTabCommandClass::Get_Description() const
+{
+    return "Switch the command bar to the Building Tab.";
+}
+
+bool SetStructureTabCommandClass::Process()
+{
+    Map.Column[Vinifera_ActiveSidebarTab].Deactivate();
+    Vinifera_ActiveSidebarTab = SIDEBAR_TAB_STRUCTURE;
+    Map.Column[Vinifera_ActiveSidebarTab].Activate();
+    Map.Column[Vinifera_ActiveSidebarTab].Flag_To_Redraw();
+
+    return true;
+}
+
+
+/**
+ *  Switches the sidebar to the Unit Tab.
+ *
+ *  @author: ZivDero
+ */
+const char* SetUnitTabCommandClass::Get_Name() const
+{
+    return "UnitTab";
+}
+
+const char* SetUnitTabCommandClass::Get_UI_Name() const
+{
+    return "Unit Tab";
+}
+
+const char* SetUnitTabCommandClass::Get_Category() const
+{
+    return Text_String(TXT_INTERFACE);
+}
+
+const char* SetUnitTabCommandClass::Get_Description() const
+{
+    return "Switch the command bar to the Unit Tab.";
+}
+
+bool SetUnitTabCommandClass::Process()
+{
+    Map.Column[Vinifera_ActiveSidebarTab].Deactivate();
+    Vinifera_ActiveSidebarTab = SIDEBAR_TAB_UNIT;
+    Map.Column[Vinifera_ActiveSidebarTab].Activate();
+    Map.Column[Vinifera_ActiveSidebarTab].Flag_To_Redraw();
+
+    return true;
+}
+
+
+/**
  *  Produces a memory dump on request.
  * 
  *  @author: CCHyper

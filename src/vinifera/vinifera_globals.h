@@ -53,6 +53,15 @@ extern char Vinifera_ProjectVersion[64];
 extern char Vinifera_IconName[64];
 extern char Vinifera_CursorName[64];
 
+enum SidebarTabs
+{
+    SIDEBAR_TAB_STRUCTURE,
+    SIDEBAR_TAB_UNIT,
+
+    SIDEBAR_TAB_COUNT
+};
+
+extern int Vinifera_ActiveSidebarTab;
 
 /**
  *  Defines and constants.
