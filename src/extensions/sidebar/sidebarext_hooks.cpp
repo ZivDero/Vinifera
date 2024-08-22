@@ -107,7 +107,8 @@ DECLARE_PATCH(_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch)
     _SidebarClass_StripClass_CustomImage = nullptr;
 
     technotypeext = Extension::Fetch<TechnoTypeClassExtension>(reinterpret_cast<const TechnoTypeClass *>(obj));
-    if (technotypeext->CameoImageSurface) {
+    if (technotypeext->CameoImageSurface)
+	{
         _SidebarClass_StripClass_CustomImage = technotypeext->CameoImageSurface;
     }
 
@@ -128,7 +129,8 @@ DECLARE_PATCH(_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch)
     _SidebarClass_StripClass_CustomImage = nullptr;
 
     supertypeext = Extension::Fetch<SuperWeaponTypeClassExtension>(supertype);
-    if (supertypeext->CameoImageSurface) {
+    if (supertypeext->CameoImageSurface)
+	{
         _SidebarClass_StripClass_CustomImage = supertypeext->CameoImageSurface;
     }
 
@@ -238,19 +240,6 @@ void StripClassFake::_Draw_It(bool complete)
 
 		Rect rect = Rect(0, SidebarRect.Y, SidebarRect.Width, SidebarRect.Height);
 
-		//SidebarRedraws++;
-
-		/*
-		**	Fills the background to the side strip. We shouldnt need to do this if the strip
-		** has a full complement of icons.
-		*/
-		/*
-		** New sidebar needs to be drawn not filled
-		*/
-		/*if (BuildableCount < MAX_VISIBLE) {
-			CC_Draw_Shape(LogoShapes, ID, X + (2 * RESFACTOR), Y, WINDOW_MAIN, SHAPE_WIN_REL | SHAPE_NORMAL, 0);
-		}*/
-
 		/*
 		**	Redraw the scroll buttons.
 		*/
@@ -280,12 +269,10 @@ void StripClassFake::_Draw_It(bool complete)
 			int  stage = 0;
 			bool darken = false;
 			ShapeFileStruct const* shapefile = nullptr;
-			//int shapenum = 0;
-			//void const* remapper = 0;
-			FactoryClass* factory = 0;
+			FactoryClass* factory = nullptr;
 			int index = i + TopIndex;
 			int x = X;
-			int y = /*Y*/26 + (i * OBJECT_HEIGHT);
+			int y = OBJECT_START_Y + (i * OBJECT_HEIGHT);
 
 			bool isready = false;
 			const char* state = nullptr;
@@ -317,12 +304,6 @@ void StripClassFake::_Draw_It(bool complete)
 						darken = false;
 
 						/*
-						**	Fetch the remap table that is appropriate for this object
-						**	type.
-						*/
-						//remapper = PlayerPtr->Remap_Table(false, ((TechnoTypeClass const*)obj)->Remap);
-
-						/*
 						**	If there is already a factory producing this kind of object, then all
 						**	objects of this type are displays in a disabled state.
 						*/
@@ -342,18 +323,9 @@ void StripClassFake::_Draw_It(bool complete)
 							darken = true;
 						}
 
-						/*
-						**	Infantry don't get remapped in the sidebar (special case).
-						*/
-						//if (Buildables[index].BuildableType == RTTI_INFANTRYTYPE) {
-						//	remapper = 0;
-						//}
-
 						shapefile = obj->Get_Cameo_Data();
-						//shapenum = 0;
 
 						factory = Buildables[index].Factory;
-
 						if (factory != nullptr)
 						{
 							production = true;
@@ -371,29 +343,20 @@ void StripClassFake::_Draw_It(bool complete)
 						else
 						{
 							production = false;
-							// jump away
-
-							/*
-							**	Darken the imagery if a factory of a matching type is
-							**	already busy.
-							*/
-							//darken = isbusy;
 						}
 					}
-					else {
+					else
+					{
 						shapefile = LogoShape;
-						//darken = PlayerPtr->Is_Hack_Prevented(Buildables[index].BuildableType, Buildables[index].BuildableID);
 					}
 
 				}
 				else
 				{
 					spc = (SpecialWeaponType)Buildables[index].BuildableID;
-					SuperWeaponTypeClass* swtype = SuperWeaponTypes[spc];
 
 					name = SuperWeaponTypes[spc]->FullName;
 					shapefile = Get_Special_Cameo(spc);
-					//shapenum = 0;
 
 					production = true;
 					completed = !PlayerPtr->SuperWeapon[spc]->Needs_Redraw();
@@ -414,7 +377,6 @@ void StripClassFake::_Draw_It(bool complete)
 				production = false;
 			}
 
-			//remapper = 0;
 			/*
 			**	Now that the shape of the object at the current working slot has been found,
 			**	draw it and any graphic overlays as necessary.
