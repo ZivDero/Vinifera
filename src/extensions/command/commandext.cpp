@@ -1364,7 +1364,7 @@ bool SpecialWeaponsCommandClass::Process()
         /**
          *  Redraw the right column.
          */
-        Map.Column[1].Flag_To_Redraw();
+        SidebarExtension->Get_Tab(RTTI_SPECIAL).Flag_To_Redraw();
     }
 
     return true;

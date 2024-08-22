@@ -201,7 +201,7 @@ void BuildingClassFake::_Update_Buildables()
             break;
         }
 
-        qsort(&SidebarExtension->Column[Class->ToBuild]->Buildables, SidebarExtension->Column[Class->ToBuild]->BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
+        qsort(&SidebarExtension->Get_Tab(Class->ToBuild).Buildables, SidebarExtension->Get_Tab(Class->ToBuild).BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
     }
 }
 

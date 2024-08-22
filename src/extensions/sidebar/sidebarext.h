@@ -68,6 +68,9 @@ public:
         void Init_Strips();
         void Change_Tab(SidebarTabType index);
 
+        SidebarClass::StripClass& Active_Tab() const { return *Column[TabIndex];}
+        SidebarClass::StripClass& Get_Tab(RTTIType type) const { return *Column[Which_Tab(type)]; }
+
         static SidebarTabType Which_Tab(RTTIType type);
 
         static int Max_Visible(bool one_strip = false)

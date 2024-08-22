@@ -625,7 +625,7 @@ bool SidebarClassFake::_Scroll(bool up, int column)
 	if (*(int*)0x007E492C)
 		return false;
 
-	bool scr = SidebarExtension->Column[SidebarExtension->TabIndex]->Scroll(up);
+	bool scr = SidebarExtension->Active_Tab().Scroll(up);
 
 	if (scr)
 	{
@@ -645,7 +645,7 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 	{
 		Activate(1);
 	    Point2D newpoint(xy.X - 480, xy.Y);
-	    SidebarExtension->Column[SidebarExtension->TabIndex]->AI(input, newpoint);
+	    SidebarExtension->Active_Tab().AI(input, newpoint);
 	}
 
 	if (IsSidebarActive)
@@ -712,7 +712,7 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 
 void SidebarClassFake::_Recalc()
 {
-    if (SidebarExtension->Column[SidebarExtension->TabIndex]->Recalc())
+    if (SidebarExtension->Active_Tab().Recalc())
     {
         IsToRedraw = true;
 		Flag_To_Redraw();
@@ -722,7 +722,7 @@ void SidebarClassFake::_Recalc()
 
 bool SidebarClassFake::_Abandon_Production(RTTIType type, FactoryClass* factory)
 {
-    return SidebarExtension->Column[SidebarClassExtension::Which_Tab(type)]->Abandon_Production(factory);
+    return SidebarExtension->Get_Tab(type).Abandon_Production(factory);
 }
 
 
@@ -787,7 +787,7 @@ bool SidebarClassFake::_Activate(int control)
 			Add_A_Button(Power);
 			Waypoint.Zap();
 			Add_A_Button(Waypoint);
-			SidebarExtension->Column[SidebarExtension->TabIndex]->Activate();
+			SidebarExtension->Active_Tab().Activate();
 			Background.Zap();
 			Add_A_Button(Background);
 			RadarButton.Zap();
@@ -876,7 +876,7 @@ void SidebarClassFake::_Draw_It(bool complete)
 
 	if (IsSidebarActive && (IsToRedraw || complete) && !Debug_Map)
 	{
-		if (complete || SidebarExtension->Column[SidebarExtension->TabIndex]->IsToRedraw)
+		if (complete || SidebarExtension->Active_Tab().IsToRedraw)
         {
 			Point2D xy(0, SidebarRect.Y);
 			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
@@ -896,7 +896,7 @@ void SidebarClassFake::_Draw_It(bool complete)
 			xy = Point2D(0, y + SidebarBottomShape->Get_Height());
 			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarAddonShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
 
-			SidebarExtension->Column[SidebarExtension->TabIndex]->IsToRedraw = true;
+			SidebarExtension->Active_Tab().IsToRedraw = true;
         }
 	}
 
@@ -905,7 +905,7 @@ void SidebarClassFake::_Draw_It(bool complete)
 	*/
 	if (IsSidebarActive)
 	{
-	    SidebarExtension->Column[SidebarExtension->TabIndex]->Draw_It(complete);
+	    SidebarExtension->Active_Tab().Draw_It(complete);
 	}
 
 	if (Repair.IsDrawn)
@@ -1257,12 +1257,5 @@ void SidebarClassExtension_Hooks()
     // Patch the argument to HouseClass::Can_Build in SidebarClass::StripClass::Recalc so that prerequisites are checked
     Patch_Byte(0x005F5762, false);
 
-	
-	//Patch_Jump(0x005F6396, &_SidebarClass_entry_84_SelectClass_Positions);
-	//Patch_Jump(0x005F634D, &_SidebarClass_entry_84_SelectClass_Count);
-	//Patch_Jump(0x005F44CC, &_StripClass_Activate_SelectClass_Count);
-	//Patch_Jump(0x005F45B2, &_StripClass_Deactivate_SelectClass_Count);
-	//Patch_Jump(0x005F4380, &_StripClass_Init_IO_SelectClass_Count);
-	//Patch_Jump(0x005F3818, &_SidebarClass_Draw_It_Draw_Tab);
-	//Patch_Jump(0x005F3F39, 0x005F3F44); //SidebarClass::Activate skip activating the second tab
+
 }

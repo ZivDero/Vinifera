@@ -33,11 +33,13 @@
 #include "fatal.h"
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "extension_globals.h"
 #include "technotype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
 #include "mouse.h"
+#include "sidebarext.h"
 #include "techno.h"
 
 
@@ -104,7 +106,7 @@ void FactoryClassFake::_Verify_Can_Build()
     if (need_update)
     {
         if (House == PlayerPtr)
-            Map.Column[is_building ? 0 : 1].Flag_To_Redraw();
+            SidebarExtension->Get_Tab(type).Flag_To_Redraw();
 
         House->Update_Factories(type);
         Resume_Queue();
