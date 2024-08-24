@@ -229,12 +229,9 @@ void SidebarClassExtension::Entry_84_Tooltips()
     {
         ToolTip tooltip;
 
-        for (int i = 0; i < 2; ++i)
+        for (int i = 0; i < 100; i++)
         {
-            for (int j = 0; j < 100; ++j)
-            {
-                ToolTipHandler->Remove((j | (i << 8)) + 1000);
-            }
+            ToolTipHandler->Remove(1000 + i);
         }
 
         int max_visible = Max_Visible();
@@ -253,12 +250,15 @@ void SidebarClassExtension::Entry_84_Tooltips()
                 const int x = SidebarRect.X + ((i % 2 == 0) ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X);
                 const int y = SidebarRect.Y + SidebarClass::COLUMN_ONE_Y + ((i / 2) * SidebarClass::StripClass::OBJECT_HEIGHT);
                 SidebarExtension->SelectButton[tab][i].Set_Position(x, y);
-                tooltip.Region = Rect(SidebarExtension->SelectButton[tab][i].X, SidebarExtension->SelectButton[tab][i].Y, SidebarExtension->SelectButton[tab][i].Width, SidebarExtension->SelectButton[tab][i].Height);
-                tooltip.ID = (i | (tab << 8)) + 1000;
-                tooltip.Text = TXT_NONE;
-                ToolTipHandler->Add(&tooltip);
-
             }
+        }
+
+        for (int i = 0; i < max_visible; i++)
+        {
+            tooltip.Region = Rect(SidebarExtension->SelectButton[0][i].X, SidebarExtension->SelectButton[0][i].Y, SidebarExtension->SelectButton[0][i].Width, SidebarExtension->SelectButton[0][i].Height);
+            tooltip.ID = 1000 + i;
+            tooltip.Text = TXT_NONE;
+            ToolTipHandler->Add(&tooltip);
         }
 
         tooltip.Region = Rect(SidebarClass::Repair.X, SidebarClass::Repair.Y, SidebarClass::Repair.Width, SidebarClass::Repair.Height);

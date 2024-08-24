@@ -61,6 +61,7 @@
 #include "voc.h"
 #include "vox.h"
 #include "event.h"
+#include "tooltip.h"
 
 
 static const ObjectTypeClass *_SidebarClass_StripClass_obj = nullptr;
@@ -108,6 +109,8 @@ public:
 	void _Activate();
 	void _Deactivate();
 	bool _AI(KeyNumType& input, Point2D& xy);
+	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
+	const char* _Help_Text(int gadget_id);
 };
 
 
@@ -731,9 +734,7 @@ const char* SidebarClassFake::_Help_Text(int gadget_id)
 	const char* text = PowerClass::Help_Text(gadget_id);
 	if (text == nullptr)
 	{
-		int column = (gadget_id - 1000) >> 8;
-		if (column < SidebarClassExtension::SIDEBAR_TAB_COUNT)
-			return SidebarExtension->Column[column]->Help_Text((gadget_id - 1000) & 0xFF);
+	    return SidebarExtension->Column[SidebarExtension->TabIndex]->Help_Text(gadget_id - 1000);
 	}
 	return text;
 }
@@ -743,7 +744,7 @@ bool SidebarClassFake::_Activate(int control)
 {
 	bool old = IsSidebarActive;
 
-	if (Session.Play && Session.Type != GAME_NORMAL && Session.Type != GAME_SKIRMISH)
+	if (Session.Play && !Session.Singleplayer_Game())
 		return old;
 
 	/*
@@ -825,21 +826,7 @@ void SidebarClassFake::_Init_Strips()
 
 bool SidebarClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
 {
-    SidebarClassExtension::SidebarTabType column = SidebarClassExtension::Which_Tab(type);
-	for (int i = 0; i < SidebarExtension->Column[column]->BuildableCount; i++)
-	{
-	    if (SidebarExtension->Column[column]->Buildables[i].BuildableType == type &&
-			SidebarExtension->Column[column]->Buildables[i].BuildableID == id)
-	    {
-			SidebarExtension->Column[column]->Buildables[i].Factory = factory;
-			SidebarExtension->Column[column]->IsBuilding = true;
-			SidebarExtension->Column[column]->IsToRedraw = true;
-			Map.Flag_To_Redraw();
-            return true;
-	    }
-	}
-
-	return false;
+	return SidebarExtension->Get_Tab(type).Factory_Link(factory, type, id);
 }
 
 
@@ -931,6 +918,9 @@ void SidebarClassFake::_Draw_It(bool complete)
 		RedrawSidebar = true;
 		Waypoint.IsDrawn = false;
 	}
+
+	if (ToolTipHandler)
+		ToolTipHandler->Force_Redraw(true);
 
 	IsToRedraw = false;
 	IsToFullRedraw = false;
@@ -1201,6 +1191,59 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 }
 
 
+bool StripClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
+{
+	for (int i = 0; i < BuildableCount; i++)
+	{
+		if (Buildables[i].BuildableType == type &&
+			Buildables[i].BuildableID == id)
+		{
+			Buildables[i].Factory = factory;
+			IsBuilding = true;
+			/*
+			** Flag that all the icons on this strip need to be redrawn
+			*/
+			Flag_To_Redraw();
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
+const char* StripClassFake::_Help_Text(int gadget_id)
+{
+	static char _buffer[84];
+
+	int i = gadget_id + TopIndex;
+
+	if (GameActive)
+	{
+		if (i < BuildableCount && BuildableCount < MAX_BUILDABLES)
+		{
+			if (Buildables[i].BuildableType == RTTI_SPECIAL)
+				return SuperWeaponTypes[Buildables[i].BuildableID]->Full_Name();
+
+			const TechnoTypeClass* ttype = Fetch_Techno_Type(Buildables[i].BuildableType, Buildables[i].BuildableID);
+
+			// BUGFIX from YR.
+			if (!ttype)
+				return nullptr;
+
+			if (Map.field_1CD4)
+				std::snprintf(_buffer, sizeof(_buffer), Fetch_String(TXT_MONEY_FORMAT_1), ttype->Cost_Of(PlayerPtr));
+			else
+				std::snprintf(_buffer, sizeof(_buffer), Fetch_String(TXT_MONEY_FORMAT_2), ttype->Full_Name(), ttype->Cost_Of(PlayerPtr));
+
+			return _buffer;
+		}
+	}
+
+	return nullptr;
+}
+
+
 DECLARE_PATCH(_SidebarClass_entry_84_Patch)
 {
 	SidebarExtension->Entry_84_Tooltips();
@@ -1239,17 +1282,20 @@ void SidebarClassExtension_Hooks()
 	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
 	Patch_Jump(0x005F46B0, &StripClassFake::_Scroll);
 	Patch_Jump(0x005F4910, &StripClassFake::_AI);
+	Patch_Jump(0x005F5F10, &StripClassFake::_Factory_Link);
+	Patch_Jump(0x005F4E40, &StripClassFake::_Help_Text);
+
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F52AF, &_SidebarClass_StripClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F4EDD, &_SidebarClass_StripClass_Help_Text_Extended_Tooltip_Patch);
     //Patch_Byte(0x005F4EF7 + 2, 0x14); // Pop one more argument passed to sprintf
-	//
-    //// NOP away tooltip length check for formatting
-    //Patch_Byte(0x0044E486, 0x90);
-    //Patch_Byte(0x0044E486 + 1, 0x90);
-	//
+	
+    // NOP away tooltip length check for formatting
+    Patch_Byte(0x0044E486, 0x90);
+    Patch_Byte(0x0044E486 + 1, 0x90);
+	
 
     // Change jle to jl to allow rendering tooltips that are exactly as wide as the sidebar
     Patch_Byte(0x0044E605 + 1, 0x8C);
