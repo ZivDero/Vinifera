@@ -327,39 +327,6 @@ draw_darken_shape:
 }
 
 
-/**
- *  Adds support for extended sidebar tooltips.
- *
- *  @author: Rampastring
- */
-char extended_description[512];
-DECLARE_PATCH(_SidebarClass_StripClass_Help_Text_Extended_Tooltip_Patch)
-{
-    GET_REGISTER_STATIC(int, cost, eax);
-    GET_REGISTER_STATIC(TechnoTypeClass*, technotype, esi);
-
-    static TechnoTypeClassExtension* technotypeext;
-    static char* description;
-    technotypeext = Extension::Fetch<TechnoTypeClassExtension>(technotype);
-    description = technotypeext->Description;
-
-    // Using sprintf below will affect the stack, but the compiler should also clean it up,
-    // so there should be no issue.
-    if (description[0] == '\0') {
-        // If there is no extended description, then simply show the name and price.
-        sprintf(extended_description, "%s@$%d", technotype->FullName, cost);
-    }
-    else {
-        // If there is an extended description, then show the name, price, and the description.
-        sprintf(extended_description, "%s@$%d@@%s", technotype->FullName, cost, technotypeext->Description);
-    }
-
-    // Set up return value
-    _asm { mov  eax, offset ds : extended_description }
-    JMP_REG(ecx, 0x005F4EFF);
-}
-
-
 void StripClassFake::_Draw_It(bool complete)
 {
 	if (IsToRedraw || complete)
@@ -1214,7 +1181,7 @@ bool StripClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
 
 const char* StripClassFake::_Help_Text(int gadget_id)
 {
-	static char _buffer[84];
+	static char _buffer[512];
 
 	int i = gadget_id + TopIndex;
 
@@ -1231,10 +1198,22 @@ const char* StripClassFake::_Help_Text(int gadget_id)
 			if (!ttype)
 				return nullptr;
 
-			if (Map.field_1CD4)
+			const TechnoTypeClassExtension* technotypeext = Extension::Fetch<TechnoTypeClassExtension>(ttype);
+			const char* description = technotypeext->Description;
+
+			if (description[0] == '\0') {
+				// If there is no extended description, then simply show the name and price.
+				std::snprintf(_buffer, sizeof(_buffer), "%s@$%d", ttype->Full_Name(), ttype->Cost_Of(PlayerPtr));
+			}
+			else {
+				// If there is an extended description, then show the name, price, and the description.
+				std::snprintf(_buffer, sizeof(_buffer), "%s@$%d@@%s", ttype->Full_Name(), ttype->Cost_Of(PlayerPtr), technotypeext->Description);
+			}
+
+			/*if (Map.field_1CD4)
 				std::snprintf(_buffer, sizeof(_buffer), Fetch_String(TXT_MONEY_FORMAT_1), ttype->Cost_Of(PlayerPtr));
 			else
-				std::snprintf(_buffer, sizeof(_buffer), Fetch_String(TXT_MONEY_FORMAT_2), ttype->Full_Name(), ttype->Cost_Of(PlayerPtr));
+				std::snprintf(_buffer, sizeof(_buffer), Fetch_String(TXT_MONEY_FORMAT_2), ttype->Full_Name(), ttype->Cost_Of(PlayerPtr));*/
 
 			return _buffer;
 		}
@@ -1289,13 +1268,10 @@ void SidebarClassExtension_Hooks()
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F52AF, &_SidebarClass_StripClass_Custom_Cameo_Image_Patch);
-    //Patch_Jump(0x005F4EDD, &_SidebarClass_StripClass_Help_Text_Extended_Tooltip_Patch);
-    //Patch_Byte(0x005F4EF7 + 2, 0x14); // Pop one more argument passed to sprintf
 	
     // NOP away tooltip length check for formatting
     Patch_Byte(0x0044E486, 0x90);
     Patch_Byte(0x0044E486 + 1, 0x90);
-	
 
     // Change jle to jl to allow rendering tooltips that are exactly as wide as the sidebar
     Patch_Byte(0x0044E605 + 1, 0x8C);
