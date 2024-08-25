@@ -80,6 +80,7 @@ static class SidebarClassFake final : public SidebarClass
 {
 public:
 	bool _Scroll(bool up, int column);
+	bool _Scroll_Page(bool up, int column);
 	bool _Activate(int control);
 	void _Init_Strips();
 	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
@@ -89,6 +90,7 @@ public:
 	void _Recalc();
 	bool _Abandon_Production(RTTIType type, FactoryClass* factory);
 	const char* _Help_Text(int gadget_id);
+	int _Max_Visible();
 };
 
 
@@ -105,6 +107,7 @@ public:
 
     void _Draw_It(bool complete);
 	bool _Scroll(bool up);
+	bool _Scroll_Page(bool up);
 	void _Init_IO(int id);
 	void _Activate();
 	void _Deactivate();
@@ -592,10 +595,26 @@ void StripClassFake::_Draw_It(bool complete)
 
 bool SidebarClassFake::_Scroll(bool up, int column)
 {
-	if (*(int*)0x007E492C)
+	if (*reinterpret_cast<int*>(0x007E492C))
 		return false;
 
 	bool scr = SidebarExtension->Active_Tab().Scroll(up);
+
+	if (scr)
+	{
+		IsToRedraw = true;
+		Flag_To_Redraw(false);
+		return true;
+	}
+
+    Sound_Effect(Rule->ScoldSound);
+	return false;
+}
+
+
+bool SidebarClassFake::_Scroll_Page(bool up, int column)
+{
+	bool scr = SidebarExtension->Active_Tab().Scroll_Page(up);
 
 	if (scr)
 	{
@@ -705,6 +724,13 @@ const char* SidebarClassFake::_Help_Text(int gadget_id)
 	}
 	return text;
 }
+
+
+int SidebarClassFake::_Max_Visible()
+{
+	return SidebarClassExtension::Max_Visible(true);
+}
+
 
 
 bool SidebarClassFake::_Activate(int control)
@@ -917,6 +943,23 @@ bool StripClassFake::_Scroll(bool up)
 	return true;
 }
 
+bool StripClassFake::_Scroll_Page(bool up)
+{
+	if (up)
+	{
+		if (!TopIndex)
+			return false;
+		Scroller -= SidebarClassExtension::Max_Visible();
+	}
+	else
+	{
+		if (TopIndex + SidebarClassExtension::Max_Visible() >= BuildableCount)
+			return false;
+		Scroller += SidebarClassExtension::Max_Visible();
+	}
+	return true;
+}
+
 
 void StripClassFake::_Init_IO(int id)
 {
@@ -1011,7 +1054,6 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 		}
 		else
 		{
-
 			/*
 			**	Top of list is moving toward lower ordered entries in the object list. It looks like
 			**	the "window" to the object list is moving up even though the actual object images are
@@ -1035,7 +1077,7 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 			}
 			else
 			{
-				if (TopIndex + SidebarClassExtension::Max_Visible() >= BuildableCount)
+				if (2 * (TopIndex + SidebarClassExtension::Max_Visible(true)) > BuildableCount)
 				{
 					Scroller = 0;
 				}
@@ -1248,18 +1290,21 @@ void SidebarClassExtension_Hooks()
 	Patch_Jump(0x005F2C50, &SidebarClassFake::_Factory_Link);
 	Patch_Jump(0x005F2E20, &SidebarClassFake::_Add);
 	Patch_Jump(0x005F2E90, &SidebarClassFake::_Scroll);
+	Patch_Jump(0x005F30F0, &SidebarClassFake::_Scroll_Page);
 	//Patch_Jump(0x005F30F0, &SidebarClassFake::_Page);
 	Patch_Jump(0x005F3560, &SidebarClassFake::_Draw_It);
 	Patch_Jump(0x005F3C70, &SidebarClassFake::_AI);
 	Patch_Jump(0x005F3E20, &SidebarClassFake::_Recalc);
 	Patch_Jump(0x005F5F70, &SidebarClassFake::_Abandon_Production);
 	Patch_Jump(0x005F6620, &SidebarClassFake::_Help_Text);
+	Patch_Jump(0x005F6670, &SidebarClassFake::_Max_Visible);
 
 	Patch_Jump(0x005F42A0, &StripClassFake::_Init_IO);
 	Patch_Jump(0x005F4450, &StripClassFake::_Activate);
 	Patch_Jump(0x005F4560, &StripClassFake::_Deactivate);
 	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
 	Patch_Jump(0x005F46B0, &StripClassFake::_Scroll);
+	Patch_Jump(0x005F4760, &StripClassFake::_Scroll_Page);
 	Patch_Jump(0x005F4910, &StripClassFake::_AI);
 	Patch_Jump(0x005F5F10, &StripClassFake::_Factory_Link);
 	Patch_Jump(0x005F4E40, &StripClassFake::_Help_Text);
