@@ -35,6 +35,7 @@
 #include "vinifera_saveload.h"
 #include "asserthandler.h"
 #include "debughandler.h"
+#include "drawshape.h"
 #include "language.h"
 #include "tooltip.h"
 #include "mouse.h"
@@ -214,3 +215,134 @@ SidebarClassExtension::SidebarTabType SidebarClassExtension::Which_Tab(RTTIType 
         return SIDEBAR_TAB_SPECIAL;
     }
 }
+
+
+SidebarClassExtension::TabButtonClass::TabButtonClass() :
+ToggleClass(0, 0, 0, 0, 0),
+DrawX(0),
+DrawY(0),
+ShapeDrawer(CameoDrawer),
+ShapeData(nullptr),
+State(TAB_STATE_NORMAL),
+FlashTimer(0),
+FlashState(false)
+{
+    IsToggleType = true;
+}
+
+
+SidebarClassExtension::TabButtonClass::TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer, int w, int h) :
+ToggleClass(id, x, y, w, h),
+DrawX(0),
+DrawY(0),
+ShapeDrawer(drawer),
+ShapeData(shapes),
+State(TAB_STATE_NORMAL),
+FlashTimer(0),
+FlashState(false)
+{
+    IsToggleType = true;
+}
+
+
+bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
+{
+    // IsDisabled - is the button unresponsive to the user's input?
+    // IsPressed - is the user currently pressing the button?
+    // IsOn - is the button currently in the "true" state?
+
+    if (!ControlClass::Draw_Me(forced))
+        return false;
+
+    if (!ShapeData)
+        return false;
+
+    if (!ShapeDrawer)
+        return false;
+
+
+    int shapenum = 0;
+
+    // A disabled tab always looks darkened
+    if (IsDisabled)
+    {
+        shapenum = 2;
+    }
+    else switch (State)
+    {
+    case TAB_STATE_NORMAL:
+        // Selected
+        if (IsOn)
+        {
+            shapenum = 1;
+        }
+        // Currently held down
+        else if (IsPressed)
+        {
+            shapenum = 4;
+        }
+        // Just normal unselected tab
+        else
+        {
+            shapenum = 0;
+        }
+        break;
+
+    case TAB_STATE_FLASHING:
+        // If the user is currently holding down the button, don't flash
+        if (IsPressed)
+        {
+            shapenum = 4;
+        }
+        else
+        {
+            if (FlashTimer.Expired())
+            {
+                FlashState = !FlashState;
+                FlashTimer = 15;
+            }
+
+            shapenum = FlashState ? 3 : 4;
+        }
+        break;
+    }
+
+    CC_Draw_Shape(SidebarSurface, ShapeDrawer, ShapeData, shapenum, &Point2D(X + DrawX, Y + DrawY), &ScreenRect, SHAPE_NORMAL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0);
+    return true;
+}
+
+
+void SidebarClassExtension::TabButtonClass::Set_Shape(const ShapeFileStruct* data, int width, int height)
+{
+    ShapeData = data;
+    if (ShapeData)
+    {
+        Width = ShapeData->Get_Width();
+        Height = ShapeData->Get_Height();
+    }
+
+    if (width != 0)
+        Width = width;
+
+    if (height != 0)
+        Height = height;
+}
+
+
+void SidebarClassExtension::TabButtonClass::Set_State(TabButtonState state)
+{
+    State = state;
+    switch (State)
+    {
+    case TAB_STATE_NORMAL:
+        FlashTimer.Stop();
+        FlashState = false;
+        break;
+
+    case TAB_STATE_FLASHING:
+        FlashTimer.Start();
+        FlashTimer = FLASH_RATE;
+        FlashState = false;
+    }
+}
+

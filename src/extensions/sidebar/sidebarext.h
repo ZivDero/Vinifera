@@ -52,8 +52,41 @@ public:
         BUTTON_REPAIR_X_OFFSET = 36,
         UP_X_OFFSET = 5,				                            // Scroll up arrow coordinates.
         UP_Y_OFFSET = COLUMN_ONE_Y - 1,
-        DOWN_X_OFFSET = UP_X_OFFSET,				                            // Scroll down arrow coordinates.
-        DOWN_Y_OFFSET = UP_Y_OFFSET,                                //BGint(MAX_VISIBLE)*int(OBJECT_HEIGHT)+1,
+        DOWN_X_OFFSET = UP_X_OFFSET,				                // Scroll down arrow coordinates.
+        DOWN_Y_OFFSET = UP_Y_OFFSET,                                
+    };
+
+    class TabButtonClass : public ToggleClass
+    {
+        enum TabButtonState
+        {
+            TAB_STATE_NORMAL,
+            TAB_STATE_FLASHING
+        };
+
+        enum
+        {
+            FLASH_RATE = 15
+        };
+
+    public:
+        TabButtonClass();
+        TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer = CameoDrawer, int w = 0, int h = 0);
+        virtual ~TabButtonClass() override = default;
+
+        virtual bool Draw_Me(bool forced = false) override;
+        virtual void Set_Shape(const ShapeFileStruct* data, int width = 0, int height = 0);
+        const ShapeFileStruct* Get_Shape_Data() const { return ShapeData; }
+        void Set_State(TabButtonState state);
+
+    public:
+        int DrawX;
+        int DrawY;
+        ConvertClass* ShapeDrawer;
+        const ShapeFileStruct* ShapeData;
+        TabButtonState State;
+        CDTimerClass<SystemTimerClass> FlashTimer;
+        bool FlashState;
     };
 
 public:
@@ -114,4 +147,8 @@ public:
          */
         SidebarClass::StripClass::SelectClass SelectButton[SIDEBAR_TAB_COUNT][SidebarClass::StripClass::MAX_BUILDABLES];
 
+        /**
+        *  Buttons for the tabs.
+        */
+        TabButtonClass* TabButtons[SIDEBAR_TAB_COUNT];
 };

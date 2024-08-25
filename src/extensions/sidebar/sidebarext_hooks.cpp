@@ -724,7 +724,7 @@ void SidebarClassFake::_Init_IO()
 		Repair.Y = 148;
 		Repair.DrawX = -480;
 		Repair.DrawY = 3;
-		Repair.field_3C = true;
+		Repair.DrawnOnSidebarSurface = true;
 		Repair.ShapeDrawer = SidebarDrawer;
 		Repair.IsPressed = false;
 		Repair.IsToggleType = true;
@@ -735,7 +735,7 @@ void SidebarClassFake::_Init_IO()
 		Sell.Y = 148;
 		Sell.DrawX = -480;
 		Sell.DrawY = 3;
-		Sell.field_3C = true;
+		Sell.DrawnOnSidebarSurface = true;
 		Sell.ShapeDrawer = SidebarDrawer;
 		Sell.IsPressed = false;
 		Sell.IsToggleType = true;
@@ -746,7 +746,7 @@ void SidebarClassFake::_Init_IO()
 		Power.Y = 148;
 		Power.DrawX = -480;
 		Power.DrawY = 3;
-		Power.field_3C = true;
+		Power.DrawnOnSidebarSurface = true;
 		Power.ShapeDrawer = SidebarDrawer;
 		Power.IsPressed = false;
 		Power.IsToggleType = true;
@@ -757,7 +757,7 @@ void SidebarClassFake::_Init_IO()
 		Waypoint.Y = 148;
 		Waypoint.DrawX = -480;
 		Waypoint.DrawY = 3;
-		Waypoint.field_3C = true;
+		Waypoint.DrawnOnSidebarSurface = true;
 		Waypoint.ShapeDrawer = SidebarDrawer;
 		Waypoint.IsPressed = false;
 		Waypoint.IsToggleType = true;
@@ -790,16 +790,16 @@ void SidebarClassFake::_Init_For_House()
 	delete SidebarDrawer;
 	SidebarDrawer = new ConvertClass(&pal, &pal, PrimarySurface, 1);
 
-	Sell.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("SELL.SHP"), 0, 0);
+	Sell.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("SELL.SHP"));
 	Sell.ShapeDrawer = SidebarDrawer;
 
-	Power.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("POWER.SHP"), 0, 0);
+	Power.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("POWER.SHP"));
 	Power.ShapeDrawer = SidebarDrawer;
 
-	Waypoint.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("WAYP.SHP"), 0, 0);
+	Waypoint.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("WAYP.SHP"));
 	Waypoint.ShapeDrawer = SidebarDrawer;
 
-	Repair.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("REPAIR.SHP"), 0, 0);
+	Repair.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("REPAIR.SHP"));
 	Repair.ShapeDrawer = SidebarDrawer;
 
 	SidebarShape = MFCC::RetrieveT<ShapeFileStruct>("SIDE1.SHP");
@@ -1189,13 +1189,13 @@ void StripClassFake::_Init_IO(int id)
 
 	UpButton[0].IsSticky = true;
 	UpButton[0].ID = BUTTON_UP;
-	UpButton[0].field_3C = true;
+	UpButton[0].DrawnOnSidebarSurface = true;
 	UpButton[0].ShapeDrawer = SidebarDrawer;
 	UpButton[0].Flags = GadgetClass::RIGHTRELEASE | GadgetClass::RIGHTPRESS | GadgetClass::LEFTRELEASE | GadgetClass::LEFTPRESS;
 
 	DownButton[0].IsSticky = true;
 	DownButton[0].ID = BUTTON_DOWN;
-	DownButton[0].field_3C = true;
+	DownButton[0].DrawnOnSidebarSurface = true;
 	DownButton[0].ShapeDrawer = SidebarDrawer;
 	DownButton[0].Flags = GadgetClass::RIGHTRELEASE | GadgetClass::RIGHTPRESS | GadgetClass::LEFTRELEASE | GadgetClass::LEFTPRESS;
 
@@ -1215,10 +1215,10 @@ void StripClassFake::_Init_IO(int id)
 
 void StripClassFake::_Init_For_House(int id)
 {
-	UpButton[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("R-UP.SHP"), 0, 0);
+	UpButton[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("R-UP.SHP"));
 	UpButton[0].ShapeDrawer = SidebarDrawer;
 
-	DownButton[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("R-DN.SHP"), 0, 0);
+	DownButton[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("R-DN.SHP"));
 	DownButton[0].ShapeDrawer = SidebarDrawer;
 }
 
