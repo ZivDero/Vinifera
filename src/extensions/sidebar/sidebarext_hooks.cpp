@@ -932,10 +932,7 @@ bool StripClassFake::_Scroll(bool up)
 	}
 	else
 	{
-		// We want to make sure the last odd item can be shown
-		int countToShow = BuildableCount + BuildableCount % 2;
-
-		if (TopIndex + SidebarClassExtension::Max_Visible() >= countToShow)
+		if (TopIndex + SidebarClassExtension::Max_Visible() >= BuildableCount + BuildableCount % 2)
 			return false;
 		Scroller++;
 	}
@@ -949,13 +946,13 @@ bool StripClassFake::_Scroll_Page(bool up)
 	{
 		if (!TopIndex)
 			return false;
-		Scroller -= SidebarClassExtension::Max_Visible();
+		Scroller -= SidebarClassExtension::Max_Visible(true);
 	}
 	else
 	{
-		if (TopIndex + SidebarClassExtension::Max_Visible() >= BuildableCount)
+		if (TopIndex + SidebarClassExtension::Max_Visible() >= BuildableCount + BuildableCount % 2)
 			return false;
-		Scroller += SidebarClassExtension::Max_Visible();
+		Scroller += SidebarClassExtension::Max_Visible(true);
 	}
 	return true;
 }
@@ -966,13 +963,13 @@ void StripClassFake::_Init_IO(int id)
 	ID = id;
 
 	UpButton[0].IsSticky = true;
-	UpButton[0].ID = BUTTON_UP + id;
+	UpButton[0].ID = BUTTON_UP;
 	UpButton[0].field_3C = true;
 	UpButton[0].ShapeDrawer = SidebarDrawer;
 	UpButton[0].Flags = GadgetClass::RIGHTRELEASE | GadgetClass::RIGHTPRESS | GadgetClass::LEFTRELEASE | GadgetClass::LEFTPRESS;
 
 	DownButton[0].IsSticky = true;
-	DownButton[0].ID = BUTTON_UP + id;
+	DownButton[0].ID = BUTTON_DOWN;
 	DownButton[0].field_3C = true;
 	DownButton[0].ShapeDrawer = SidebarDrawer;
 	DownButton[0].Flags = GadgetClass::RIGHTRELEASE | GadgetClass::RIGHTPRESS | GadgetClass::LEFTRELEASE | GadgetClass::LEFTPRESS;
@@ -1070,14 +1067,14 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 					Scroller++;
 					IsScrollingDown = false;
 					IsScrolling = true;
-					TopIndex--;
+					TopIndex -= 2;
 					Slid = 0;
 				}
 
 			}
 			else
 			{
-				if (2 * (TopIndex + SidebarClassExtension::Max_Visible(true)) > BuildableCount)
+				if (TopIndex + SidebarClassExtension::Max_Visible() > BuildableCount)
 				{
 					Scroller = 0;
 				}
@@ -1104,7 +1101,7 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 			{
 				IsScrolling = false;
 				Slid = 0;
-				TopIndex++;
+				TopIndex += 2;
 			}
 		}
 		else
