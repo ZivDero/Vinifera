@@ -38,6 +38,7 @@
 #include "extension.h"
 #include "fatal.h"
 #include "asserthandler.h"
+#include "convert.h"
 #include "debughandler.h"
 #include "factory.h"
 #include "fetchres.h"
@@ -79,21 +80,23 @@ static BSurface *_SidebarClass_StripClass_CustomImage = nullptr;
 static class SidebarClassFake final : public SidebarClass
 {
 public:
-	bool _Scroll(bool up, int column);
-	bool _Scroll_Page(bool up, int column);
-	bool _Activate(int control);
+	void _One_Time();
+	void _Init_Clear();
+	void _Init_IO();
+	void _Init_For_House();
 	void _Init_Strips();
 	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
 	bool _Add(RTTIType type, int id);
+	bool _Activate(int control);
+	bool _Scroll(bool up, int column);
+	bool _Scroll_Page(bool up, int column);
 	void _Draw_It(bool complete);
 	void _AI(KeyNumType& input, Point2D& xy);
 	void _Recalc();
 	bool _Abandon_Production(RTTIType type, FactoryClass* factory);
+	void _entry_84();
 	const char* _Help_Text(int gadget_id);
 	int _Max_Visible();
-	void _Init_IO();
-	void _Init_Clear();
-	void _entry_84();
 };
 
 
@@ -107,16 +110,17 @@ public:
 static class StripClassFake final : public SidebarClass::StripClass
 {
 public:
-
-    void _Draw_It(bool complete);
-	bool _Scroll(bool up);
-	bool _Scroll_Page(bool up);
+	void _One_Time(int id);
 	void _Init_IO(int id);
+	void _Init_For_House(int id);
 	void _Activate();
 	void _Deactivate();
+	bool _Scroll(bool up);
+	bool _Scroll_Page(bool up);
 	bool _AI(KeyNumType& input, Point2D& xy);
-	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
 	const char* _Help_Text(int gadget_id);
+    void _Draw_It(bool complete);
+	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
 };
 
 
@@ -499,7 +503,7 @@ void StripClassFake::_Draw_It(bool complete)
 				if (!completed)
 				{
 					int shapenum;
-					ShapeFileStruct* shape;
+					const ShapeFileStruct* shape;
 					Point2D drawpoint;
 
 					if (isready)
@@ -777,6 +781,52 @@ void SidebarClassFake::_Init_IO()
 }
 
 
+void SidebarClassFake::_Init_For_House()
+{
+	PowerClass::Init_For_House();
+
+	PaletteClass pal("SIDEBAR.PAL");
+
+	delete SidebarDrawer;
+	SidebarDrawer = new ConvertClass(&pal, &pal, PrimarySurface, 1);
+
+	Sell.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("SELL.SHP"), 0, 0);
+	Sell.ShapeDrawer = SidebarDrawer;
+
+	Power.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("POWER.SHP"), 0, 0);
+	Power.ShapeDrawer = SidebarDrawer;
+
+	Waypoint.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("WAYP.SHP"), 0, 0);
+	Waypoint.ShapeDrawer = SidebarDrawer;
+
+	Repair.Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("REPAIR.SHP"), 0, 0);
+	Repair.ShapeDrawer = SidebarDrawer;
+
+	SidebarShape = MFCC::RetrieveT<ShapeFileStruct>("SIDE1.SHP");
+	SidebarMiddleShape = MFCC::RetrieveT<ShapeFileStruct>("SIDE2.SHP");
+	SidebarBottomShape = MFCC::RetrieveT<ShapeFileStruct>("SIDE3.SHP");
+	SidebarAddonShape = MFCC::RetrieveT<ShapeFileStruct>("ADDON.SHP");
+
+	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; ++i)
+		static_cast<StripClassFake*>(SidebarExtension->Column[i])->_Init_For_House(i);
+}
+
+
+void SidebarClassFake::_One_Time()
+{
+	PowerClass::One_Time();
+
+	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+		SidebarExtension->Column[i]->One_Time(i);
+
+	/*
+	**  Load the sidebar shapes in at this time.
+	*/
+    StripClass::RechargeClockShape = MFCC::RetrieveT<ShapeFileStruct>("RCLOCK2.SHP");
+    StripClass::ClockShape = MFCC::RetrieveT<ShapeFileStruct>("GCLOCK2.SHP");
+}
+
+
 void SidebarClassFake::_Init_Clear()
 {
 	PowerClass::Init_Clear();
@@ -806,9 +856,9 @@ void SidebarClassFake::_entry_84()
 
 	if (!SidebarShape)
 	{
-		SidebarShape = (ShapeFileStruct*)MixFileClass::Retrieve("SIDEGDI1.SHP");
-		SidebarMiddleShape = (ShapeFileStruct*)MixFileClass::Retrieve("SIDEGDI2.SHP");
-		SidebarBottomShape = (ShapeFileStruct*)MixFileClass::Retrieve("SIDEGDI3.SHP");
+		SidebarShape = MFCC::RetrieveT<ShapeFileStruct>("SIDEGDI1.SHP");
+		SidebarMiddleShape = MFCC::RetrieveT<ShapeFileStruct>("SIDEGDI2.SHP");
+		SidebarBottomShape = MFCC::RetrieveT<ShapeFileStruct>("SIDEGDI3.SHP");
 	}
 
 	Background.Set_Position(SidebarRect.X + 16, TacticalRect.Y);
@@ -1041,6 +1091,12 @@ void SidebarClassFake::_Draw_It(bool complete)
 
 			SidebarExtension->Active_Tab().IsToRedraw = true;
         }
+
+		Repair.Draw_Me(true);
+		Sell.Draw_Me(true);
+		Power.Draw_Me(true);
+		Waypoint.Draw_Me(true);
+		RedrawSidebar = true;
 	}
 
 	/*
@@ -1121,6 +1177,12 @@ bool StripClassFake::_Scroll_Page(bool up)
 }
 
 
+void StripClassFake::_One_Time(int id)
+{
+	DarkenShape = MFCC::RetrieveT<ShapeFileStruct>("DARKEN.SHP");
+}
+
+
 void StripClassFake::_Init_IO(int id)
 {
 	ID = id;
@@ -1148,6 +1210,16 @@ void StripClassFake::_Init_IO(int id)
 		g.Height = OBJECT_HEIGHT;
 		g.Set_Owner(*this, index);
 	}
+}
+
+
+void StripClassFake::_Init_For_House(int id)
+{
+	UpButton[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("R-UP.SHP"), 0, 0);
+	UpButton[0].ShapeDrawer = SidebarDrawer;
+
+	DownButton[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("R-DN.SHP"), 0, 0);
+	DownButton[0].ShapeDrawer = SidebarDrawer;
 }
 
 
@@ -1433,23 +1505,26 @@ void SidebarClassExtension_Hooks()
 	Patch_Jump(0x005F23AC, &_SidebarClass_Constructor_Patch);
 	Patch_Jump(0x005B8B7D, &_SidebarClass_Destructor_Patch);
 
+	Patch_Jump(0x005F2610, &SidebarClassFake::_One_Time);
 	Patch_Jump(0x005F2660, &SidebarClassFake::_Init_Clear);
 	Patch_Jump(0x005F2720, &SidebarClassFake::_Init_IO);
+	Patch_Jump(0x005F2900, &SidebarClassFake::_Init_For_House);
 	Patch_Jump(0x005F2B00, &SidebarClassFake::_Init_Strips);
 	Patch_Jump(0x005F2C30, &SidebarClassExtension::Which_Tab);
 	Patch_Jump(0x005F2C50, &SidebarClassFake::_Factory_Link);
 	Patch_Jump(0x005F2E20, &SidebarClassFake::_Add);
-	Patch_Jump(0x005F3E60, &SidebarClassFake::_Activate);
 	Patch_Jump(0x005F2E90, &SidebarClassFake::_Scroll);
 	Patch_Jump(0x005F30F0, &SidebarClassFake::_Scroll_Page);
 	Patch_Jump(0x005F3560, &SidebarClassFake::_Draw_It);
 	Patch_Jump(0x005F3C70, &SidebarClassFake::_AI);
 	Patch_Jump(0x005F3E20, &SidebarClassFake::_Recalc);
+	Patch_Jump(0x005F3E60, &SidebarClassFake::_Activate);
 	Patch_Jump(0x005F5F70, &SidebarClassFake::_Abandon_Production);
 	Patch_Jump(0x005F6080, &SidebarClassFake::_entry_84);
 	Patch_Jump(0x005F6620, &SidebarClassFake::_Help_Text);
 	Patch_Jump(0x005F6670, &SidebarClassFake::_Max_Visible);
 
+	Patch_Jump(0x005F4210, &StripClassFake::_One_Time);
 	Patch_Jump(0x005F42A0, &StripClassFake::_Init_IO);
 	Patch_Jump(0x005F4450, &StripClassFake::_Activate);
 	Patch_Jump(0x005F4560, &StripClassFake::_Deactivate);

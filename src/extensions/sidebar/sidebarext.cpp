@@ -167,19 +167,6 @@ void SidebarClassExtension::Compute_CRC(WWCRCEngine &crc) const
 }
 
 
-/**
- *  Initialises any values for this instance.
- *
- *  @author: ZivDero
- */
-void SidebarClassExtension::Activate()
-{
-    //EXT_DEBUG_TRACE("ScenarioClassExtension::Init_Clear - 0x%08X\n", (uintptr_t)(This()));
-
-    Column[TabIndex]->Activate();
-}
-
-
 void SidebarClassExtension::Init_Strips()
 {
     int max_visible = Max_Visible(true);
