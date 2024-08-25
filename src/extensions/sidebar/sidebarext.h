@@ -45,6 +45,17 @@ public:
         SIDEBAR_TAB_COUNT
     };
 
+    enum SidebarExtGeneralEnums
+    {
+        COLUMN_ONE_Y = 54,
+        COLUMN_TWO_Y = COLUMN_ONE_Y,
+        BUTTON_REPAIR_X_OFFSET = 36,
+        UP_X_OFFSET = 5,				                            // Scroll up arrow coordinates.
+        UP_Y_OFFSET = COLUMN_ONE_Y - 1,
+        DOWN_X_OFFSET = UP_X_OFFSET,				                            // Scroll down arrow coordinates.
+        DOWN_Y_OFFSET = UP_Y_OFFSET,                                //BGint(MAX_VISIBLE)*int(OBJECT_HEIGHT)+1,
+    };
+
 public:
         IFACEMETHOD(Load)(IStream *pStm);
         IFACEMETHOD(Save)(IStream *pStm, BOOL fClearDirty);

@@ -329,7 +329,7 @@ void StripClassFake::_Draw_It(bool complete)
 			FactoryClass* factory = nullptr;
 			int index = i + TopIndex;
 			int x = i % 2 == 0 ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X;
-			int y = SidebarClass::COLUMN_ONE_Y + ((i / 2) * OBJECT_HEIGHT);
+			int y = SidebarClassExtension::COLUMN_ONE_Y + ((i / 2) * OBJECT_HEIGHT);
 
 			bool isready = false;
 			const char* state = nullptr;
@@ -864,19 +864,19 @@ void SidebarClassFake::_entry_84()
 	Background.Set_Position(SidebarRect.X + 16, TacticalRect.Y);
 	Background.Flag_To_Redraw();
 
-	Repair.Set_Position(SidebarRect.X + 31, SidebarRect.Y - 9);
+	Repair.Set_Position(SidebarRect.X + SidebarClassExtension::BUTTON_REPAIR_X_OFFSET, SidebarRect.Y  + BUTTON_REPAIR_Y_OFFSET);
 	Repair.Flag_To_Redraw();
 	Repair.DrawX = -SidebarRect.X;
 
-	Sell.Set_Position(Repair.X + 27, Repair.Y);
+	Sell.Set_Position(Repair.X + BUTTON_SELL_X_OFFSET, Repair.Y);
 	Sell.Flag_To_Redraw();
 	Sell.DrawX = -SidebarRect.X;
 
-	Power.Set_Position(Sell.X + 27, Sell.Y);
+	Power.Set_Position(Sell.X + BUTTON_POWER_X_OFFSET, Sell.Y);
 	Power.Flag_To_Redraw();
 	Power.DrawX = -SidebarRect.X;
 
-	Waypoint.Set_Position(Power.X + 27, Power.Y);
+	Waypoint.Set_Position(Power.X + BUTTON_WAYPOINT_X_OFFSET, Power.Y);
 	Waypoint.Flag_To_Redraw();
 	Waypoint.DrawX = -SidebarRect.X;
 
@@ -891,10 +891,10 @@ void SidebarClassFake::_entry_84()
 
 		int max_visible = SidebarClassExtension::Max_Visible();
 
-		StripClass::UpButton[0].Set_Position(SidebarRect.X + COLUMN_ONE_X + StripClass::UP_X_OFFSET, SidebarRect.Y + StripClass::OBJECT_HEIGHT * max_visible / 2 + StripClass::UP_Y_OFFSET);
+		StripClass::UpButton[0].Set_Position(SidebarRect.X + COLUMN_ONE_X + SidebarClassExtension::UP_X_OFFSET, SidebarRect.Y + StripClass::OBJECT_HEIGHT * max_visible / 2 + SidebarClassExtension::UP_Y_OFFSET);
 		StripClass::UpButton[0].Flag_To_Redraw();
 		StripClass::UpButton[0].DrawX = -SidebarRect.X;
-		StripClass::DownButton[0].Set_Position(SidebarRect.X + COLUMN_TWO_X + StripClass::DOWN_X_OFFSET, SidebarRect.Y + StripClass::OBJECT_HEIGHT * max_visible / 2 + StripClass::DOWN_Y_OFFSET);
+		StripClass::DownButton[0].Set_Position(SidebarRect.X + COLUMN_TWO_X + SidebarClassExtension::DOWN_X_OFFSET, SidebarRect.Y + StripClass::OBJECT_HEIGHT * max_visible / 2 + SidebarClassExtension::DOWN_Y_OFFSET);
 		StripClass::DownButton[0].Flag_To_Redraw();
 		StripClass::DownButton[0].DrawX = -SidebarRect.X;
 
@@ -903,7 +903,7 @@ void SidebarClassFake::_entry_84()
 			for (int i = 0; i < max_visible; i++)
 			{
 				const int x = SidebarRect.X + ((i % 2 == 0) ? COLUMN_ONE_X : COLUMN_TWO_X);
-				const int y = SidebarRect.Y + COLUMN_ONE_Y + ((i / 2) * StripClass::OBJECT_HEIGHT);
+				const int y = SidebarRect.Y + SidebarClassExtension::COLUMN_ONE_Y + ((i / 2) * StripClass::OBJECT_HEIGHT);
 				SidebarExtension->SelectButton[tab][i].Set_Position(x, y);
 			}
 		}
@@ -917,26 +917,26 @@ void SidebarClassFake::_entry_84()
 		}
 
 		tooltip.Region = Rect(Repair.X, Repair.Y, Repair.Width, Repair.Height);
-		tooltip.ID = 101;
-		tooltip.Text = 101;
+		tooltip.ID = BUTTON_REPAIR;
+		tooltip.Text = TXT_REPAIR_MODE;
 		ToolTipHandler->Remove(tooltip.ID);
 		ToolTipHandler->Add(&tooltip);
 
 		tooltip.Region = Rect(Power.X, Power.Y, Power.Width, Power.Height);
-		tooltip.ID = 102;
-		tooltip.Text = 105;
+		tooltip.ID = BUTTON_POWER;
+		tooltip.Text = TXT_POWER_MODE;
 		ToolTipHandler->Remove(tooltip.ID);
 		ToolTipHandler->Add(&tooltip);
 
 		tooltip.Region = Rect(Sell.X, Sell.Y, Sell.Width, Sell.Height);
-		tooltip.ID = 103;
-		tooltip.Text = 103;
+		tooltip.ID = BUTTON_SELL;
+		tooltip.Text = TXT_SELL_MODE;
 		ToolTipHandler->Remove(tooltip.ID);
 		ToolTipHandler->Add(&tooltip);
 
 		tooltip.Region = Rect(Waypoint.X, Waypoint.Y, Waypoint.Width, Waypoint.Height);
-		tooltip.ID = 105;
-		tooltip.Text = 135;
+		tooltip.ID = BUTTON_WAYPOINT;
+		tooltip.Text = TXT_WAYPOINTMODE;
 		ToolTipHandler->Remove(tooltip.ID);
 		ToolTipHandler->Add(&tooltip);
 	}
@@ -1205,7 +1205,7 @@ void StripClassFake::_Init_IO(int id)
 		SelectClass& g = SidebarExtension->SelectButton[ID][index];
 		g.ID = BUTTON_SELECT;
 		g.X = SidebarRect.X + ((index % 2 == 0) ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X);
-		g.Y = SidebarRect.Y + SidebarClass::COLUMN_ONE_Y + ((index / 2) * OBJECT_HEIGHT);
+		g.Y = SidebarRect.Y + SidebarClassExtension::COLUMN_ONE_Y + ((index / 2) * OBJECT_HEIGHT);
 		g.Width = OBJECT_WIDTH;
 		g.Height = OBJECT_HEIGHT;
 		g.Set_Owner(*this, index);
@@ -1496,6 +1496,23 @@ const char* StripClassFake::_Help_Text(int gadget_id)
 	return nullptr;
 }
 
+DECLARE_PATCH(_PowerClass_Draw_It_Bar_Count)
+{
+	GET_REGISTER_STATIC(int, bar_count, eax);
+
+	bar_count += (SidebarClassExtension::COLUMN_ONE_Y - SidebarClass::COLUMN_ONE_Y) / 4;
+
+	if (bar_count > 0)
+	{
+		// We have bars to draw, draw them
+	    _asm mov edi, bar_count
+		JMP(0x005AB50D);
+	}
+
+	// No bars to draw
+	JMP(0x005AB550);
+}
+
 
 /**
  *  Main function for patching the hooks.
@@ -1535,6 +1552,7 @@ void SidebarClassExtension_Hooks()
 	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
 	Patch_Jump(0x005F5F10, &StripClassFake::_Factory_Link);
 
+	Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
