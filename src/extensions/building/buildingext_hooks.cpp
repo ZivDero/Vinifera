@@ -121,6 +121,12 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
     if (bt1->BuildableType == bt2->BuildableType)
         return bt1->BuildableID - bt2->BuildableID;
 
+    if (bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE)
+        return 1;
+
     if (bt1->BuildableType == RTTI_INFANTRYTYPE)
         return -1;
 
