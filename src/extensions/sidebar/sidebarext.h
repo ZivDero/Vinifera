@@ -61,10 +61,7 @@ public:
         virtual const char *Name() const override { return "Sidebar"; }
         virtual const char *Full_Name() const override { return "Sidebar"; }
 
-        void Init_Clear();
-        void Init_IO();
         void Activate();
-        void Entry_84_Tooltips();
         void Init_Strips();
         void Change_Tab(SidebarTabType index);
 

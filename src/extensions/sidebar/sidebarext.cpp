@@ -166,33 +166,6 @@ void SidebarClassExtension::Compute_CRC(WWCRCEngine &crc) const
     //EXT_DEBUG_TRACE("SidebarClassExtension::Compute_CRC - 0x%08X\n", (uintptr_t)(This()));
 }
 
-/**
- *  Initialises any values for this instance.
- *
- *  @author: ZivDero
- */
-void SidebarClassExtension::Init_Clear()
-{
-    //EXT_DEBUG_TRACE("ScenarioClassExtension::Init_Clear - 0x%08X\n", (uintptr_t)(This()));
-
-    TabIndex = SIDEBAR_TAB_STRUCTURE;
-
-    for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
-        Column[i]->Init_Clear();
-}
-
-/**
- *  Initialises any values for this instance.
- *
- *  @author: ZivDero
- */
-void SidebarClassExtension::Init_IO()
-{
-    //EXT_DEBUG_TRACE("ScenarioClassExtension::Init_Clear - 0x%08X\n", (uintptr_t)(This()));
-
-    for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
-        Column[i]->Init_IO(i);
-}
 
 /**
  *  Initialises any values for this instance.
@@ -206,86 +179,6 @@ void SidebarClassExtension::Activate()
     Column[TabIndex]->Activate();
 }
 
-
-void SidebarClassExtension::Entry_84_Tooltips()
-{
-    SidebarClass::Repair.Set_Position(SidebarRect.X + 31, SidebarRect.Y - 9);
-    SidebarClass::Repair.Flag_To_Redraw();
-    SidebarClass::Repair.DrawX = -SidebarRect.X;
-
-    SidebarClass::Sell.Set_Position(SidebarClass::Repair.X + 27, SidebarClass::Repair.Y);
-    SidebarClass::Sell.Flag_To_Redraw();
-    SidebarClass::Sell.DrawX = -SidebarRect.X;
-
-    SidebarClass::Power.Set_Position(SidebarClass::Sell.X + 27, SidebarClass::Sell.Y);
-    SidebarClass::Power.Flag_To_Redraw();
-    SidebarClass::Power.DrawX = -SidebarRect.X;
-
-    SidebarClass::Waypoint.Set_Position(SidebarClass::Power.X + 27, SidebarClass::Power.Y);
-    SidebarClass::Waypoint.Flag_To_Redraw();
-    SidebarClass::Waypoint.DrawX = -SidebarRect.X;
-
-    if (ToolTipHandler)
-    {
-        ToolTip tooltip;
-
-        for (int i = 0; i < 100; i++)
-        {
-            ToolTipHandler->Remove(1000 + i);
-        }
-
-        int max_visible = Max_Visible();
-
-        SidebarClass::StripClass::UpButton[0].Set_Position(SidebarRect.X + SidebarClass::COLUMN_ONE_X + SidebarClass::StripClass::UP_X_OFFSET, SidebarRect.Y + SidebarClass::StripClass::OBJECT_HEIGHT * max_visible / 2 + SidebarClass::StripClass::UP_Y_OFFSET);
-        SidebarClass::StripClass::UpButton[0].Flag_To_Redraw();
-        SidebarClass::StripClass::UpButton[0].DrawX = -SidebarRect.X;
-        SidebarClass::StripClass::DownButton[0].Set_Position(SidebarRect.X + SidebarClass::COLUMN_TWO_X + SidebarClass::StripClass::DOWN_X_OFFSET, SidebarRect.Y + SidebarClass::StripClass::OBJECT_HEIGHT * max_visible / 2 + SidebarClass::StripClass::DOWN_Y_OFFSET);
-        SidebarClass::StripClass::DownButton[0].Flag_To_Redraw();
-        SidebarClass::StripClass::DownButton[0].DrawX = -SidebarRect.X;
-
-        for (int tab = 0; tab < SIDEBAR_TAB_COUNT; tab++)
-        {
-            for (int i = 0; i < max_visible; i++)
-            {
-                const int x = SidebarRect.X + ((i % 2 == 0) ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X);
-                const int y = SidebarRect.Y + SidebarClass::COLUMN_ONE_Y + ((i / 2) * SidebarClass::StripClass::OBJECT_HEIGHT);
-                SidebarExtension->SelectButton[tab][i].Set_Position(x, y);
-            }
-        }
-
-        for (int i = 0; i < max_visible; i++)
-        {
-            tooltip.Region = Rect(SidebarExtension->SelectButton[0][i].X, SidebarExtension->SelectButton[0][i].Y, SidebarExtension->SelectButton[0][i].Width, SidebarExtension->SelectButton[0][i].Height);
-            tooltip.ID = 1000 + i;
-            tooltip.Text = TXT_NONE;
-            ToolTipHandler->Add(&tooltip);
-        }
-
-        tooltip.Region = Rect(SidebarClass::Repair.X, SidebarClass::Repair.Y, SidebarClass::Repair.Width, SidebarClass::Repair.Height);
-        tooltip.ID = 101;
-        tooltip.Text = 101;
-        ToolTipHandler->Remove(tooltip.ID);
-        ToolTipHandler->Add(&tooltip);
-
-        tooltip.Region = Rect(SidebarClass::Power.X, SidebarClass::Power.Y, SidebarClass::Power.Width, SidebarClass::Power.Height);
-        tooltip.ID = 102;
-        tooltip.Text = 105;
-        ToolTipHandler->Remove(tooltip.ID);
-        ToolTipHandler->Add(&tooltip);
-
-        tooltip.Region = Rect(SidebarClass::Sell.X, SidebarClass::Sell.Y, SidebarClass::Sell.Width, SidebarClass::Sell.Height);
-        tooltip.ID = 103;
-        tooltip.Text = 103;
-        ToolTipHandler->Remove(tooltip.ID);
-        ToolTipHandler->Add(&tooltip);
-
-        tooltip.Region = Rect(SidebarClass::Waypoint.X, SidebarClass::Waypoint.Y, SidebarClass::Waypoint.Width, SidebarClass::Waypoint.Height);
-        tooltip.ID = 105;
-        tooltip.Text = 135;
-        ToolTipHandler->Remove(tooltip.ID);
-        ToolTipHandler->Add(&tooltip);
-    }
-}
 
 void SidebarClassExtension::Init_Strips()
 {

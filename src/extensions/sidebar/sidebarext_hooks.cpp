@@ -91,6 +91,9 @@ public:
 	bool _Abandon_Production(RTTIType type, FactoryClass* factory);
 	const char* _Help_Text(int gadget_id);
 	int _Max_Visible();
+	void _Init_IO();
+	void _Init_Clear();
+	void _entry_84();
 };
 
 
@@ -176,45 +179,6 @@ DECLARE_PATCH(_SidebarClass_Destructor_Patch)
 		pop ebx
 		ret
 	}
-}
-
-
-/**
- *  Patch for including the extended class members when initialsing the scenario data.
- *
- *  @warning: Do not touch this unless you know what you are doing!
- *
- *  @author: ZivDero
- */
-DECLARE_PATCH(_SidebarClass_Init_Clear_Patch)
-{
-	//GET_REGISTER_STATIC(SidebarClass*, this_ptr, esi);
-
-	SidebarExtension->Init_Clear();
-
-	/**
-	 *  Stolen bytes here.
-	 */
-	_asm xor eax, eax
-
-	JMP_REG(ecx, 0x005F2711)
-}
-
-
-/**
- *  Patch for including the extended class members when initialsing the scenario data.
- *
- *  @warning: Do not touch this unless you know what you are doing!
- *
- *  @author: ZivDero
- */
-DECLARE_PATCH(_SidebarClass_Init_IO_Patch)
-{
-	//GET_REGISTER_STATIC(SidebarClass*, this_ptr, esi);
-
-	SidebarExtension->Init_IO();
-
-	JMP(0x005F28D1)
 }
 
 
@@ -731,6 +695,205 @@ int SidebarClassFake::_Max_Visible()
 	return SidebarClassExtension::Max_Visible(true);
 }
 
+
+void SidebarClassFake::_Init_IO()
+{
+	PowerClass::Init_IO();
+
+	SidebarRect.X = TacticalRect.Width + TacticalRect.X;
+	SidebarRect.Y = 148;
+	SidebarRect.Width = 641 - (TacticalRect.Width + TacticalRect.X);
+	SidebarRect.Height = TacticalRect.Height + TacticalRect.Y - SidebarRect.Y;
+
+	/*
+	** Add the sidebar's buttons only if we're not in editor mode.
+	*/
+	if (!Debug_Map) {
+
+		Repair.X = TacticalRect.Width + TacticalRect.X;
+		Sell.X = TacticalRect.Width + TacticalRect.X + 27;
+		Power.X = TacticalRect.Width + TacticalRect.X + 54;
+		Waypoint.X = TacticalRect.Width + TacticalRect.X + 81;
+
+		Repair.IsSticky = true;
+		Repair.ID = BUTTON_REPAIR;
+		Repair.Y = 148;
+		Repair.DrawX = -480;
+		Repair.DrawY = 3;
+		Repair.field_3C = true;
+		Repair.ShapeDrawer = SidebarDrawer;
+		Repair.IsPressed = false;
+		Repair.IsToggleType = true;
+		Repair.ReflectButtonState = true;
+
+		Sell.IsSticky = true;
+		Sell.ID = BUTTON_SELL;
+		Sell.Y = 148;
+		Sell.DrawX = -480;
+		Sell.DrawY = 3;
+		Sell.field_3C = true;
+		Sell.ShapeDrawer = SidebarDrawer;
+		Sell.IsPressed = false;
+		Sell.IsToggleType = true;
+		Sell.ReflectButtonState = true;
+
+		Power.IsSticky = true;
+		Power.ID = BUTTON_POWER;
+		Power.Y = 148;
+		Power.DrawX = -480;
+		Power.DrawY = 3;
+		Power.field_3C = true;
+		Power.ShapeDrawer = SidebarDrawer;
+		Power.IsPressed = false;
+		Power.IsToggleType = true;
+		Power.ReflectButtonState = true;
+
+		Waypoint.IsSticky = true;
+		Waypoint.ID = BUTTON_WAYPOINT;
+		Waypoint.Y = 148;
+		Waypoint.DrawX = -480;
+		Waypoint.DrawY = 3;
+		Waypoint.field_3C = true;
+		Waypoint.ShapeDrawer = SidebarDrawer;
+		Waypoint.IsPressed = false;
+		Waypoint.IsToggleType = true;
+		Waypoint.ReflectButtonState = true;
+		Waypoint.Enable();
+
+		for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+			SidebarExtension->Column[i]->Init_IO(i);
+
+		entry_84();
+
+		/*
+		** If a game was loaded & the sidebar was enabled, pop it up now.
+		*/
+		if (IsSidebarActive)
+		{
+			IsSidebarActive = false;
+			Activate(1);
+		}
+	}
+}
+
+
+void SidebarClassFake::_Init_Clear()
+{
+	PowerClass::Init_Clear();
+
+	IsToRedraw = true;
+	IsRepairActive = false;
+	IsUpgradeActive = false;
+	IsUpgradeActive = false;
+
+	SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
+
+	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+		SidebarExtension->Column[i]->Init_Clear();
+
+	Activate(0);
+}
+
+
+void SidebarClassFake::_entry_84()
+{
+    SidebarRect.X = Options.SidebarOn ? TacticalRect.X + TacticalRect.Width : 0;
+	SidebarRect.Y = 148;
+	SidebarRect.Width = 168;
+	SidebarRect.Height = TacticalRect.Y + TacticalRect.Height - 148;
+
+	PowerClass::entry_84();
+
+	if (!SidebarShape)
+	{
+		SidebarShape = (ShapeFileStruct*)MixFileClass::Retrieve("SIDEGDI1.SHP");
+		SidebarMiddleShape = (ShapeFileStruct*)MixFileClass::Retrieve("SIDEGDI2.SHP");
+		SidebarBottomShape = (ShapeFileStruct*)MixFileClass::Retrieve("SIDEGDI3.SHP");
+	}
+
+	Background.Set_Position(SidebarRect.X + 16, TacticalRect.Y);
+	Background.Flag_To_Redraw();
+
+	Repair.Set_Position(SidebarRect.X + 31, SidebarRect.Y - 9);
+	Repair.Flag_To_Redraw();
+	Repair.DrawX = -SidebarRect.X;
+
+	Sell.Set_Position(Repair.X + 27, Repair.Y);
+	Sell.Flag_To_Redraw();
+	Sell.DrawX = -SidebarRect.X;
+
+	Power.Set_Position(Sell.X + 27, Sell.Y);
+	Power.Flag_To_Redraw();
+	Power.DrawX = -SidebarRect.X;
+
+	Waypoint.Set_Position(Power.X + 27, Power.Y);
+	Waypoint.Flag_To_Redraw();
+	Waypoint.DrawX = -SidebarRect.X;
+
+	if (ToolTipHandler)
+	{
+		ToolTip tooltip;
+
+		for (int i = 0; i < 100; i++)
+		{
+			ToolTipHandler->Remove(1000 + i);
+		}
+
+		int max_visible = SidebarClassExtension::Max_Visible();
+
+		StripClass::UpButton[0].Set_Position(SidebarRect.X + COLUMN_ONE_X + StripClass::UP_X_OFFSET, SidebarRect.Y + StripClass::OBJECT_HEIGHT * max_visible / 2 + StripClass::UP_Y_OFFSET);
+		StripClass::UpButton[0].Flag_To_Redraw();
+		StripClass::UpButton[0].DrawX = -SidebarRect.X;
+		StripClass::DownButton[0].Set_Position(SidebarRect.X + COLUMN_TWO_X + StripClass::DOWN_X_OFFSET, SidebarRect.Y + StripClass::OBJECT_HEIGHT * max_visible / 2 + StripClass::DOWN_Y_OFFSET);
+		StripClass::DownButton[0].Flag_To_Redraw();
+		StripClass::DownButton[0].DrawX = -SidebarRect.X;
+
+		for (int tab = 0; tab < SidebarClassExtension::SIDEBAR_TAB_COUNT; tab++)
+		{
+			for (int i = 0; i < max_visible; i++)
+			{
+				const int x = SidebarRect.X + ((i % 2 == 0) ? COLUMN_ONE_X : COLUMN_TWO_X);
+				const int y = SidebarRect.Y + COLUMN_ONE_Y + ((i / 2) * StripClass::OBJECT_HEIGHT);
+				SidebarExtension->SelectButton[tab][i].Set_Position(x, y);
+			}
+		}
+
+		for (int i = 0; i < max_visible; i++)
+		{
+			tooltip.Region = Rect(SidebarExtension->SelectButton[0][i].X, SidebarExtension->SelectButton[0][i].Y, SidebarExtension->SelectButton[0][i].Width, SidebarExtension->SelectButton[0][i].Height);
+			tooltip.ID = 1000 + i;
+			tooltip.Text = TXT_NONE;
+			ToolTipHandler->Add(&tooltip);
+		}
+
+		tooltip.Region = Rect(Repair.X, Repair.Y, Repair.Width, Repair.Height);
+		tooltip.ID = 101;
+		tooltip.Text = 101;
+		ToolTipHandler->Remove(tooltip.ID);
+		ToolTipHandler->Add(&tooltip);
+
+		tooltip.Region = Rect(Power.X, Power.Y, Power.Width, Power.Height);
+		tooltip.ID = 102;
+		tooltip.Text = 105;
+		ToolTipHandler->Remove(tooltip.ID);
+		ToolTipHandler->Add(&tooltip);
+
+		tooltip.Region = Rect(Sell.X, Sell.Y, Sell.Width, Sell.Height);
+		tooltip.ID = 103;
+		tooltip.Text = 103;
+		ToolTipHandler->Remove(tooltip.ID);
+		ToolTipHandler->Add(&tooltip);
+
+		tooltip.Region = Rect(Waypoint.X, Waypoint.Y, Waypoint.Width, Waypoint.Height);
+		tooltip.ID = 105;
+		tooltip.Text = 135;
+		ToolTipHandler->Remove(tooltip.ID);
+		ToolTipHandler->Add(&tooltip);
+	}
+
+	Background.Set_Position(Options.SidebarOn ? TacticalRect.X + TacticalRect.Width : 0, RadarButton.Height + RadarButton.Y);
+	Background.Set_Size(SidebarSurface->Get_Width(), SidebarSurface->Get_Height() - RadarButton.Height + RadarButton.Y);
+}
 
 
 bool SidebarClassFake::_Activate(int control)
@@ -1262,14 +1425,6 @@ const char* StripClassFake::_Help_Text(int gadget_id)
 }
 
 
-DECLARE_PATCH(_SidebarClass_entry_84_Patch)
-{
-	SidebarExtension->Entry_84_Tooltips();
-
-	JMP(0x005F65B5);
-}
-
-
 /**
  *  Main function for patching the hooks.
  */
@@ -1277,34 +1432,33 @@ void SidebarClassExtension_Hooks()
 {
 	Patch_Jump(0x005F23AC, &_SidebarClass_Constructor_Patch);
 	Patch_Jump(0x005B8B7D, &_SidebarClass_Destructor_Patch);
-	Patch_Jump(0x005F2683, &_SidebarClass_Init_Clear_Patch);
-	Patch_Jump(0x005F28B8, &_SidebarClass_Init_IO_Patch);
-	Patch_Jump(0x005F620D, &_SidebarClass_entry_84_Patch);
 
-	Patch_Jump(0x005F3E60, &SidebarClassFake::_Activate);
+	Patch_Jump(0x005F2660, &SidebarClassFake::_Init_Clear);
+	Patch_Jump(0x005F2720, &SidebarClassFake::_Init_IO);
 	Patch_Jump(0x005F2B00, &SidebarClassFake::_Init_Strips);
 	Patch_Jump(0x005F2C30, &SidebarClassExtension::Which_Tab);
 	Patch_Jump(0x005F2C50, &SidebarClassFake::_Factory_Link);
 	Patch_Jump(0x005F2E20, &SidebarClassFake::_Add);
+	Patch_Jump(0x005F3E60, &SidebarClassFake::_Activate);
 	Patch_Jump(0x005F2E90, &SidebarClassFake::_Scroll);
 	Patch_Jump(0x005F30F0, &SidebarClassFake::_Scroll_Page);
-	//Patch_Jump(0x005F30F0, &SidebarClassFake::_Page);
 	Patch_Jump(0x005F3560, &SidebarClassFake::_Draw_It);
 	Patch_Jump(0x005F3C70, &SidebarClassFake::_AI);
 	Patch_Jump(0x005F3E20, &SidebarClassFake::_Recalc);
 	Patch_Jump(0x005F5F70, &SidebarClassFake::_Abandon_Production);
+	Patch_Jump(0x005F6080, &SidebarClassFake::_entry_84);
 	Patch_Jump(0x005F6620, &SidebarClassFake::_Help_Text);
 	Patch_Jump(0x005F6670, &SidebarClassFake::_Max_Visible);
 
 	Patch_Jump(0x005F42A0, &StripClassFake::_Init_IO);
 	Patch_Jump(0x005F4450, &StripClassFake::_Activate);
 	Patch_Jump(0x005F4560, &StripClassFake::_Deactivate);
-	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
 	Patch_Jump(0x005F46B0, &StripClassFake::_Scroll);
 	Patch_Jump(0x005F4760, &StripClassFake::_Scroll_Page);
 	Patch_Jump(0x005F4910, &StripClassFake::_AI);
-	Patch_Jump(0x005F5F10, &StripClassFake::_Factory_Link);
 	Patch_Jump(0x005F4E40, &StripClassFake::_Help_Text);
+	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
+	Patch_Jump(0x005F5F10, &StripClassFake::_Factory_Link);
 
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
@@ -1320,6 +1474,4 @@ void SidebarClassExtension_Hooks()
 
     // Patch the argument to HouseClass::Can_Build in SidebarClass::StripClass::Recalc so that prerequisites are checked
     Patch_Byte(0x005F5762, false);
-
-
 }
