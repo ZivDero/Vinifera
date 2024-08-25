@@ -58,10 +58,10 @@ SidebarClassExtension::SidebarClassExtension(const SidebarClass *this_ptr) :
 
     for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
     {
-        Column[i] = new SidebarClass::StripClass(NoInitClass());
-        Column[i]->X = SidebarClass::COLUMN_ONE_X;
-        Column[i]->Y = SidebarClass::COLUMN_ONE_Y;
-        Column[i]->Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * max_visible);
+        new (&Column[i]) SidebarClass::StripClass(NoInitClass());
+        Column[i].X = SidebarClass::COLUMN_ONE_X;
+        Column[i].Y = COLUMN_Y;
+        Column[i].Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * max_visible);
     }
 }
 
@@ -86,12 +86,6 @@ SidebarClassExtension::SidebarClassExtension(const NoInitClass &noinit) :
 SidebarClassExtension::~SidebarClassExtension()
 {
     //EXT_DEBUG_TRACE("SidebarClassExtension::~SidebarClassExtension - 0x%08X\n", (uintptr_t)(ThisPtr));
-
-    for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
-    {
-        if (Column[i] != nullptr)
-            delete Column[i];
-    }
 }
 
 
@@ -174,19 +168,91 @@ void SidebarClassExtension::Init_Strips()
 
     for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
     {
-        Column[i] = new SidebarClass::StripClass(NoInitClass());
-        Column[i]->X = SidebarClass::COLUMN_ONE_X;
-        Column[i]->Y = SidebarClass::COLUMN_ONE_Y;
-        Column[i]->Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * max_visible);
+        new (&Column[i]) SidebarClass::StripClass(NoInitClass());
+        Column[i].X = SidebarClass::COLUMN_ONE_X;
+        Column[i].Y = COLUMN_Y;
+        Column[i].Size = Rect(SidebarClass::COLUMN_ONE_X, SidebarClass::COLUMN_ONE_Y, SidebarClass::StripClass::OBJECT_WIDTH, SidebarClass::StripClass::OBJECT_HEIGHT * max_visible);
     }
+}
+
+
+void SidebarClassExtension::Init_IO()
+{
+    TabButtons[0].IsSticky = true;
+    TabButtons[0].ID = BUTTON_TAB_1;
+    TabButtons[0].Y = 148;
+    TabButtons[0].DrawX = -480;
+    TabButtons[0].DrawY = 3;
+    TabButtons[0].IsPressed = false;
+    TabButtons[0].IsToggleType = true;
+
+    TabButtons[1].IsSticky = true;
+    TabButtons[1].ID = BUTTON_TAB_2;
+    TabButtons[1].Y = 148;
+    TabButtons[1].DrawX = -480;
+    TabButtons[1].DrawY = 3;
+    TabButtons[1].IsPressed = false;
+    TabButtons[1].IsToggleType = true;
+
+    TabButtons[2].IsSticky = true;
+    TabButtons[2].ID = BUTTON_TAB_3;
+    TabButtons[2].Y = 148;
+    TabButtons[2].DrawX = -480;
+    TabButtons[2].DrawY = 3;
+    TabButtons[2].IsPressed = false;
+    TabButtons[2].IsToggleType = true;
+
+    TabButtons[3].IsSticky = true;
+    TabButtons[3].ID = BUTTON_TAB_4;
+    TabButtons[3].Y = 148;
+    TabButtons[3].DrawX = -480;
+    TabButtons[3].DrawY = 3;
+    TabButtons[3].IsPressed = false;
+    TabButtons[3].IsToggleType = true;
+}
+
+
+void SidebarClassExtension::entry_84()
+{
+    TabButtons[0].Set_Position(SidebarRect.X + TAB_ONE_X_OFFSET, SidebarRect.Y + TAB_Y_OFFSET);
+    TabButtons[0].Flag_To_Redraw();
+    TabButtons[0].DrawX = -SidebarRect.X;
+
+    TabButtons[1].Set_Position(SidebarRect.X + TAB_TWO_X_OFFSET, TabButtons[0].Y);
+    TabButtons[1].Flag_To_Redraw();
+    TabButtons[1].DrawX = -SidebarRect.X;
+
+    TabButtons[2].Set_Position(SidebarRect.X + TAB_THREE_X_OFFSET, TabButtons[1].Y);
+    TabButtons[2].Flag_To_Redraw();
+    TabButtons[2].DrawX = -SidebarRect.X;
+
+    TabButtons[3].Set_Position(SidebarRect.X + TAB_FOUR_X_OFFSET, TabButtons[2].Y);
+    TabButtons[3].Flag_To_Redraw();
+    TabButtons[3].DrawX = -SidebarRect.X;
+}
+
+
+void SidebarClassExtension::Init_For_House()
+{
+    TabButtons[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("TAB-BLD.SHP"));
+    TabButtons[0].ShapeDrawer = SidebarDrawer;
+
+    TabButtons[1].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("TAB-INF.SHP"));
+    TabButtons[1].ShapeDrawer = SidebarDrawer;
+
+    TabButtons[2].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("TAB-UNT.SHP"));
+    TabButtons[2].ShapeDrawer = SidebarDrawer;
+
+    TabButtons[3].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("TAB-SPC.SHP"));
+    TabButtons[3].ShapeDrawer = SidebarDrawer;
 }
 
 
 void SidebarClassExtension::Change_Tab(SidebarTabType index)
 {
-    Column[TabIndex]->Deactivate();
+    Column[TabIndex].Deactivate();
     TabIndex = index;
-    Column[TabIndex]->Activate();
+    Column[TabIndex].Activate();
     Map.IsToFullRedraw = true;
 }
 
@@ -225,7 +291,8 @@ ShapeDrawer(CameoDrawer),
 ShapeData(nullptr),
 State(TAB_STATE_NORMAL),
 FlashTimer(0),
-FlashState(false)
+FlashState(false),
+IsDrawn(false)
 {
     IsToggleType = true;
 }
@@ -239,7 +306,8 @@ ShapeDrawer(drawer),
 ShapeData(shapes),
 State(TAB_STATE_NORMAL),
 FlashTimer(0),
-FlashState(false)
+FlashState(false),
+IsDrawn(false)
 {
     IsToggleType = true;
 }
@@ -268,46 +336,36 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     {
         shapenum = 2;
     }
+    // Selected
+    else if (IsOn)
+    {
+        shapenum = 1;
+    }
+    // Currently held down
+    else if (IsPressed)
+    {
+        shapenum = 4;
+    }
     else switch (State)
     {
     case TAB_STATE_NORMAL:
-        // Selected
-        if (IsOn)
-        {
-            shapenum = 1;
-        }
-        // Currently held down
-        else if (IsPressed)
-        {
-            shapenum = 4;
-        }
         // Just normal unselected tab
-        else
-        {
-            shapenum = 0;
-        }
+        shapenum = 0;
         break;
 
     case TAB_STATE_FLASHING:
-        // If the user is currently holding down the button, don't flash
-        if (IsPressed)
+        if (FlashTimer.Expired())
         {
-            shapenum = 4;
+            FlashState = !FlashState;
+            FlashTimer = FLASH_RATE;
         }
-        else
-        {
-            if (FlashTimer.Expired())
-            {
-                FlashState = !FlashState;
-                FlashTimer = 15;
-            }
 
-            shapenum = FlashState ? 3 : 4;
-        }
+        shapenum = FlashState ? 4 : 3;
         break;
     }
 
     CC_Draw_Shape(SidebarSurface, ShapeDrawer, ShapeData, shapenum, &Point2D(X + DrawX, Y + DrawY), &ScreenRect, SHAPE_NORMAL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0);
+    IsDrawn = true;
     return true;
 }
 

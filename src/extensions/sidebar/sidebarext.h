@@ -47,23 +47,36 @@ public:
 
     enum SidebarExtGeneralEnums
     {
-        COLUMN_ONE_Y = 54,
-        COLUMN_TWO_Y = COLUMN_ONE_Y,
+        COLUMN_Y = 54,
         BUTTON_REPAIR_X_OFFSET = 36,
         UP_X_OFFSET = 5,				                            // Scroll up arrow coordinates.
-        UP_Y_OFFSET = COLUMN_ONE_Y - 1,
+        UP_Y_OFFSET = COLUMN_Y - 1,
         DOWN_X_OFFSET = UP_X_OFFSET,				                // Scroll down arrow coordinates.
-        DOWN_Y_OFFSET = UP_Y_OFFSET,                                
+        DOWN_Y_OFFSET = UP_Y_OFFSET,
+        TAB_Y_OFFSET = 24,
+        TAB_ONE_X_OFFSET = 20,
+        TAB_TWO_X_OFFSET = TAB_ONE_X_OFFSET + 35,
+        TAB_THREE_X_OFFSET = TAB_TWO_X_OFFSET + 35,
+        TAB_FOUR_X_OFFSET = TAB_THREE_X_OFFSET + 35,
+    };
+
+    enum ButtonNumberType {
+        BUTTON_TAB_1 = 115,
+        BUTTON_TAB_2,
+        BUTTON_TAB_3,
+        BUTTON_TAB_4
     };
 
     class TabButtonClass : public ToggleClass
     {
+    public:
         enum TabButtonState
         {
             TAB_STATE_NORMAL,
             TAB_STATE_FLASHING
         };
 
+    private:
         enum
         {
             FLASH_RATE = 15
@@ -87,6 +100,7 @@ public:
         TabButtonState State;
         CDTimerClass<SystemTimerClass> FlashTimer;
         bool FlashState;
+        bool IsDrawn;
     };
 
 public:
@@ -106,10 +120,13 @@ public:
         virtual const char *Full_Name() const override { return "Sidebar"; }
 
         void Init_Strips();
+        void Init_IO();
+        void Init_For_House();
+        void entry_84();
         void Change_Tab(SidebarTabType index);
 
-        SidebarClass::StripClass& Active_Tab() const { return *Column[TabIndex];}
-        SidebarClass::StripClass& Get_Tab(RTTIType type) const { return *Column[Which_Tab(type)]; }
+        SidebarClass::StripClass& Active_Tab() { return Column[TabIndex];}
+        SidebarClass::StripClass& Get_Tab(RTTIType type) { return Column[Which_Tab(type)]; }
 
         static SidebarTabType Which_Tab(RTTIType type);
 
@@ -140,7 +157,7 @@ public:
         /**
          *  Replacement strips.
          */
-        SidebarClass::StripClass* Column[SIDEBAR_TAB_COUNT];
+        SidebarClass::StripClass Column[SIDEBAR_TAB_COUNT];
 
         /**
          *  Replacement select buttons.
@@ -150,5 +167,5 @@ public:
         /**
         *  Buttons for the tabs.
         */
-        TabButtonClass* TabButtons[SIDEBAR_TAB_COUNT];
+        TabButtonClass TabButtons[SIDEBAR_TAB_COUNT];
 };

@@ -121,6 +121,7 @@ public:
 	const char* _Help_Text(int gadget_id);
     void _Draw_It(bool complete);
 	bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
+	void _Tab_Button_AI();
 };
 
 
@@ -329,7 +330,7 @@ void StripClassFake::_Draw_It(bool complete)
 			FactoryClass* factory = nullptr;
 			int index = i + TopIndex;
 			int x = i % 2 == 0 ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X;
-			int y = SidebarClassExtension::COLUMN_ONE_Y + ((i / 2) * OBJECT_HEIGHT);
+			int y = SidebarClassExtension::COLUMN_Y + ((i / 2) * OBJECT_HEIGHT);
 
 			bool isready = false;
 			const char* state = nullptr;
@@ -602,12 +603,12 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 	{
 		Activate(1);
 	    Point2D newpoint(xy.X - 480, xy.Y);
-	    SidebarExtension->Active_Tab().AI(input, newpoint);
+	    for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+			SidebarExtension->Column[i].AI(input, newpoint);
 	}
 
 	if (IsSidebarActive)
 	{
-
 		/*
 		**	If there are any buildings in the player's inventory, then allow the repair
 		**	option.
@@ -669,7 +670,11 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 
 void SidebarClassFake::_Recalc()
 {
-    if (SidebarExtension->Active_Tab().Recalc())
+	bool redraw = false;
+	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+		redraw |= SidebarExtension->Column[i].Recalc();
+
+    if (redraw)
     {
         IsToRedraw = true;
 		Flag_To_Redraw();
@@ -688,7 +693,7 @@ const char* SidebarClassFake::_Help_Text(int gadget_id)
 	const char* text = PowerClass::Help_Text(gadget_id);
 	if (text == nullptr)
 	{
-	    return SidebarExtension->Column[SidebarExtension->TabIndex]->Help_Text(gadget_id - 1000);
+	    return SidebarExtension->Column[SidebarExtension->TabIndex].Help_Text(gadget_id - 1000);
 	}
 	return text;
 }
@@ -764,8 +769,10 @@ void SidebarClassFake::_Init_IO()
 		Waypoint.ReflectButtonState = true;
 		Waypoint.Enable();
 
+		SidebarExtension->Init_IO();
+
 		for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
-			SidebarExtension->Column[i]->Init_IO(i);
+			SidebarExtension->Column[i].Init_IO(i);
 
 		entry_84();
 
@@ -807,8 +814,10 @@ void SidebarClassFake::_Init_For_House()
 	SidebarBottomShape = MFCC::RetrieveT<ShapeFileStruct>("SIDE3.SHP");
 	SidebarAddonShape = MFCC::RetrieveT<ShapeFileStruct>("ADDON.SHP");
 
+	SidebarExtension->Init_For_House();
+
 	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; ++i)
-		static_cast<StripClassFake*>(SidebarExtension->Column[i])->_Init_For_House(i);
+		static_cast<StripClassFake*>(&SidebarExtension->Column[i])->_Init_For_House(i);
 }
 
 
@@ -817,7 +826,7 @@ void SidebarClassFake::_One_Time()
 	PowerClass::One_Time();
 
 	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
-		SidebarExtension->Column[i]->One_Time(i);
+		SidebarExtension->Column[i].One_Time(i);
 
 	/*
 	**  Load the sidebar shapes in at this time.
@@ -839,7 +848,7 @@ void SidebarClassFake::_Init_Clear()
 	SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
 
 	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
-		SidebarExtension->Column[i]->Init_Clear();
+		SidebarExtension->Column[i].Init_Clear();
 
 	Activate(0);
 }
@@ -880,6 +889,8 @@ void SidebarClassFake::_entry_84()
 	Waypoint.Flag_To_Redraw();
 	Waypoint.DrawX = -SidebarRect.X;
 
+	SidebarExtension->entry_84();
+
 	if (ToolTipHandler)
 	{
 		ToolTip tooltip;
@@ -903,7 +914,7 @@ void SidebarClassFake::_entry_84()
 			for (int i = 0; i < max_visible; i++)
 			{
 				const int x = SidebarRect.X + ((i % 2 == 0) ? COLUMN_ONE_X : COLUMN_TWO_X);
-				const int y = SidebarRect.Y + SidebarClassExtension::COLUMN_ONE_Y + ((i / 2) * StripClass::OBJECT_HEIGHT);
+				const int y = SidebarRect.Y + SidebarClassExtension::COLUMN_Y + ((i / 2) * StripClass::OBJECT_HEIGHT);
 				SidebarExtension->SelectButton[tab][i].Set_Position(x, y);
 			}
 		}
@@ -997,6 +1008,11 @@ bool SidebarClassFake::_Activate(int control)
 			SidebarExtension->Active_Tab().Activate();
 			Background.Zap();
 			Add_A_Button(Background);
+			for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+			{
+				SidebarExtension->TabButtons[i].Zap();
+				Add_A_Button(SidebarExtension->TabButtons[i]);
+			}
 			RadarButton.Zap();
 			Add_A_Button(RadarButton);
 		}
@@ -1009,7 +1025,10 @@ bool SidebarClassFake::_Activate(int control)
 			Remove_A_Button(Waypoint);
 			Remove_A_Button(Background);
 			for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
-				SidebarExtension->Column[i]->Deactivate();
+			{
+			    SidebarExtension->Column[i].Deactivate();
+				Remove_A_Button(SidebarExtension->TabButtons[i]);
+			}
 			Remove_A_Button(RadarButton);
 		}
 
@@ -1042,7 +1061,7 @@ bool SidebarClassFake::_Add(RTTIType type, int id)
 	{
 		SidebarClassExtension::SidebarTabType column = SidebarClassExtension::Which_Tab(type);
 
-		if (SidebarExtension->Column[column]->Add(type, id))
+		if (SidebarExtension->Column[column].Add(type, id))
 		{
 			Activate(1);
 			IsToRedraw = true;
@@ -1096,6 +1115,10 @@ void SidebarClassFake::_Draw_It(bool complete)
 		Sell.Draw_Me(true);
 		Power.Draw_Me(true);
 		Waypoint.Draw_Me(true);
+
+		for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+			SidebarExtension->TabButtons[i].Draw_Me(true);
+
 		RedrawSidebar = true;
 	}
 
@@ -1129,6 +1152,15 @@ void SidebarClassFake::_Draw_It(bool complete)
 	{
 		RedrawSidebar = true;
 		Waypoint.IsDrawn = false;
+	}
+
+	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+	{
+	    if (SidebarExtension->TabButtons[i].IsDrawn)
+	    {
+			RedrawSidebar = true;
+			SidebarExtension->TabButtons[i].IsDrawn = false;
+	    }
 	}
 
 	if (ToolTipHandler)
@@ -1205,7 +1237,7 @@ void StripClassFake::_Init_IO(int id)
 		SelectClass& g = SidebarExtension->SelectButton[ID][index];
 		g.ID = BUTTON_SELECT;
 		g.X = SidebarRect.X + ((index % 2 == 0) ? SidebarClass::COLUMN_ONE_X : SidebarClass::COLUMN_TWO_X);
-		g.Y = SidebarRect.Y + SidebarClassExtension::COLUMN_ONE_Y + ((index / 2) * OBJECT_HEIGHT);
+		g.Y = SidebarRect.Y + SidebarClassExtension::COLUMN_Y + ((index / 2) * OBJECT_HEIGHT);
 		g.Width = OBJECT_WIDTH;
 		g.Height = OBJECT_HEIGHT;
 		g.Set_Owner(*this, index);
@@ -1256,6 +1288,63 @@ void StripClassFake::_Deactivate()
 bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 {
 	bool redraw = false;
+
+	_Tab_Button_AI();
+
+	/*
+	**	Handle any building clock animation logic.
+	*/
+	if (IsBuilding)
+	{
+		for (int index = 0; index < BuildableCount; index++)
+		{
+			FactoryClass* factory = Buildables[index].Factory;
+			if (factory && factory->Has_Changed())
+			{
+				redraw = true;
+				if (factory->Has_Completed())
+				{
+					/*
+					**	Construction has been completed. Announce this fact to the player and
+					**	try to get the object to automatically leave the factory. Buildings are
+					**	the main exception to the ability to leave the factory under their own
+					**	power.
+					*/
+					TechnoClass* pending = factory->Get_Object();
+					if (pending != nullptr)
+					{
+						switch (pending->Kind_Of())
+						{
+						case RTTI_UNIT:
+						case RTTI_AIRCRAFT:
+							OutList.Add(EventClass(pending->Owner(), EVENT_PLACE, pending->Kind_Of(), &INVALID_CELL));
+							Speak(VOX_UNIT_READY);
+							break;
+
+						case RTTI_BUILDING:
+							SidebarExtension->TabButtons[ID].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_FLASHING);
+							Speak(VOX_CONSTRUCTION);
+							break;
+
+						case RTTI_INFANTRY:
+							OutList.Add(EventClass(pending->Owner(), EVENT_PLACE, pending->Kind_Of(), &INVALID_CELL));
+							Speak(VOX_UNIT_READY);
+							break;
+
+						default:
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/*
+	**	If this is not the currently active tab, return and do not redraw.
+	*/
+	if (SidebarExtension->TabIndex != ID)
+		return false;
 
 	/*
 	**	If this is scroll button for this side strip, then scroll the strip as
@@ -1370,54 +1459,6 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 	}
 
 	/*
-	**	Handle any building clock animation logic.
-	*/
-	if (IsBuilding)
-	{
-		for (int index = 0; index < BuildableCount; index++)
-		{
-			FactoryClass* factory = Buildables[index].Factory;
-			if (factory && factory->Has_Changed())
-			{
-				redraw = true;
-				if (factory->Has_Completed())
-				{
-					/*
-					**	Construction has been completed. Announce this fact to the player and
-					**	try to get the object to automatically leave the factory. Buildings are
-					**	the main exception to the ability to leave the factory under their own
-					**	power.
-					*/
-					TechnoClass* pending = factory->Get_Object();
-					if (pending != nullptr)
-					{
-						switch (pending->Kind_Of())
-					    {
-						case RTTI_UNIT:
-						case RTTI_AIRCRAFT:
-							OutList.Add(EventClass(pending->Owner(), EVENT_PLACE, pending->Kind_Of(), &INVALID_CELL));
-						    Speak(VOX_UNIT_READY);
-							break;
-
-						case RTTI_BUILDING:
-							Speak(VOX_CONSTRUCTION);
-							break;
-
-						case RTTI_INFANTRY:
-							OutList.Add(EventClass(pending->Owner(), EVENT_PLACE, pending->Kind_Of(), &INVALID_CELL));
-							Speak(VOX_UNIT_READY);
-							break;
-
-						default:
-							break;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	/*
 	**	If any of the logic determined that this side strip needs to be redrawn, then
 	**	set the redraw flag for this side strip.
 	*/
@@ -1451,6 +1492,22 @@ bool StripClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
 
 	return false;
 }
+
+
+void StripClassFake::_Tab_Button_AI()
+{
+	if (BuildableCount > 0 && !SidebarExtension->TabButtons[ID].Is_Enabled())
+	{
+		SidebarExtension->TabButtons[ID].Enable();
+		SidebarExtension->TabButtons[ID].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_NORMAL);
+	}
+	else if (BuildableCount == 0)
+	{
+		SidebarExtension->TabButtons[ID].Disable();
+		SidebarExtension->TabButtons[ID].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_NORMAL);
+	}
+}
+
 
 
 const char* StripClassFake::_Help_Text(int gadget_id)
@@ -1500,7 +1557,7 @@ DECLARE_PATCH(_PowerClass_Draw_It_Bar_Count)
 {
 	GET_REGISTER_STATIC(int, bar_count, eax);
 
-	bar_count += (SidebarClassExtension::COLUMN_ONE_Y - SidebarClass::COLUMN_ONE_Y) / 4;
+	bar_count += (SidebarClassExtension::COLUMN_Y - SidebarClass::COLUMN_ONE_Y) / 4;
 
 	if (bar_count > 0)
 	{
@@ -1511,6 +1568,29 @@ DECLARE_PATCH(_PowerClass_Draw_It_Bar_Count)
 
 	// No bars to draw
 	JMP(0x005AB550);
+}
+
+
+DECLARE_PATCH(_PowerClass_Draw_It_Move_Power_Bar)
+{
+	static int y;
+	y = SidebarRect.Y + SidebarClassExtension::COLUMN_Y - 1;
+	_asm mov esi, y
+
+	static int max_visible;
+    max_visible = SidebarClassExtension::Max_Visible(true);
+	_asm mov eax, max_visible
+	_asm mov ecx, max_visible
+
+	JMP_REG(ebx, 0x005AB4D9);
+}
+
+
+DECLARE_PATCH(_HouseClass_Manual_Place_Stop_Sidebar_Flash)
+{
+	SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_STRUCTURE].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_NORMAL);
+	Unselect_All();
+	JMP(0x004BEEDC);
 }
 
 
@@ -1552,7 +1632,9 @@ void SidebarClassExtension_Hooks()
 	Patch_Jump(0x005F4F10, &StripClassFake::_Draw_It);
 	Patch_Jump(0x005F5F10, &StripClassFake::_Factory_Link);
 
-	Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
+	//Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
+	Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
+	Patch_Jump(0x004BEED7, _HouseClass_Manual_Place_Stop_Sidebar_Flash);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
