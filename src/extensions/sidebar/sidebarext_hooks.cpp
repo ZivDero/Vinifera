@@ -1559,6 +1559,26 @@ void StripClassFake::_Tab_Button_AI()
 					SidebarExtension->TabButtons[ID].Stop_Flashing();
 			}
 		}
+
+		int special_tab = SidebarClassExtension::Which_Tab(RTTI_SPECIAL);
+		if (ID == special_tab)
+		{
+			bool ready_sw = false;
+			for (int i = 0; i < PlayerPtr->SuperWeapon.Count(); i++)
+			{
+				SuperClass* sw = PlayerPtr->SuperWeapon[i];
+				if (sw->Is_Ready())
+				{
+					ready_sw = true;
+					break;
+				}
+			}
+
+			if (ready_sw && !SidebarExtension->TabButtons[ID].IsFlashing)
+			    SidebarExtension->TabButtons[ID].Start_Flashing();
+		    else if (!ready_sw && SidebarExtension->TabButtons[ID].IsFlashing)
+			    SidebarExtension->TabButtons[ID].Stop_Flashing();
+		}
 	}
 	else
 	{
