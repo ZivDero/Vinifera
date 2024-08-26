@@ -325,7 +325,7 @@ public:
     virtual const char* Get_Description() const override;
     virtual bool Process() override;
 
-    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_H); }
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Q); }
 };
 
 
@@ -344,7 +344,7 @@ public:
     virtual const char* Get_Description() const override;
     virtual bool Process() override;
 
-    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_J); }
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_W); }
 };
 
 
@@ -363,7 +363,7 @@ public:
     virtual const char* Get_Description() const override;
     virtual bool Process() override;
 
-    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_K); }
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_E); }
 };
 
 
@@ -382,7 +382,7 @@ public:
     virtual const char* Get_Description() const override;
     virtual bool Process() override;
 
-    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_L); }
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_R); }
 };
 
 

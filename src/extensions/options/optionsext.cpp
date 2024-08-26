@@ -165,6 +165,17 @@ void OptionsClassExtension::Load_Settings()
         FilterBandBoxSelection = sun_ini.Get_Bool("Options", "FilterBandBoxSelection", FilterBandBoxSelection);
         IsClassicMessagePosition = sun_ini.Get_Bool("Options", "ClassicMessageListPosition", IsClassicMessagePosition);
     }
+
+    RawFileClass keyboard_file("Keyboard.ini");
+    CCINIClass keyboard_ini;
+
+    if (keyboard_file.Is_Available()) {
+
+        keyboard_ini.Load(keyboard_file, false);
+
+        Options.KeyQueueMove1 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "QueueMove", Options.KeyQueueMove1);
+        Options.KeyQueueMove2 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "QueueMove", Options.KeyQueueMove2);
+    }
 }
 
 
