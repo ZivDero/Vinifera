@@ -1671,13 +1671,13 @@ bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass*
     TechnoTypeClassExtension* technotypeext = Extension::Fetch<TechnoTypeClassExtension>(techno_type);
 
     if (technotypeext->RequiredHouses != -1 &&
-        (technotypeext->RequiredHouses & 1 << Class->House) == 0)
+        (technotypeext->RequiredHouses & 1 << ActLike) == 0)
     {
         return false;
     }
 
     if (technotypeext->ForbiddenHouses != -1 &&
-        (technotypeext->ForbiddenHouses & 1 << Class->House) != 0)
+        (technotypeext->ForbiddenHouses & 1 << ActLike) != 0)
     {
         return false;
     }
