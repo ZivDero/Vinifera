@@ -1730,7 +1730,7 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
         const TechnoTypeClass* technotype = Fetch_Techno_Type(type, id);
         if (fptr->Remove_From_Queue(*technotype))
         {
-            SidebarExtension->Active_Tab().Flag_To_Redraw();
+            SidebarExtension->Current_Tab().Flag_To_Redraw();
             return PROD_OK;
         }
     }

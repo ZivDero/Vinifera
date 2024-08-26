@@ -567,7 +567,7 @@ bool SidebarClassFake::_Scroll(bool up, int column)
 	if (*reinterpret_cast<int*>(0x007E492C))
 		return false;
 
-	bool scr = SidebarExtension->Active_Tab().Scroll(up);
+	bool scr = SidebarExtension->Current_Tab().Scroll(up);
 
 	if (scr)
 	{
@@ -583,7 +583,7 @@ bool SidebarClassFake::_Scroll(bool up, int column)
 
 bool SidebarClassFake::_Scroll_Page(bool up, int column)
 {
-	bool scr = SidebarExtension->Active_Tab().Scroll_Page(up);
+	bool scr = SidebarExtension->Current_Tab().Scroll_Page(up);
 
 	if (scr)
 	{
@@ -642,6 +642,26 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 		{
 			Sell_Mode_Control(-1);
 		}
+
+		if (input == (SidebarClassExtension::BUTTON_TAB_1 | KN_BUTTON))
+		{
+			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_STRUCTURE);
+		}
+
+		if (input == (SidebarClassExtension::BUTTON_TAB_2 | KN_BUTTON))
+		{
+			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_UNIT);
+		}
+
+		if (input == (SidebarClassExtension::BUTTON_TAB_3 | KN_BUTTON))
+		{
+			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_INFANTRY);
+		}
+
+		if (input == (SidebarClassExtension::BUTTON_TAB_4 | KN_BUTTON))
+		{
+			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_SPECIAL);
+		}
 	}
 
 	if (!IsRepairMode && Repair.IsOn)
@@ -662,6 +682,18 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 	if (!IsWaypointMode && Waypoint.IsOn)
 	{
 		Waypoint.Turn_Off();
+	}
+
+	// If for some reason the current tab's button is not selected, select it
+	if (!SidebarExtension->TabButtons[SidebarExtension->TabIndex].IsSelected)
+		SidebarExtension->TabButtons[SidebarExtension->TabIndex].Select();
+
+	// If our current tab no longer has any buildables, try to change to one that has some
+	if (SidebarExtension->Current_Tab().BuildableCount < 1)
+	{
+		SidebarClassExtension::SidebarTabType newtab = SidebarExtension->First_Active_Tab();
+		if (newtab != SidebarClassExtension::SIDEBAR_TAB_NONE)
+			SidebarExtension->Change_Tab(newtab);
 	}
 
 	PowerClass::AI(input, xy);
@@ -693,7 +725,9 @@ const char* SidebarClassFake::_Help_Text(int gadget_id)
 	const char* text = PowerClass::Help_Text(gadget_id);
 	if (text == nullptr)
 	{
-	    return SidebarExtension->Column[SidebarExtension->TabIndex].Help_Text(gadget_id - 1000);
+		const int id = gadget_id - 1000;
+	    if (id >= 0 && id < SidebarExtension->Current_Tab().BuildableCount)
+			return SidebarExtension->Current_Tab().Help_Text(gadget_id - 1000);
 	}
 	return text;
 }
@@ -1005,7 +1039,7 @@ bool SidebarClassFake::_Activate(int control)
 			Add_A_Button(Power);
 			Waypoint.Zap();
 			Add_A_Button(Waypoint);
-			SidebarExtension->Active_Tab().Activate();
+			SidebarExtension->Current_Tab().Activate();
 			Background.Zap();
 			Add_A_Button(Background);
 			for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
@@ -1088,7 +1122,7 @@ void SidebarClassFake::_Draw_It(bool complete)
 
 	if (IsSidebarActive && (IsToRedraw || complete) && !Debug_Map)
 	{
-		if (complete || SidebarExtension->Active_Tab().IsToRedraw)
+		if (complete || SidebarExtension->Current_Tab().IsToRedraw)
         {
 			Point2D xy(0, SidebarRect.Y);
 			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
@@ -1108,7 +1142,7 @@ void SidebarClassFake::_Draw_It(bool complete)
 			xy = Point2D(0, y + SidebarBottomShape->Get_Height());
 			CC_Draw_Shape(SidebarSurface, SidebarDrawer, SidebarAddonShape, 0, &xy, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
 
-			SidebarExtension->Active_Tab().IsToRedraw = true;
+			SidebarExtension->Current_Tab().IsToRedraw = true;
         }
 
 		Repair.Draw_Me(true);
@@ -1127,7 +1161,7 @@ void SidebarClassFake::_Draw_It(bool complete)
 	*/
 	if (IsSidebarActive)
 	{
-	    SidebarExtension->Active_Tab().Draw_It(complete);
+	    SidebarExtension->Current_Tab().Draw_It(complete);
 	}
 
 	if (Repair.IsDrawn)
@@ -1322,7 +1356,7 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 							break;
 
 						case RTTI_BUILDING:
-							SidebarExtension->TabButtons[ID].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_FLASHING);
+							SidebarExtension->TabButtons[ID].Start_Flashing();
 							Speak(VOX_CONSTRUCTION);
 							break;
 
@@ -1496,15 +1530,26 @@ bool StripClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int id)
 
 void StripClassFake::_Tab_Button_AI()
 {
-	if (BuildableCount > 0 && !SidebarExtension->TabButtons[ID].Is_Enabled())
+	if (BuildableCount > 0)
 	{
-		SidebarExtension->TabButtons[ID].Enable();
-		SidebarExtension->TabButtons[ID].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_NORMAL);
+	    if (!SidebarExtension->TabButtons[ID].Is_Enabled())
+			SidebarExtension->TabButtons[ID].Enable();
+
+		int building_tab = SidebarClassExtension::Which_Tab(RTTI_BUILDINGTYPE);
+		if (ID == building_tab)
+		{
+			if (SidebarExtension->TabButtons[ID].IsFlashing)
+			{
+				FactoryClass* fptr = PlayerPtr->Fetch_Factory(RTTI_BUILDINGTYPE);
+				if (fptr == nullptr || !fptr->Has_Completed())
+					SidebarExtension->TabButtons[ID].Stop_Flashing();
+			}
+		}
 	}
-	else if (BuildableCount == 0)
+	else
 	{
-		SidebarExtension->TabButtons[ID].Disable();
-		SidebarExtension->TabButtons[ID].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_NORMAL);
+		if (SidebarExtension->TabButtons[ID].Is_Enabled())
+		    SidebarExtension->TabButtons[ID].Disable();
 	}
 }
 
@@ -1588,7 +1633,7 @@ DECLARE_PATCH(_PowerClass_Draw_It_Move_Power_Bar)
 
 DECLARE_PATCH(_HouseClass_Manual_Place_Stop_Sidebar_Flash)
 {
-	SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_STRUCTURE].Set_State(SidebarClassExtension::TabButtonClass::TAB_STATE_NORMAL);
+	SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_STRUCTURE].Stop_Flashing();
 	Unselect_All();
 	JMP(0x004BEEDC);
 }
@@ -1634,7 +1679,7 @@ void SidebarClassExtension_Hooks()
 
 	//Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
 	Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
-	Patch_Jump(0x004BEED7, _HouseClass_Manual_Place_Stop_Sidebar_Flash);
+	//Patch_Jump(0x004BEED7, _HouseClass_Manual_Place_Stop_Sidebar_Flash);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);

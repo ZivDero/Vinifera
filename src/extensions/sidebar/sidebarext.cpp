@@ -39,6 +39,7 @@
 #include "language.h"
 #include "tooltip.h"
 #include "mouse.h"
+#include "wwmouse.h"
 
 
 SidebarClass::StripClass* Column[SidebarClassExtension::SIDEBAR_TAB_COUNT];
@@ -183,32 +184,32 @@ void SidebarClassExtension::Init_IO()
     TabButtons[0].Y = 148;
     TabButtons[0].DrawX = -480;
     TabButtons[0].DrawY = 3;
-    TabButtons[0].IsPressed = false;
-    TabButtons[0].IsToggleType = true;
+    TabButtons[0].IsSelected = false;
+    TabButtons[0].IsDisabled = true;
 
     TabButtons[1].IsSticky = true;
     TabButtons[1].ID = BUTTON_TAB_2;
     TabButtons[1].Y = 148;
     TabButtons[1].DrawX = -480;
     TabButtons[1].DrawY = 3;
-    TabButtons[1].IsPressed = false;
-    TabButtons[1].IsToggleType = true;
+    TabButtons[1].IsSelected = false;
+    TabButtons[1].IsDisabled = true;
 
     TabButtons[2].IsSticky = true;
     TabButtons[2].ID = BUTTON_TAB_3;
     TabButtons[2].Y = 148;
     TabButtons[2].DrawX = -480;
     TabButtons[2].DrawY = 3;
-    TabButtons[2].IsPressed = false;
-    TabButtons[2].IsToggleType = true;
+    TabButtons[2].IsSelected = false;
+    TabButtons[2].IsDisabled = true;
 
     TabButtons[3].IsSticky = true;
     TabButtons[3].ID = BUTTON_TAB_4;
     TabButtons[3].Y = 148;
     TabButtons[3].DrawX = -480;
     TabButtons[3].DrawY = 3;
-    TabButtons[3].IsPressed = false;
-    TabButtons[3].IsToggleType = true;
+    TabButtons[3].IsSelected = false;
+    TabButtons[3].IsDisabled = true;
 }
 
 
@@ -248,13 +249,37 @@ void SidebarClassExtension::Init_For_House()
 }
 
 
-void SidebarClassExtension::Change_Tab(SidebarTabType index)
+bool SidebarClassExtension::Change_Tab(SidebarTabType index)
 {
+    // Do not switch to inactive tabs
+    if (Column[index].BuildableCount < 1)
+        return false;
+
     Column[TabIndex].Deactivate();
+    TabButtons[TabIndex].Deselect();
+
     TabIndex = index;
+
     Column[TabIndex].Activate();
+    TabButtons[TabIndex].Select();
+
     Map.IsToFullRedraw = true;
+    return true;
 }
+
+
+SidebarClassExtension::SidebarTabType SidebarClassExtension::First_Active_Tab()
+{
+    for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
+    {
+        if (Column[i].BuildableCount > 0)
+            return (SidebarTabType)i;
+    }
+
+    return SIDEBAR_TAB_NONE;
+}
+
+
 
 SidebarClassExtension::SidebarTabType SidebarClassExtension::Which_Tab(RTTIType type)
 {
@@ -284,32 +309,117 @@ SidebarClassExtension::SidebarTabType SidebarClassExtension::Which_Tab(RTTIType 
 
 
 SidebarClassExtension::TabButtonClass::TabButtonClass() :
-ToggleClass(0, 0, 0, 0, 0),
+ControlClass(0, 0, 0, 0, 0, LEFTPRESS | LEFTRELEASE, true),
 DrawX(0),
 DrawY(0),
 ShapeDrawer(CameoDrawer),
 ShapeData(nullptr),
-State(TAB_STATE_NORMAL),
+IsFlashing(false),
 FlashTimer(0),
 FlashState(false),
+IsSelected(false),
 IsDrawn(false)
 {
-    IsToggleType = true;
 }
 
 
 SidebarClassExtension::TabButtonClass::TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer, int w, int h) :
-ToggleClass(id, x, y, w, h),
+    ControlClass(id, x, y, w, h, LEFTPRESS | LEFTRELEASE, true),
 DrawX(0),
 DrawY(0),
 ShapeDrawer(drawer),
 ShapeData(shapes),
-State(TAB_STATE_NORMAL),
+IsFlashing(false),
 FlashTimer(0),
 FlashState(false),
+IsSelected(false),
 IsDrawn(false)
 {
-    IsToggleType = true;
+}
+
+
+bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& key)
+{
+    /*
+    **	If there are no action flag bits set, then this must be a forced call. A forced call
+    **	must never actually function like a real call, but rather only performs any necessary
+    **	graphic updating.
+    */
+    bool overbutton = (WWMouse->Get_Mouse_X() - X) < Width && (WWMouse->Get_Mouse_Y() - Y) < Height;
+    if (!flags)
+    {
+        Flag_To_Redraw();
+        /*if (overbutton) { 
+            if (!IsPressed) {
+                IsPressed = true;
+                Flag_To_Redraw();
+            }
+        }
+        else {
+            if (IsPressed) {
+                IsPressed = false;
+                Flag_To_Redraw();
+            }
+        }*/
+    }
+
+    /*
+    **	Handle the sticky state for this gadget. It must be processed here
+    **	because the event flags might be cleared before the action function
+    **	is called.
+    */
+    Sticky_Process(flags);
+
+    /*
+    **	Flag the button to show the pressed down imagery if this mouse button
+    **	was pressed over this gadget.
+    */
+    if (flags & LEFTPRESS)
+    {
+        //IsPressed = true;
+        //Flag_To_Redraw();
+        flags &= ~LEFTPRESS;
+        ControlClass::Action(flags, key);
+        key = KN_NONE;				        // erase the event
+        return true;		                // stop processing other buttons now
+    }
+
+    if (flags & LEFTRELEASE)
+    {
+        if (!IsSelected && overbutton)
+        {
+            IsSelected = true;
+            Flag_To_Redraw();
+        }
+        else
+        {
+            flags &= ~LEFTRELEASE;
+        }
+    }
+    
+    /*
+    **	Do normal button processing. This ends up causing the button's ID number to
+    **	be returned from the controlling Input() function.
+    */
+    return ControlClass::Action(flags, key);
+}
+
+
+void SidebarClassExtension::TabButtonClass::Disable()
+{
+    IsSelected = false;
+    Stop_Flashing();
+
+    ControlClass::Disable();
+}
+
+
+void SidebarClassExtension::TabButtonClass::Enable()
+{
+    IsSelected = false;
+    Stop_Flashing();
+
+    ControlClass::Enable();
 }
 
 
@@ -329,7 +439,7 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
         return false;
 
 
-    int shapenum = 0;
+    int shapenum;
 
     // A disabled tab always looks darkened
     if (IsDisabled)
@@ -337,23 +447,12 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
         shapenum = 2;
     }
     // Selected
-    else if (IsOn)
+    else if (IsSelected)
     {
         shapenum = 1;
     }
-    // Currently held down
-    else if (IsPressed)
+    else if (IsFlashing)
     {
-        shapenum = 4;
-    }
-    else switch (State)
-    {
-    case TAB_STATE_NORMAL:
-        // Just normal unselected tab
-        shapenum = 0;
-        break;
-
-    case TAB_STATE_FLASHING:
         if (FlashTimer.Expired())
         {
             FlashState = !FlashState;
@@ -361,7 +460,11 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
         }
 
         shapenum = FlashState ? 4 : 3;
-        break;
+    }
+    else
+    {
+        // Just normal unselected tab
+        shapenum = 0;
     }
 
     CC_Draw_Shape(SidebarSurface, ShapeDrawer, ShapeData, shapenum, &Point2D(X + DrawX, Y + DrawY), &ScreenRect, SHAPE_NORMAL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0);
@@ -387,20 +490,33 @@ void SidebarClassExtension::TabButtonClass::Set_Shape(const ShapeFileStruct* dat
 }
 
 
-void SidebarClassExtension::TabButtonClass::Set_State(TabButtonState state)
+void SidebarClassExtension::TabButtonClass::Start_Flashing()
 {
-    State = state;
-    switch (State)
-    {
-    case TAB_STATE_NORMAL:
-        FlashTimer.Stop();
-        FlashState = false;
-        break;
-
-    case TAB_STATE_FLASHING:
-        FlashTimer.Start();
-        FlashTimer = FLASH_RATE;
-        FlashState = false;
-    }
+    IsFlashing = true;
+    FlashTimer.Start();
+    FlashTimer = FLASH_RATE;
+    FlashState = false;
 }
 
+
+
+void SidebarClassExtension::TabButtonClass::Stop_Flashing()
+{
+    IsFlashing = false;
+    FlashTimer.Stop();
+    FlashState = false;
+}
+
+
+
+void SidebarClassExtension::TabButtonClass::Select()
+{
+    IsSelected = true;
+}
+
+
+
+void SidebarClassExtension::TabButtonClass::Deselect()
+{
+    IsSelected = false;
+}

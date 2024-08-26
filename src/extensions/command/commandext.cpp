@@ -746,8 +746,7 @@ bool SetStructureTabCommandClass::Process()
     if (SidebarExtension->TabIndex == newtab)
         return false;
 
-    SidebarExtension->Change_Tab(newtab);
-    return true;
+    return SidebarExtension->Change_Tab(newtab);
 }
 
 
@@ -783,8 +782,7 @@ bool SetInfantryTabCommandClass::Process()
     if (SidebarExtension->TabIndex == newtab)
         return false;
 
-    SidebarExtension->Change_Tab(newtab);
-    return true;
+    return SidebarExtension->Change_Tab(newtab);
 }
 
 
@@ -820,8 +818,7 @@ bool SetUnitTabCommandClass::Process()
     if (SidebarExtension->TabIndex == newtab)
         return false;
 
-    SidebarExtension->Change_Tab(newtab);
-    return true;
+    return SidebarExtension->Change_Tab(newtab);
 }
 
 
@@ -857,8 +854,7 @@ bool SetSpecialTabCommandClass::Process()
     if (SidebarExtension->TabIndex == newtab)
         return false;
 
-    SidebarExtension->Change_Tab(newtab);
-    return true;
+    return SidebarExtension->Change_Tab(newtab);
 }
 
 

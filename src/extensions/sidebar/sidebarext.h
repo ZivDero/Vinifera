@@ -42,7 +42,8 @@ public:
         SIDEBAR_TAB_UNIT,
         SIDEBAR_TAB_SPECIAL,
 
-        SIDEBAR_TAB_COUNT
+        SIDEBAR_TAB_COUNT,
+        SIDEBAR_TAB_NONE = -1
     };
 
     enum SidebarExtGeneralEnums
@@ -67,15 +68,8 @@ public:
         BUTTON_TAB_4
     };
 
-    class TabButtonClass : public ToggleClass
+    class TabButtonClass : public ControlClass
     {
-    public:
-        enum TabButtonState
-        {
-            TAB_STATE_NORMAL,
-            TAB_STATE_FLASHING
-        };
-
     private:
         enum
         {
@@ -87,19 +81,29 @@ public:
         TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer = CameoDrawer, int w = 0, int h = 0);
         virtual ~TabButtonClass() override = default;
 
+        virtual bool Action(unsigned flags, KeyNumType& key) override;
+        virtual void Disable() override;
+        virtual void Enable() override;
         virtual bool Draw_Me(bool forced = false) override;
         virtual void Set_Shape(const ShapeFileStruct* data, int width = 0, int height = 0);
+        
         const ShapeFileStruct* Get_Shape_Data() const { return ShapeData; }
-        void Set_State(TabButtonState state);
+        void Start_Flashing();
+        void Stop_Flashing();
+        void Select();
+        void Deselect();
 
     public:
         int DrawX;
         int DrawY;
         ConvertClass* ShapeDrawer;
         const ShapeFileStruct* ShapeData;
-        TabButtonState State;
+
+        bool IsFlashing;
         CDTimerClass<SystemTimerClass> FlashTimer;
         bool FlashState;
+
+        bool IsSelected;
         bool IsDrawn;
     };
 
@@ -123,10 +127,11 @@ public:
         void Init_IO();
         void Init_For_House();
         void entry_84();
-        void Change_Tab(SidebarTabType index);
+        bool Change_Tab(SidebarTabType index);
 
-        SidebarClass::StripClass& Active_Tab() { return Column[TabIndex];}
+        SidebarClass::StripClass& Current_Tab() { return Column[TabIndex];}
         SidebarClass::StripClass& Get_Tab(RTTIType type) { return Column[Which_Tab(type)]; }
+        SidebarTabType First_Active_Tab();
 
         static SidebarTabType Which_Tab(RTTIType type);
 
