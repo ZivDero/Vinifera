@@ -230,6 +230,35 @@ void SidebarClassExtension::entry_84()
     TabButtons[3].Set_Position(SidebarRect.X + TAB_FOUR_X_OFFSET, TabButtons[2].Y);
     TabButtons[3].Flag_To_Redraw();
     TabButtons[3].DrawX = -SidebarRect.X;
+
+    if (ToolTipHandler)
+    {
+        ToolTip tooltip;
+
+        tooltip.Region = Rect(TabButtons[0].X, TabButtons[0].Y, TabButtons[0].Width, TabButtons[0].Height);
+        tooltip.ID = BUTTON_TAB_1;
+        tooltip.Text = TXT_NONE;
+        ToolTipHandler->Remove(tooltip.ID);
+        ToolTipHandler->Add(&tooltip);
+
+        tooltip.Region = Rect(TabButtons[1].X, TabButtons[1].Y, TabButtons[1].Width, TabButtons[1].Height);
+        tooltip.ID = BUTTON_TAB_2;
+        tooltip.Text = TXT_NONE;
+        ToolTipHandler->Remove(tooltip.ID);
+        ToolTipHandler->Add(&tooltip);
+
+        tooltip.Region = Rect(TabButtons[2].X, TabButtons[2].Y, TabButtons[2].Width, TabButtons[2].Height);
+        tooltip.ID = BUTTON_TAB_3;
+        tooltip.Text = TXT_NONE;
+        ToolTipHandler->Remove(tooltip.ID);
+        ToolTipHandler->Add(&tooltip);
+
+        tooltip.Region = Rect(TabButtons[3].X, TabButtons[3].Y, TabButtons[3].Width, TabButtons[3].Height);
+        tooltip.ID = BUTTON_TAB_4;
+        tooltip.Text = TXT_NONE;
+        ToolTipHandler->Remove(tooltip.ID);
+        ToolTipHandler->Add(&tooltip);
+    }
 }
 
 
@@ -251,6 +280,10 @@ void SidebarClassExtension::Init_For_House()
 
 bool SidebarClassExtension::Change_Tab(SidebarTabType index)
 {
+    // Don't switch to the same tab
+    if (TabIndex == index)
+        return false;
+
     // Do not switch to inactive tabs
     if (Column[index].BuildableCount < 1)
         return false;
@@ -345,22 +378,9 @@ bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& k
     **	must never actually function like a real call, but rather only performs any necessary
     **	graphic updating.
     */
-    bool overbutton = (WWMouse->Get_Mouse_X() - X) < Width && (WWMouse->Get_Mouse_Y() - Y) < Height;
     if (!flags)
     {
         Flag_To_Redraw();
-        /*if (overbutton) { 
-            if (!IsPressed) {
-                IsPressed = true;
-                Flag_To_Redraw();
-            }
-        }
-        else {
-            if (IsPressed) {
-                IsPressed = false;
-                Flag_To_Redraw();
-            }
-        }*/
     }
 
     /*
@@ -376,8 +396,6 @@ bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& k
     */
     if (flags & LEFTPRESS)
     {
-        //IsPressed = true;
-        //Flag_To_Redraw();
         flags &= ~LEFTPRESS;
         ControlClass::Action(flags, key);
         key = KN_NONE;				        // erase the event
@@ -386,6 +404,7 @@ bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& k
 
     if (flags & LEFTRELEASE)
     {
+        bool overbutton = (WWMouse->Get_Mouse_X() - X) < Width && (WWMouse->Get_Mouse_Y() - Y) < Height;
         if (!IsSelected && overbutton)
         {
             IsSelected = true;

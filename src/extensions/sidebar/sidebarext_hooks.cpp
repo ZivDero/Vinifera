@@ -650,12 +650,12 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 
 		if (input == (SidebarClassExtension::BUTTON_TAB_2 | KN_BUTTON))
 		{
-			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_UNIT);
+			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_INFANTRY);
 		}
 
 		if (input == (SidebarClassExtension::BUTTON_TAB_3 | KN_BUTTON))
 		{
-			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_INFANTRY);
+			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_UNIT);
 		}
 
 		if (input == (SidebarClassExtension::BUTTON_TAB_4 | KN_BUTTON))
@@ -725,6 +725,20 @@ const char* SidebarClassFake::_Help_Text(int gadget_id)
 	const char* text = PowerClass::Help_Text(gadget_id);
 	if (text == nullptr)
 	{
+		switch (gadget_id)
+		{
+		case SidebarClassExtension::BUTTON_TAB_1:
+			return SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_STRUCTURE].Is_Enabled() ? "Structures Tab" : "Structures Tab@(Disabled)";
+		case SidebarClassExtension::BUTTON_TAB_2:
+			return SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_INFANTRY].Is_Enabled() ? "Infantry Tab" : "Infantry Tab@(Disabled)";
+		case SidebarClassExtension::BUTTON_TAB_3:
+			return SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_UNIT].Is_Enabled() ? "Vehicles Tab" : "Vehicles Tab@(Disabled)";
+		case SidebarClassExtension::BUTTON_TAB_4:
+			return SidebarExtension->TabButtons[SidebarClassExtension::SIDEBAR_TAB_SPECIAL].Is_Enabled() ? "Specials Tab" : "Specials Tab@(Disabled)";
+		default:
+			break;
+		}
+
 		const int id = gadget_id - 1000;
 	    if (id >= 0 && id < SidebarExtension->Current_Tab().BuildableCount)
 			return SidebarExtension->Current_Tab().Help_Text(gadget_id - 1000);
