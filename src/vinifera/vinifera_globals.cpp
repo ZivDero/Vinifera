@@ -49,9 +49,6 @@ char Vinifera_ProjectVersion[64] = { '\0' };
 char Vinifera_IconName[64] = { '\0' };
 char Vinifera_CursorName[64] = { '\0' };
 
-RTTIType Vinifera_LastBuilding_RTTI = RTTI_NONE;
-int Vinifera_LastBuilding_HeapID = 0;
-
 bool Vinifera_Developer_InstantBuild = false;
 bool Vinifera_Developer_AIInstantBuild = false;
 bool Vinifera_Developer_InstantSuperRecharge = false;

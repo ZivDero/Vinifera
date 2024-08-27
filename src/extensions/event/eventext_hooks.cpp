@@ -31,10 +31,11 @@
 #include "scenario.h"
 #include "session.h"
 #include "techno.h"
-#include "vinifera_globals.h"
 
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "extension_globals.h"
+#include "sidebarext.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -58,8 +59,8 @@ void EventClassFake::_Remember_Last_Building(int house, EventType eventtype, RTT
 {
     if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
     {
-        Vinifera_LastBuilding_RTTI = type;
-        Vinifera_LastBuilding_HeapID = id;
+        SidebarExtension->LastBuildingRTTI = type;
+        SidebarExtension->LastBuildingHeapID = id;
     }
 
     new (this) EventClass(house, eventtype, type, id);

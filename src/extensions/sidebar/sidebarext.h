@@ -173,4 +173,7 @@ public:
         *  Buttons for the tabs.
         */
         TabButtonClass TabButtons[SIDEBAR_TAB_COUNT];
+
+        RTTIType LastBuildingRTTI = RTTI_NONE;
+        int LastBuildingHeapID = 0;
 };

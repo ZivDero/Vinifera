@@ -894,6 +894,8 @@ void SidebarClassFake::_Init_Clear()
 	IsUpgradeActive = false;
 
 	SidebarExtension->TabIndex = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
+	SidebarExtension->LastBuildingRTTI = RTTI_NONE;
+	SidebarExtension->LastBuildingHeapID = 0;
 
 	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
 		SidebarExtension->Column[i].Init_Clear();

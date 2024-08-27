@@ -917,15 +917,15 @@ const char* RepeatStructureCommandClass::Get_Description() const
 
 bool RepeatStructureCommandClass::Process()
 {
-    if (Vinifera_LastBuilding_RTTI)
+    if (SidebarExtension->LastBuildingRTTI)
     {
         for (int i = 0; i < SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).BuildableCount; i++)
         {
             SidebarClass::StripClass::BuildType& buildtype = SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).Buildables[i];
-            if (buildtype.BuildableType == Vinifera_LastBuilding_RTTI &&
-                buildtype.BuildableID == Vinifera_LastBuilding_HeapID)
+            if (buildtype.BuildableType == SidebarExtension->LastBuildingRTTI &&
+                buildtype.BuildableID == SidebarExtension->LastBuildingHeapID)
             {
-                OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, Vinifera_LastBuilding_RTTI, Vinifera_LastBuilding_HeapID));
+                OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, SidebarExtension->LastBuildingRTTI, SidebarExtension->LastBuildingHeapID));
                 return true;
             }
         }
