@@ -683,6 +683,8 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
 		{
 			SidebarExtension->Change_Tab(SidebarClassExtension::SIDEBAR_TAB_SPECIAL);
 		}
+
+		SidebarClassExtension::ViniferaSelectClass::Check_Hover(SidebarExtension->SelectButton[SidebarExtension->TabIndex], WWMouse->Get_Mouse_X(), WWMouse->Get_Mouse_Y());
 	}
 
 	if (!IsRepairMode && Repair.IsOn)
@@ -1787,7 +1789,7 @@ void SidebarClassExtension_Hooks()
 
 	//Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
 	Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
-	Patch_Jump(0x004A9F0F, _GadgetClass_Input_Mouse_Enter_Leave);
+	//Patch_Jump(0x004A9F0F, _GadgetClass_Input_Mouse_Enter_Leave);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);

@@ -566,6 +566,7 @@ void SidebarClassExtension::ViniferaSelectClass::Check_Hover(GadgetClass* gadget
         if (LastHovered)
         {
             LastHovered->On_Mouse_Leave();
+            LastHovered = nullptr;
         }
 
         if (to_enter)
