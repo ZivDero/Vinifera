@@ -459,7 +459,7 @@ void StripClassFake::_Draw_It(bool complete)
 
 				if (overbutton)
 				{
-					Rect cameo_hover_rect(x, SidebarRect.Y + y, OBJECT_WIDTH, OBJECT_HEIGHT);
+					Rect cameo_hover_rect(x, SidebarRect.Y + y, OBJECT_WIDTH, OBJECT_HEIGHT - 3);
 					if (ScenExtension->CachedToolTipColorSchemeIndex > -1) {
 						RGBClass rgb = ColorSchemes[ScenExtension->CachedToolTipColorSchemeIndex]->field_308.operator RGBClass();
 						SidebarSurface->Draw_Rect(cameo_hover_rect, DSurface::RGB_To_Pixel(rgb));
