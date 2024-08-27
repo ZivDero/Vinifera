@@ -210,6 +210,21 @@ void OptionsClassExtension::Save_Settings()
     
     // Rampastring: DTA uses Settings.ini rather than SUN.ini
     RawFileClass file("Settings.ini");
+
+    RawFileClass keyboard_file("Keyboard.ini");
+    CCINIClass keyboard_ini;
+
+    if (keyboard_file.Is_Available()) {
+
+        keyboard_ini.Load(keyboard_file, false);
+
+        keyboard_ini.Put_Int("Hotkey", "ForceMove", Options.KeyForceMove1);
+        keyboard_ini.Put_Int("Hotkey", "ForceAttack", Options.KeyForceAttack1);
+        keyboard_ini.Put_Int("Hotkey", "Select", Options.KeySelect1);
+        keyboard_ini.Put_Int("Hotkey", "QueueMove", Options.KeyQueueMove1);
+
+        keyboard_ini.Save(keyboard_file, false);
+    }
 }
 
 
