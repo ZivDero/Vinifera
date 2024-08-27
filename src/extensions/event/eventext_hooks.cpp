@@ -31,12 +31,39 @@
 #include "scenario.h"
 #include "session.h"
 #include "techno.h"
+#include "vinifera_globals.h"
 
 #include "debughandler.h"
 #include "asserthandler.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
+
+
+ /**
+  *  A fake class for implementing new member functions which allow
+  *  access to the "this" pointer of the intended class.
+  *
+  *  @note: This must not contain a constructor or deconstructor!
+  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
+  */
+static class EventClassFake final : public EventClass
+{
+public:
+    void _Remember_Last_Building(int house, EventType eventtype, RTTIType type, int id);
+};
+
+
+void EventClassFake::_Remember_Last_Building(int house, EventType eventtype, RTTIType type, int id)
+{
+    if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
+    {
+        Vinifera_LastBuilding_RTTI = type;
+        Vinifera_LastBuilding_HeapID = id;
+    }
+
+    new (this) EventClass(house, eventtype, type, id);
+}
 
 
 /**
@@ -168,4 +195,6 @@ void EventClassExtension_Hooks()
     Patch_Jump(0x004946FF, &_EventClass_Execute_MEGAMISSION_Prevent_Controlling_Enemy_Units_Patch);
     Patch_Jump(0x004949AF, &_EventClass_Execute_IDLE_Prevent_Controlling_Enemy_Units_Patch);
     Patch_Jump(0x004946CD, &_EventClass_Executre_PRIMARY_Prevent_Setting_For_Enemy_Patch);
+
+    Patch_Call(0x005F5DE9, &EventClassFake::_Remember_Last_Building);
 }

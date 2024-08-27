@@ -77,6 +77,7 @@
 #include "debughandler.h"
 #include "asserthandler.h"
 #include "sidebarext.h"
+#include "event.h"
 
 
 /**
@@ -886,6 +887,51 @@ bool SetSpecialTabCommandClass::Process()
 {
     const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_SPECIAL;
     return SidebarExtension->Change_Tab(newtab);
+}
+
+
+/**
+ *  Switches the sidebar to the Special Tab.
+ *
+ *  @author: ZivDero
+ */
+const char* RepeatStructureCommandClass::Get_Name() const
+{
+    return "RepeatStructure";
+}
+
+const char* RepeatStructureCommandClass::Get_UI_Name() const
+{
+    return "Repeat Structure";
+}
+
+const char* RepeatStructureCommandClass::Get_Category() const
+{
+    return Text_String(TXT_INTERFACE);
+}
+
+const char* RepeatStructureCommandClass::Get_Description() const
+{
+    return "Start building the last produced structure.";
+}
+
+bool RepeatStructureCommandClass::Process()
+{
+    if (Vinifera_LastBuilding_RTTI)
+    {
+        for (int i = 0; i < SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).BuildableCount; i++)
+        {
+            SidebarClass::StripClass::BuildType& buildtype = SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).Buildables[i];
+            if (buildtype.BuildableType == Vinifera_LastBuilding_RTTI &&
+                buildtype.BuildableID == Vinifera_LastBuilding_HeapID)
+            {
+                OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, Vinifera_LastBuilding_RTTI, Vinifera_LastBuilding_HeapID));
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 

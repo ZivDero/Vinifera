@@ -30,6 +30,7 @@
 #include "always.h"
 #include "vector.h"
 #include "ccfile.h"
+#include "tibsun_defines.h"
 
 
 class EBoltClass;
@@ -52,6 +53,9 @@ extern char Vinifera_ProjectName[64];
 extern char Vinifera_ProjectVersion[64];
 extern char Vinifera_IconName[64];
 extern char Vinifera_CursorName[64];
+
+extern RTTIType Vinifera_LastBuilding_RTTI;
+extern int Vinifera_LastBuilding_HeapID;
 
 /**
  *  Defines and constants.

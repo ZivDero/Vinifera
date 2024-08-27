@@ -37,6 +37,7 @@
 #include "unittype.h"
 #include "asserthandler.h"
 #include "debughandler.h"
+#include "event.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -256,6 +257,9 @@ void Init_Vinifera_Commands()
     Commands.Add(cmdptr);
 
     cmdptr = new SetSpecialTabCommandClass;
+    Commands.Add(cmdptr);
+
+    cmdptr = new RepeatStructureCommandClass;
     Commands.Add(cmdptr);
 
     /**
