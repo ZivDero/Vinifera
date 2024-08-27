@@ -727,7 +727,7 @@ const char* SetStructureTabCommandClass::Get_Name() const
 
 const char* SetStructureTabCommandClass::Get_UI_Name() const
 {
-    return "Buildings Tab";
+    return "Select Structures Tab";
 }
 
 const char* SetStructureTabCommandClass::Get_Category() const
@@ -806,7 +806,7 @@ const char* SetInfantryTabCommandClass::Get_Name() const
 
 const char* SetInfantryTabCommandClass::Get_UI_Name() const
 {
-    return "Infantry Tab";
+    return "Select Infantry Tab";
 }
 
 const char* SetInfantryTabCommandClass::Get_Category() const
@@ -838,7 +838,7 @@ const char* SetUnitTabCommandClass::Get_Name() const
 
 const char* SetUnitTabCommandClass::Get_UI_Name() const
 {
-    return "Unit Tab";
+    return "Select Vehicles Tab";
 }
 
 const char* SetUnitTabCommandClass::Get_Category() const
@@ -848,7 +848,7 @@ const char* SetUnitTabCommandClass::Get_Category() const
 
 const char* SetUnitTabCommandClass::Get_Description() const
 {
-    return "Switch the command bar to the Unit Tab.";
+    return "Switch the command bar to the Vehicle Tab.";
 }
 
 bool SetUnitTabCommandClass::Process()
@@ -870,7 +870,7 @@ const char* SetSpecialTabCommandClass::Get_Name() const
 
 const char* SetSpecialTabCommandClass::Get_UI_Name() const
 {
-    return "Special Tab";
+    return "Select Specials Tab";
 }
 
 const char* SetSpecialTabCommandClass::Get_Category() const
