@@ -1749,6 +1749,13 @@ DECLARE_PATCH(_GadgetClass_Input_Mouse_Enter_Leave)
 }
 
 
+DECLARE_PATCH(_SelectClass_Action_Redraw_Column)
+{
+	SidebarExtension->Current_Tab().IsToRedraw = true;
+	JMP(0x005F5C95);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -1790,6 +1797,7 @@ void SidebarClassExtension_Hooks()
 	//Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
 	Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
 	//Patch_Jump(0x004A9F0F, _GadgetClass_Input_Mouse_Enter_Leave);
+	Patch_Jump(0x005F5C01, _SelectClass_Action_Redraw_Column);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);
