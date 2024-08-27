@@ -173,6 +173,12 @@ void OptionsClassExtension::Load_Settings()
 
         keyboard_ini.Load(keyboard_file, false);
 
+        Options.KeyForceMove1 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "ForceMove", Options.KeyForceMove1);
+        Options.KeyForceMove2 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "ForceMove", Options.KeyForceMove2);
+        Options.KeyForceAttack1 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "ForceAttack", Options.KeyForceAttack1);
+        Options.KeyForceAttack2 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "ForceAttack", Options.KeyForceAttack2);
+        Options.KeySelect1 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "Select", Options.KeySelect1);
+        Options.KeySelect2 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "Select", Options.KeySelect2);
         Options.KeyQueueMove1 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "QueueMove", Options.KeyQueueMove1);
         Options.KeyQueueMove2 = (KeyNumType)keyboard_ini.Get_Int("Hotkey", "QueueMove", Options.KeyQueueMove2);
     }
