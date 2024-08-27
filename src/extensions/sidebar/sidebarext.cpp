@@ -42,8 +42,7 @@
 #include "wwmouse.h"
 
 
-SidebarClass::StripClass* Column[SidebarClassExtension::SIDEBAR_TAB_COUNT];
-SidebarClass::StripClass::SelectClass SelectButton[SidebarClassExtension::SIDEBAR_TAB_COUNT][SidebarClass::StripClass::MAX_BUILDABLES];
+SidebarClassExtension::ViniferaSelectClass* SidebarClassExtension::ViniferaSelectClass::LastHovered;
 
 /**
  *  Class constructor.
@@ -539,3 +538,44 @@ void SidebarClassExtension::TabButtonClass::Deselect()
 {
     IsSelected = false;
 }
+
+
+void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Enter()
+{
+    MousedOver = true;
+    Map.IsToFullRedraw = true;
+    Map.Flag_To_Redraw();
+    RedrawSidebar = true;
+}
+
+
+void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Leave()
+{
+    MousedOver = false;
+    Map.IsToFullRedraw = true;
+    Map.Flag_To_Redraw();
+    RedrawSidebar = true;
+}
+
+
+void SidebarClassExtension::ViniferaSelectClass::Check_Hover(GadgetClass* gadget, int mousex, int mousey)
+{
+    GadgetClass* to_enter = gadget->Extract_Gadget_At_Mouse(mousex, mousey);
+    if (to_enter != LastHovered)
+    {
+        if (LastHovered)
+        {
+            LastHovered->On_Mouse_Leave();
+        }
+
+        if (to_enter)
+        {
+            if (auto select = dynamic_cast<ViniferaSelectClass*>(to_enter))
+            {
+                LastHovered = select;
+                select->On_Mouse_Enter();
+            }
+        }
+    }
+}
+

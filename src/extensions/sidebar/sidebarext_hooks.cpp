@@ -63,6 +63,8 @@
 #include "vox.h"
 #include "event.h"
 #include "tooltip.h"
+#include "scenarioext.h"
+#include "wwmouse.h"
 
 
 static const ObjectTypeClass *_SidebarClass_StripClass_obj = nullptr;
@@ -441,12 +443,32 @@ void StripClassFake::_Draw_It(bool complete)
 			*/
 			if (shapefile != LogoShape)
 			{
+				Point2D drawpoint(x, y);
+
 				if (shapefile != nullptr)
 				{
-					Point2D drawpoint(x, y);
 					CC_Draw_Shape(SidebarSurface, CameoDrawer, shapefile,
 						0, &drawpoint, &rect, SHAPE_WIN_REL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
 				}
+
+
+				/*
+				**	Draw a selection box around the cameo if we're currently hovering over it
+				*/
+				bool overbutton = SidebarExtension->SelectButton[ID][index].MousedOver;
+
+				if (overbutton)
+				{
+					Rect cameo_hover_rect(x, SidebarRect.Y + y, OBJECT_WIDTH, OBJECT_HEIGHT);
+					if (ScenExtension->CachedToolTipColorSchemeIndex > -1) {
+						RGBClass rgb = ColorSchemes[ScenExtension->CachedToolTipColorSchemeIndex]->field_308.operator RGBClass();
+						SidebarSurface->Draw_Rect(cameo_hover_rect, DSurface::RGB_To_Pixel(rgb));
+					}
+					else {
+						SidebarSurface->Draw_Rect(cameo_hover_rect, 0);
+					}
+				}
+
 
 				/*
 				**	Darken this object because it cannot be produced or is otherwise
@@ -454,7 +476,6 @@ void StripClassFake::_Draw_It(bool complete)
 				*/
 				if (darken)
 				{
-					Point2D drawpoint(x, y);
 					CC_Draw_Shape(SidebarSurface, SidebarDrawer, DarkenShape,
 						0, &drawpoint, &rect, SHAPE_WIN_REL | SHAPE_DARKEN, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0, 0);
 				}
@@ -1675,6 +1696,57 @@ DECLARE_PATCH(_HouseClass_Manual_Place_Stop_Sidebar_Flash)
 }
 
 
+DECLARE_PATCH(_GadgetClass_Input_Mouse_Enter_Leave)
+{
+	GET_REGISTER_STATIC(int, key, eax);
+	GET_REGISTER_STATIC(int, mousex, ebp);
+	GET_REGISTER_STATIC(int, mousey, ebx);
+	GET_REGISTER_STATIC(unsigned, flags, edi);
+	GET_REGISTER_STATIC(GadgetClass*, this_ptr, esi);
+
+	_asm push eax
+	_asm push edx
+	SidebarClassExtension::ViniferaSelectClass::Check_Hover(this_ptr, mousex, mousey);
+	_asm pop edx
+	_asm pop eax
+
+	// Stolen code
+
+	/*
+	**	Set the mouse button state flags. These will be passed to the individual
+	**	buttons so that they can determine what action to perform (if any).
+	*/
+	flags = 0;
+	if (key)
+	{
+		if (key == KN_LMOUSE)
+			flags |= GadgetClass::LEFTPRESS;
+		
+		if (key == KN_RMOUSE)
+			flags |= GadgetClass::RIGHTPRESS;
+		
+		if (key == (KN_LMOUSE | KN_RLSE_BIT))
+			flags |= GadgetClass::LEFTRELEASE;
+		
+		if (key == (KN_RMOUSE | KN_RLSE_BIT))
+			flags |= GadgetClass::RIGHTRELEASE;
+
+		/*
+	    **	If the mouse wasn't responsible for this key code, then it must be from
+	    **	the keyboard. Flag this fact.
+	    */
+		if (!flags)
+			flags |= GadgetClass::KEYBOARD;
+
+		_asm mov edi, flags
+		JMP_REG(ecx, 0x004A9F7F);
+	}
+
+	_asm mov edi, flags
+	JMP_REG(ecx, 0x004A9F4D);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -1715,7 +1787,7 @@ void SidebarClassExtension_Hooks()
 
 	//Patch_Jump(0x005AB507, _PowerClass_Draw_It_Bar_Count);
 	Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
-	//Patch_Jump(0x004BEED7, _HouseClass_Manual_Place_Stop_Sidebar_Flash);
+	Patch_Jump(0x004A9F0F, _GadgetClass_Input_Mouse_Enter_Leave);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);

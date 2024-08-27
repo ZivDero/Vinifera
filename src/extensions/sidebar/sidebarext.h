@@ -73,7 +73,7 @@ public:
     private:
         enum
         {
-            FLASH_RATE = 15
+            FLASH_RATE = 7
         };
 
     public:
@@ -105,6 +105,23 @@ public:
 
         bool IsSelected;
         bool IsDrawn;
+    };
+
+    class ViniferaSelectClass : public SidebarClass::StripClass::SelectClass
+    {
+    public:
+        ViniferaSelectClass() = default;
+        ViniferaSelectClass(const NoInitClass& x) : SelectClass(x) {}
+
+        virtual void On_Mouse_Enter();
+        virtual void On_Mouse_Leave();
+
+        static void Check_Hover(GadgetClass* gadget, int mousex, int mousey);
+
+    public:
+        bool MousedOver = false;
+
+        static ViniferaSelectClass* LastHovered;
     };
 
 public:
@@ -167,7 +184,7 @@ public:
         /**
          *  Replacement select buttons.
          */
-        SidebarClass::StripClass::SelectClass SelectButton[SIDEBAR_TAB_COUNT][SidebarClass::StripClass::MAX_BUILDABLES];
+        ViniferaSelectClass SelectButton[SIDEBAR_TAB_COUNT][SidebarClass::StripClass::MAX_BUILDABLES];
 
         /**
         *  Buttons for the tabs.
