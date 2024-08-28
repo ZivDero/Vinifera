@@ -54,6 +54,7 @@ static class FactoryClassFake final : public FactoryClass
 {
 public:
     void _Verify_Can_Build();
+    void _AI();
 };
 
 
@@ -114,89 +115,83 @@ void FactoryClassFake::_Verify_Can_Build()
 }
 
 
-/**
- *  Patch for InstantBuildCommandClass
- * 
- *  @author: CCHyper
- */
-DECLARE_PATCH(_FactoryClass_AI_InstantBuild_Patch)
+void FactoryClassFake::_AI()
 {
-    GET_REGISTER_STATIC(FactoryClass *, this_ptr, esi);
+    _Verify_Can_Build();
 
-    if (Vinifera_DeveloperMode) {
+    if (!IsSuspended && (Object != nullptr || SpecialItem))
+    {
+        for (int index = 0; index < 1; index++)
+        {
+            if (!Has_Completed() && Graphic_Logic())
+            {
+                IsDifferent = true;
 
-        /**
-         *  If AIInstantBuild is toggled on, make sure this is a non-human AI house.
-         */
-        if (Vinifera_Developer_AIInstantBuild
-            && !this_ptr->House->Is_Human_Control() && this_ptr->House != PlayerPtr) {
+                int cost = Cost_Per_Tick();
 
-            this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-            goto production_completed;
-        }
+                cost = std::min(cost, Balance);
 
-        /**
-         *  If InstantBuild is toggled on, make sure the local player is a human house.
-         */
-        if (Vinifera_Developer_InstantBuild
-            && this_ptr->House->Is_Human_Control() && this_ptr->House == PlayerPtr) {
+                /*
+                **	Enough time has expired so that another production step can occur.
+                **	If there is insufficient funds, then go back one production step and
+                **	continue the countdown. The idea being that by the time the next
+                **	production step occurs, there may be sufficient funds available.
+                */
+                if (cost > House->Available_Money())
+                {
+                    Set_Stage(Fetch_Stage() - 1);
+                }
+                else
+                {
+                    House->Spend_Money(cost);
+                    Balance -= cost;
+                }
 
-            this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-            goto production_completed;
-        }
+                if (Vinifera_DeveloperMode)
+                {
+                    /*
+                    **	If AIInstantBuild is toggled on, make sure this is a non-human AI house.
+                    */
+                    if (Vinifera_Developer_AIInstantBuild
+                        && !House->Is_Human_Control() && House != PlayerPtr)
+                    {
+                        Set_Stage(STEP_COUNT);
+                    }
 
-        /**
-         *  If the AI has taken control of the player house, it needs a special
-         *  case to handle the "player" instant build mode.
-         */
-        if (Vinifera_Developer_InstantBuild) {
-            if (Vinifera_Developer_AIControl && this_ptr->House == PlayerPtr) {
+                    /*
+                    **	If InstantBuild is toggled on, make sure the local player is a human house.
+                    */
+                    if (Vinifera_Developer_InstantBuild
+                        && House->Is_Human_Control() && House == PlayerPtr)
+                    {
+                        Set_Stage(STEP_COUNT);
+                    }
 
-                this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-                goto production_completed;
+                    /*
+                    **	If the AI has taken control of the player house, it needs a special
+                    **	case to handle the "player" instant build mode.
+                    */
+                    if (Vinifera_Developer_InstantBuild)
+                    {
+                        if (Vinifera_Developer_AIControl && House == PlayerPtr)
+                            Set_Stage(STEP_COUNT);
+                    }
+
+                }
+
+                /*
+                **	If the production has completed, then suspend further production.
+                */
+                if (Fetch_Stage() == STEP_COUNT)
+                {
+                    IsSuspended = true;
+                    Set_Rate(0);
+                    House->Spend_Money(Balance);
+                    Balance = 0;
+                }
             }
         }
-
     }
-
-    /**
-     *  Stolen bytes/code.
-     */
-    if (this_ptr->StageClass::Fetch_Stage() == FactoryClass::STEP_COUNT) {
-        goto production_completed;
-    }
-
-function_return:
-    JMP(0x00496FA3);
-
-    /**
-     *  Production Completed, then suspend further production.
-     */
-production_completed:
-    JMP(0x00496F73);
-}
-
-
-/**
- *  Update the queue and remove any items that are no
- *  longer buildable by the factory owner's house
- *
- *  @author: ZivDero
- */
-DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
-{
-    GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
-
-    this_ptr->_Verify_Can_Build();
-
-    // Stolen bytes / code.
-    if (this_ptr->IsSuspended) {
-        // Factory is suspended, exit from function.
-        JMP(0x00496FA3);
-    }
-    
-    // Continue factory AI logic.
-    JMP(0x00496EB2);
 }
 
 
@@ -205,6 +200,5 @@ DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
  */
 void FactoryClassExtension_Hooks()
 {
-    Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
-    Patch_Jump(0x00496EA7, &_FactoryClass_AI_Abandon_If_Cant_Build);
+    Patch_Jump(0x00496EA0, &FactoryClassFake::_AI);
 }
