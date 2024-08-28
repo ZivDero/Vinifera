@@ -55,6 +55,7 @@ static class FactoryClassFake final : public FactoryClass
 public:
     void _Verify_Can_Build();
     void _AI();
+    bool _Start(bool suspend);
 };
 
 
@@ -112,6 +113,37 @@ void FactoryClassFake::_Verify_Can_Build()
         House->Update_Factories(type);
         Resume_Queue();
     }
+}
+
+
+bool FactoryClassFake::_Start(bool suspend)
+{
+    if ((Object || SpecialItem) && IsSuspended && !Has_Completed())
+    {
+        int time;
+
+        if (Object)
+        {
+            time = Object->Time_To_Build();
+        }
+
+        int rate = time / STEP_COUNT;
+        rate = std::clamp(rate, 1, 255);
+
+        Set_Rate(rate);
+        IsSuspended = false;
+
+        if (House->Available_Money() >= Cost_Per_Tick())
+        {
+            IsPlayerSuspended = true;
+
+            if (suspend)
+                Suspend(true);
+
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -201,4 +233,5 @@ void FactoryClassFake::_AI()
 void FactoryClassExtension_Hooks()
 {
     Patch_Jump(0x00496EA0, &FactoryClassFake::_AI);
+    Patch_Jump(0x004971E0, &FactoryClassFake::_Start);
 }

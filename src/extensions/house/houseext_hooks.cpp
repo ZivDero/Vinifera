@@ -82,6 +82,8 @@ public:
     bool _AI_Target_MultiMissile(SuperClass* super);
     int _AI_Building_Replacement(void);
     bool _Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type);
+    bool _Begin_Production_Additional_Checks(const TechnoTypeClass* tech);
+    ProdFailType _Begin_Production(RTTIType type, int id, bool resume);
     ProdFailType _Abandon_Production(RTTIType type, int id);
 };
 
@@ -1618,52 +1620,6 @@ enable_sw:
 }
 
 
-bool Passes_Additional_Validity_Checks(TechnoTypeClass* technotype, HouseClass* house)
-{
-    if (technotype == nullptr) {
-        // TechnoType is null, nothingness cannot be built.
-        return false;
-    }
-
-    if (house->Is_Human_Control() &&
-        (technotype->TechLevel < 0 || technotype->TechLevel > house->Control.TechLevel)) {
-        // TechnoType cannot be built by this human player.
-        return false;
-    }
-
-    return true;
-}
-
-
-/**
- *  Fixes a cheat in the original game where players were able to build
- *  unbuildable objects. Also fixes a bug where players could crash the game
- *  for everyone by attempting to build a nonexistent object.
- *
- *  Author: Rampastring
- */
-DECLARE_PATCH(_HouseClass_Begin_Production_Check_For_Unallowed_Buildables)
-{
-    GET_REGISTER_STATIC(TechnoTypeClass*, technotype, eax);
-    GET_REGISTER_STATIC(HouseClass*, this_ptr, ebp);
-    static BuildingClass* factorybuilding;
-
-    // Restore stolen code / bytes.
-    _asm { mov  edi, eax }
-
-    if (!Passes_Additional_Validity_Checks(technotype, this_ptr)) {
-        // Additional production validity check failed, exit from function.
-        JMP(0x004BE28D);
-    }
-
-    factorybuilding = technotype->Who_Can_Build_Me(false, true, true, this_ptr);
-
-    // Continue original game code.
-    _asm { mov  eax, dword ptr ds:factorybuilding }
-    JMP_REG(edx, 0x004BE22B);
-}
-
-
 /**
  *  Checks if the TechnoType can be built by this house based on RequiredHouses and ForbiddenHouses, if set.
  *
@@ -1686,6 +1642,135 @@ bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass*
     }
 
     return true;
+}
+
+
+/**
+ *  Fixes a cheat in the original game where players were able to build
+ *  unbuildable objects. Also fixes a bug where players could crash the game
+ *  for everyone by attempting to build a nonexistent object.
+ *
+ *  Author: Rampastring
+ */
+bool HouseClassFake::_Begin_Production_Additional_Checks(const TechnoTypeClass* tech)
+{
+    if (tech == nullptr) {
+        // TechnoType is null, nothingness cannot be built.
+        return false;
+    }
+
+    if (Is_Human_Control() &&
+        (tech->TechLevel < 0 || tech->TechLevel > Control.TechLevel)) {
+        // TechnoType cannot be built by this human player.
+        return false;
+    }
+
+    return true;
+}
+
+
+ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resume)
+{
+    bool result = false;
+    bool suspend = false;
+    FactoryClass* fptr;
+    TechnoTypeClass const* tech = Fetch_Techno_Type(type, id);
+
+    if (!_Begin_Production_Additional_Checks(tech))
+        return PROD_CANT;
+
+    if (!tech->Who_Can_Build_Me(false, true, true, this))
+    {
+        if (!resume || !tech->Who_Can_Build_Me(true, false, true, this))
+        {
+            DEBUG_INFO("Request to Begin_Production of '%s' was rejected. No-one can build.\n", tech->FullName);
+            return PROD_CANT;
+        }
+        suspend = true;
+    }
+
+    fptr = Fetch_Factory(type);
+
+    /*
+    **	If no factory exists, create one.
+    */
+    if (fptr == nullptr)
+    {
+        fptr = new FactoryClass();
+        if (!fptr)
+        {
+            DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Unable to create factory\n", tech->FullName);
+            return PROD_CANT;
+        }
+        Set_Factory(type, fptr);
+    }
+
+    /*
+    **	If the house is already busy producing the requested object, then
+    **	return with this failure code, unless we are restarting production.
+    */
+    if (fptr->Is_Building() && type == RTTI_BUILDINGTYPE)
+    {
+        DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Cannot queue buildings.\n", tech->FullName);
+        return PROD_CANT;
+    }
+
+    if (fptr->IsSuspended)
+    {
+        ObjectClass* obj = fptr->Get_Object();
+        if (obj != nullptr && obj->Techno_Type_Class() == tech)
+        {
+            result = true;
+        }
+    }
+
+    if (result || fptr->Set(*tech, *this, resume))
+    {
+        if (fptr->Queued_Object_Count() == 0 || resume)
+        {
+            fptr->Start(suspend);
+
+            /*
+            **	Link this factory to the sidebar so that proper graphic feedback
+            **	can take place.
+            */
+            if (PlayerPtr == this)
+                Map.Factory_Link(fptr, type, id);
+
+            return PROD_OK;
+        }
+
+        SidebarExtension->Get_Tab(type).Flag_To_Redraw();
+        return PROD_OK;
+    }
+
+
+    /*
+    **	If the factory has queued objects or is currently
+    **  holding an object, reject production.
+    */
+    DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Factory was unable to create the requested object\n", tech->Full_Name());
+    if (fptr->Queued_Object_Count() > 0 || fptr->Object)
+        return PROD_CANT;
+
+
+    /*
+    **	Output debug information if production failed.
+    */
+    DEBUG_INFO("type=%d\n", type);
+    DEBUG_INFO("Frame == %d\n", Frame);
+    DEBUG_INFO("fptr->QueuedObjects.Count() == %d\n", fptr->QueuedObjects.Count());
+    if (fptr->Get_Object())
+    {
+        DEBUG_INFO("Object->RTTI == %d\n", fptr->Object->Kind_Of());
+        DEBUG_INFO("Object->HeapID == %d\n", fptr->Object->Get_Heap_ID());
+    }
+    DEBUG_INFO("IsSuspended\t= %d\n", fptr->IsSuspended);
+
+    delete fptr;
+    Set_Factory(type, nullptr);
+
+    return PROD_CANT;
 }
 
 
@@ -1812,8 +1897,8 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004C063F, &_HouseClass_Expert_AI_Advanced_AI_Intercept);
     Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
-    Patch_Jump(0x004BE218, &_HouseClass_Begin_Production_Check_For_Unallowed_Buildables);
     Patch_Jump(0x004BBC74, &_Can_Build_Required_Forbidden_Houses);
+    Patch_Jump(0x004BE200, &HouseClassFake::_Begin_Production);
     Patch_Jump(0x004BE6A0, &HouseClassFake::_Abandon_Production);
     Patch_Jump(0x004BC023, 0x004BC102); // Skip checking the owner of the MCV when building buildings in HouseClass::Can_Build
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
