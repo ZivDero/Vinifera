@@ -28,6 +28,7 @@
 #pragma once
 
 #include "abstractext.h"
+#include "asserthandler.h"
 #include "house.h"
 #include "housetype.h"
 
@@ -112,4 +113,36 @@ HouseClassExtension final : public AbstractClassExtension
          *  was made under threat of getting rushed early in the game.
          */
         bool IsUnderStartRushThreat;
+
+        FactoryClass* ShipFactory;
+        int ShipFactoryCount;
+
+        template<typename T>
+        class GlobalArgument
+        {
+        public:
+            void Set(T value)
+            {
+                ASSERT_STACKDUMP_PRINT(_isset == false, "Tried to reset an argument that wasn't used!");
+                _value = value;
+                _isset = true;
+            }
+
+            T Get()
+            {
+                ASSERT_STACKDUMP_PRINT(_isset == true, "Tried to reset an argument that wasn't used!");
+                _isset = false;
+                return _value;
+            }
+
+        private:
+            T _value;
+            bool _isset = false;
+        };
+
+        static GlobalArgument<int> Begin_Production_IsNaval;
+        static GlobalArgument<int> Suspend_Production_IsNaval;
+        static GlobalArgument<int> Abort_Production_IsNaval;
+        static GlobalArgument<int> Fetch_Factory_IsNaval;
+        static GlobalArgument<int> Set_Factory_IsNaval;
 };

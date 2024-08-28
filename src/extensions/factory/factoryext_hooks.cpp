@@ -38,6 +38,7 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "houseext.h"
 #include "mouse.h"
 #include "sidebarext.h"
 #include "techno.h"
@@ -54,6 +55,7 @@ static class FactoryClassFake final : public FactoryClass
 {
 public:
     void _Verify_Can_Build();
+    void _Resume_Queue();
 };
 
 
@@ -112,6 +114,25 @@ void FactoryClassFake::_Verify_Can_Build()
         Resume_Queue();
     }
 }
+
+
+void FactoryClassFake::_Resume_Queue()
+{
+    if (Queued_Object_Count() > 0)
+    {
+        if (!Get_Object() && !Is_Building())
+        {
+            const TechnoTypeClass* obj = QueuedObjects.Fetch_Head();
+            QueuedObjects.Delete(0);
+            const int id = obj->Get_Heap_ID();
+            if (id >= 0)
+            {
+                House->Begin_Production(obj->Kind_Of(), id, true);
+            }
+        }
+    }
+}
+
 
 
 /**
@@ -207,4 +228,5 @@ void FactoryClassExtension_Hooks()
 {
     Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
     Patch_Jump(0x00496EA7, &_FactoryClass_AI_Abandon_If_Cant_Build);
+    Patch_Jump(0x004978D0, &FactoryClassFake::_Resume_Queue);
 }

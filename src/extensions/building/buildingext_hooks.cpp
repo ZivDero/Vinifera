@@ -67,6 +67,7 @@
 #include "asserthandler.h"
 #include "debughandler.h"
 #include "infantrytype.h"
+#include "factory.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -85,6 +86,8 @@ static class BuildingClassFake final : public BuildingClass
 public:
     bool _Can_Have_Rally_Point();
     void _Update_Buildables();
+    void _Draw_Overlays(Point2D& coord, Rect& rect);
+    void _Detach_All(bool all = false);
 };
 
 
@@ -209,6 +212,123 @@ void BuildingClassFake::_Update_Buildables()
 
         qsort(&SidebarExtension->Get_Tab(Class->ToBuild).Buildables, SidebarExtension->Get_Tab(Class->ToBuild).BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
     }
+}
+
+
+void BuildingClassFake::_Draw_Overlays(Point2D& coord, Rect& rect)
+{
+    if (BState)
+    {
+        if (IsRepairing)
+        {
+            if (!Map.Is_Shrouded(Center_Coord()) && !(Scen->SpecialFlags.IsFogOfWar || IsFogged) && Visual_Character() != VISUAL_HIDDEN)
+            {
+                Point2D xy = coord;
+                if (!IsPowerOn)
+                    xy -= Point2D(5, 5);
+
+                int delay = Options.Normalize_Delay(14) / 4;
+                if (delay < 2)
+                    delay = 2;
+
+                CC_Draw_Shape(TempSurface, MouseDrawer, WrenchShape, 6 * (Frame % delay) / (delay - 1), &xy, &rect, SHAPE_ALPHA | SHAPE_WIN_REL | SHAPE_CENTER);
+            }
+        }
+
+        if (!IsPowerOn && House->Is_Player_Control())
+        {
+            if (!Map.Is_Shrouded(Center_Coord()) && !(Scen->SpecialFlags.IsFogOfWar || IsFogged))
+            {
+                Point2D xy = coord;
+                if (IsRepairing)
+                    xy += Point2D(10, 10);
+
+                int delay = Options.Normalize_Delay(14) / 4;
+                if (delay < 2)
+                    delay = 2;
+
+                CC_Draw_Shape(TempSurface, MouseDrawer, PowerOffShape, 6 * (Frame % delay) / (delay - 1), &xy, &rect, SHAPE_ALPHA | SHAPE_WIN_REL | SHAPE_CENTER);
+            }
+        }
+
+        if (IsSelected)
+        {
+            if (House->Is_Ally(PlayerPtr) || SpiedBy & (1 << (PlayerPtr->Class->House)))
+            {
+                Point2D xy(coord.X - 10, coord.Y + 10);
+                entry_338(xy, coord, rect);
+            }
+        }
+
+        if (SpiedBy & (1 << (PlayerPtr->Class->House)))
+        {
+            if (IsSelected)
+            {
+                FactoryClass* factory = House->Is_Human_Control() ? House->Fetch_Factory(Class->ToBuild) : Factory;
+                if (factory != nullptr)
+                {
+                    ObjectClass* obj = factory->Get_Object();
+                    if (obj != nullptr)
+                    {
+                        const ShapeFileStruct* shape = obj->Techno_Type_Class()->Get_Cameo_Data();
+                        CC_Draw_Shape(TempSurface, NormalDrawer, shape, 0, &coord, &rect, SHAPE_ALPHA | SHAPE_WIN_REL | SHAPE_CENTER);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+void BuildingClassFake::_Detach_All(bool all)
+{
+    if (all)
+    {
+        /*
+        **	If it is producing something, then it must be abandoned.
+        */
+        if (Factory)
+        {
+            Factory->Abandon();
+            delete Factory;
+            Factory = nullptr;
+        }
+
+        /*
+        ** If the owner HouseClass is building something, and this building can
+        ** build that thing, we may be the last building for that house that can
+        ** build that thing; if so, abandon production of it.
+        */
+        if (House)
+        {
+            FactoryClass* factory = House->Fetch_Factory(Class->ToBuild);
+
+            /*
+            **	If a factory was found, then temporarily disable this building and then
+            **	determine if any object that is being produced can still be produced. If
+            **	not, then the object being produced must be abandoned.
+            */
+            if (factory)
+            {
+                TechnoClass* object = factory->Get_Object();
+                bool old_limbo = IsInLimbo;
+                IsInLimbo = true;
+                if (object && !object->Techno_Type_Class()->Who_Can_Build_Me(true, false, false, House))
+                {
+                    House->Abandon_Production(Class->ToBuild, -1);
+                }
+                IsInLimbo = old_limbo;
+            }
+        }
+
+        Transmit_Message(RADIO_OVER_OUT);
+        return TechnoClass::Detach_All(all);
+    }
+
+    if (Radio == nullptr || House->Is_Ally(Radio))
+        return TechnoClass::Detach_All(all);
+
+    return TechnoClass::Detach_All(false);
 }
 
 
@@ -2144,6 +2264,8 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042C9D9, &_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory);
     Patch_Jump(0x0042CAB9, &_BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic);
     Patch_Jump(0x0042CE87, &_BuildingClass_Exit_Object_Allow_Rally_Point_For_Naval_Yard_Patch);
+    Patch_Jump(0x00428810, &BuildingClassFake::_Draw_Overlays);
+    Patch_Jump(0x00434000, &BuildingClassFake::_Detach_All);
 
     // NOP out "push 1" instruction so we have an easier time injecting code here
     Patch_Byte(0x0042CE7A, 0x90);

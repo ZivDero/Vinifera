@@ -33,6 +33,13 @@
 #include "debughandler.h"
 
 
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Begin_Production_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Suspend_Production_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Abort_Production_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Fetch_Factory_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Set_Factory_IsNaval;
+
+
 /**
  *  Class constructor.
  *  
@@ -47,7 +54,9 @@ HouseClassExtension::HouseClassExtension(const HouseClass *this_ptr) :
     LastExcessRefineryCheckFrame(0),
     LastSleepingHarvesterCheckFrame(0),
     HasPerformedVehicleCharge(false),
-    IsUnderStartRushThreat(false)
+    IsUnderStartRushThreat(false),
+    ShipFactory(nullptr),
+    ShipFactoryCount(0)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("HouseClassExtension::HouseClassExtension - 0x%08X\n", (uintptr_t)(This()));
 

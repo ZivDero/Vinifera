@@ -35,6 +35,7 @@
 #include "houseext.h"
 #include "houseext.h"
 #include "aircraft.h"
+#include "aircrafttype.h"
 #include "building.h"
 #include "buildingext.h"
 #include "buildingtype.h"
@@ -65,8 +66,11 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "radarevent.h"
 #include "sidebarext.h"
 #include "tibsun_functions.h"
+#include "voc.h"
+#include "vox.h"
 
 
 /**
@@ -83,6 +87,15 @@ public:
     int _AI_Building_Replacement(void);
     bool _Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type);
     ProdFailType _Abandon_Production(RTTIType type, int id);
+    ProdFailType _Begin_Production(RTTIType type, int id, bool resume);
+    ProdFailType _Suspend_Production(RTTIType type);
+    int* _Factory_Counter(RTTIType rtti);
+    int _Factory_Count(RTTIType rtti);
+    void _Active_Add(TechnoClass const* techno);
+    void _Active_Remove(TechnoClass const* techno);
+    FactoryClass* _Fetch_Factory(RTTIType rtti) const;
+    void _Set_Factory(RTTIType rtti, FactoryClass* factory);
+    bool _Place_Object(RTTIType type, Cell& cell);
 };
 
 /**
@@ -1689,35 +1702,142 @@ bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass*
 }
 
 
-ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
+ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resume)
 {
+    bool result = false;
+    bool suspend = false;
     FactoryClass* fptr;
+    TechnoTypeClass const* tech = Fetch_Techno_Type(type, id);
 
-    switch (type)
+    if (!tech->Who_Can_Build_Me(false, true, true, this))
     {
-    case RTTI_UNIT:
-    case RTTI_UNITTYPE:
-        fptr = UnitFactory;
-        break;
+        if (!resume || !tech->Who_Can_Build_Me(true, false, true, this))
+        {
+            DEBUG_INFO("Request to Begin_Production of '%s' was rejected. No-one can build.\n", tech->FullName);
+            return PROD_CANT;
+        }
+        suspend = true;
+    }
 
-    case RTTI_AIRCRAFT:
-    case RTTI_AIRCRAFTTYPE:
-        fptr = AircraftFactory;
-        break;
+    fptr = Fetch_Factory(type);
 
-    case RTTI_BUILDING:
-    case RTTI_BUILDINGTYPE:
-        fptr = BuildingFactory;
-        break;
+    /*
+    **	If no factory exists, create one.
+    */
+    if (fptr == nullptr)
+    {
+        fptr = new FactoryClass();
+        if (!fptr)
+        {
+            DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Unable to create factory\n", tech->FullName);
+            return PROD_CANT;
+        }
+        Set_Factory(type, fptr);
+    }
 
-    case RTTI_INFANTRY:
-    case RTTI_INFANTRYTYPE:
-        fptr = InfantryFactory;
-        break;
-
-    default:
+    /*
+    **	If the house is already busy producing the requested object, then
+    **	return with this failure code, unless we are restarting production.
+    */
+    if (fptr->Is_Building() && !fptr->IsSuspended && type == RTTI_BUILDINGTYPE)
+    {
+        DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Cannot queue buildings.\n", tech->FullName);
         return PROD_CANT;
     }
+
+    if (fptr->IsSuspended)
+    {
+        ObjectClass* obj = fptr->Get_Object();
+        if (obj != nullptr && obj->Techno_Type_Class() == tech)
+        {
+            result = true;
+        }
+    }
+
+    if (result || fptr->Set(*tech, *this, resume))
+    {
+        if (fptr->Queued_Object_Count() == 0 || resume )
+        {
+            fptr->Start(suspend);
+
+            /*
+            **	Link this factory to the sidebar so that proper graphic feedback
+            **	can take place.
+            */
+            if (PlayerPtr == this)
+                Map.Factory_Link(fptr, type, id);
+
+            return PROD_OK;
+        }
+
+        SidebarExtension->Get_Tab(type).Flag_To_Redraw();
+        return PROD_OK;
+    }
+
+
+    /*
+    **	If the factory has queued objects or is currently
+    **  holding an object, reject production.
+    */
+    DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Factory was unable to create the requested object\n", tech->Full_Name());
+    if (fptr->Queued_Object_Count() > 0 || fptr->Object)
+        return PROD_CANT;
+
+
+    /*
+    **	Output debug information if production failed.
+    */
+    DEBUG_INFO("type=%d\n", type);
+    DEBUG_INFO("Frame == %d\n", Frame);
+    DEBUG_INFO("fptr->QueuedObjects.Count() == %d\n", fptr->QueuedObjects.Count());
+    if (fptr->Get_Object())
+    {
+        DEBUG_INFO("Object->RTTI == %d\n", fptr->Object->Kind_Of());
+        DEBUG_INFO("Object->HeapID == %d\n", fptr->Object->Get_Heap_ID());
+    }
+    DEBUG_INFO("IsSuspended\t= %d\n", fptr->IsSuspended);
+
+    delete fptr;
+    Set_Factory(type, nullptr);
+
+    return PROD_CANT;
+}
+
+
+ProdFailType HouseClassFake::_Suspend_Production(RTTIType type)
+{
+    FactoryClass* fptr = Fetch_Factory(type);
+
+    /*
+    **	If the house is already busy producing the requested object, then
+    **	return with this failure code.
+    */
+    if (fptr == nullptr)
+        return PROD_CANT;
+
+    /*
+    **	Actually suspend the production.
+    */
+    fptr->Suspend();
+
+    /*
+    **	Tell the sidebar that it needs to be redrawn because of this.
+    */
+    if (PlayerPtr == this)
+    {
+        Map.SidebarClass::IsToRedraw = true;
+        RedrawSidebar = true;
+        Map.Flag_To_Redraw(false);
+        SidebarExtension->Get_Tab(type).Flag_To_Redraw();
+    }
+
+    return PROD_OK;
+}
+
+
+ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
+{
+    FactoryClass* fptr = Fetch_Factory(type);
 
     /*
     **	If there is no factory to abandon, then return with a failure code.
@@ -1725,6 +1845,9 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
     if (fptr == nullptr)
         return PROD_CANT;
 
+    /*
+    **	Tell the sidebar that it needs to be redrawn because of this.
+    */
     if (fptr->Queued_Object_Count() > 0 && id > 0)
     {
         const TechnoTypeClass* technotype = Fetch_Techno_Type(type, id);
@@ -1775,6 +1898,261 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
     delete fptr;
 
     return PROD_OK;
+}
+
+
+int* HouseClassFake::_Factory_Counter(RTTIType rtti)
+{
+    switch (rtti)
+    {
+    case RTTI_UNITTYPE:
+    case RTTI_UNIT:
+        return(&UnitFactories);
+
+    case RTTI_AIRCRAFTTYPE:
+    case RTTI_AIRCRAFT:
+        return(&AircraftFactories);
+
+    case RTTI_INFANTRYTYPE:
+    case RTTI_INFANTRY:
+        return(&InfantryFactories);
+
+    case RTTI_BUILDINGTYPE:
+    case RTTI_BUILDING:
+        return(&BuildingFactories);
+
+    default:
+        break;
+    }
+    return nullptr;
+}
+
+
+int HouseClassFake::_Factory_Count(RTTIType rtti)
+{
+    const int* ptr = Factory_Counter(rtti);
+
+    if (ptr != nullptr)
+        return *ptr;
+
+    return 0;
+}
+
+
+void HouseClassFake::_Active_Add(TechnoClass const* techno)
+{
+    if (techno == nullptr)
+        return;
+
+    if (techno->What_Am_I() == RTTI_BUILDING)
+    {
+        int* fptr = Factory_Counter(((BuildingClass*)techno)->Class->ToBuild);
+        if (fptr != nullptr)
+        {
+            *fptr = *fptr + 1;
+        }
+    }
+}
+
+
+void HouseClassFake::_Active_Remove(TechnoClass const* techno)
+{
+    if (techno == nullptr)
+        return;
+
+    if (techno->What_Am_I() == RTTI_BUILDING)
+    {
+        int* fptr = Factory_Counter(((BuildingClass*)techno)->Class->ToBuild);
+        if (fptr != nullptr)
+        {
+            *fptr = *fptr - 1;
+        }
+    }
+}
+
+
+FactoryClass* HouseClassFake::_Fetch_Factory(RTTIType rtti) const
+{
+    /*
+    **	Fetch the pointer to the factory object. If there is
+    **	no object factory that matches the specified rtti type, then
+    **	null is returned.
+    */
+    switch (rtti) {
+    case RTTI_INFANTRY:
+    case RTTI_INFANTRYTYPE:
+        return InfantryFactory;
+
+    case RTTI_UNIT:
+    case RTTI_UNITTYPE:
+        return UnitFactory;
+
+    case RTTI_BUILDING:
+    case RTTI_BUILDINGTYPE:
+        return BuildingFactory;
+
+    case RTTI_AIRCRAFT:
+    case RTTI_AIRCRAFTTYPE:
+        return AircraftFactory;
+
+    default:
+        return nullptr;
+    }
+}
+
+
+void HouseClassFake::_Set_Factory(RTTIType rtti, FactoryClass* factory)
+{
+    switch (rtti) {
+    case RTTI_UNIT:
+    case RTTI_UNITTYPE:
+        UnitFactory = factory;
+        break;
+
+    case RTTI_INFANTRY:
+    case RTTI_INFANTRYTYPE:
+        InfantryFactory = factory;
+        break;
+
+    case RTTI_BUILDING:
+    case RTTI_BUILDINGTYPE:
+        BuildingFactory = factory;
+        break;
+
+    case RTTI_AIRCRAFT:
+    case RTTI_AIRCRAFTTYPE:
+        AircraftFactory = factory;
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+bool HouseClassFake::_Place_Object(RTTIType type, Cell& cell)
+{
+    TechnoClass* tech = nullptr;
+    FactoryClass* factory = Fetch_Factory(type);
+
+    /*
+    **	Only if there is a factory active for this type, can it be "placed".
+    **	In the case of a missing factory, then this request is completely bogus --
+    **	ignore it. This might occur if, between two events to exit the same
+    **	object, the mouse was clicked on the sidebar to start building again.
+    **	The second placement event should NOT try to place the object that is
+    **	just starting construction.
+    */
+    if (factory && factory->Has_Completed())
+    {
+        tech = factory->Get_Object();
+
+        if (cell == Cell() || cell == Cell(-1, -1))
+        {
+            if (tech != nullptr)
+            {
+                bool intheory = false;
+                if (tech->What_Am_I() == RTTI_AIRCRAFT) {
+
+                    /*
+                    ** BG hack - helicopters don't need a specific building to
+                    ** emerge from, in fact, they'll land next to a building if
+                    ** need be.
+                    */
+                    intheory = true;
+                }
+                BuildingClass* builder = tech->Who_Can_Build_Me(intheory, true);
+
+                const ExitType exit = builder->Exit_Object(tech);
+                const bool result = exit == EXIT_NORMAL ||
+                    (exit == EXIT_TRY_AGAIN && builder->Kind_Of() == RTTI_BUILDING && builder->Factory != nullptr);
+
+                if (builder != nullptr && result) {
+
+                    /*
+                    **	Since the object has left the factory under its own power, delete
+                    **	the production manager tied to this slot in the sidebar. Its job
+                    **	has been completed.
+                    */
+                    RadarEventClass::LastEventCell = Coord_Cell(builder->Center_Coord());
+                    factory->Completed();
+                    Abandon_Production(type, -1);
+                    Just_Built(tech);
+                }
+                else
+                {
+                    /*
+                    **	The object could not leave under it's own power. Refund.
+                    */
+                    if (tech->Kind_Of() != RTTI_BUILDING)
+                    {
+                        DEBUG_INFO("Failed to exit object from factory - refunding money\n");
+                        Abandon_Production(type, -1);
+                    }
+                    
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            if (tech)
+            {
+                TechnoClass* builder = tech->Who_Can_Build_Me(false, false);
+                if (builder)
+                {
+
+                    builder->Transmit_Message(RADIO_HELLO, tech);
+                    if (tech->Unlimbo(Cell_Coord(cell)))
+                    {
+                        if (tech->Kind_Of() == RTTI_BUILDING)
+                        {
+                            BuildingTypeClass* bldgclass = ((BuildingClass*)tech)->Class;
+                            if (bldgclass->IsFirestormWall)
+                            {
+                                Map.Building_To_Overlay(cell, *this, bldgclass);
+                            }
+                            else if (bldgclass->ToOverlay)
+                            {
+                                Map.Building_To_Wall(cell, *this, bldgclass);
+                            }
+                        }
+
+                        factory->Completed();
+                        tech->Transmit_Message(RADIO_COMPLETE, builder);
+                        Abandon_Production(type, -1);
+
+                        if (PlayerPtr == this)
+                        {
+                            if (tech->IsActive && !tech->IsDiscoveredByPlayer)
+                                tech->Revealed(this);
+
+                            Sound_Effect(Rule->BuildingSlam);
+                            Map.Set_Cursor_Shape(nullptr);
+                            Map.PendingObjectPtr = nullptr;
+                            Map.PendingObject = nullptr;
+                            Map.PendingHouse = HOUSE_NONE;
+                        }
+                        return true;
+                    }
+                    else
+                    {
+                        if (this == PlayerPtr)
+                            Speak(VOX_DEPLOY);
+                    }
+                    builder->Transmit_Message(RADIO_OVER_OUT);
+                }
+                return false;
+            }
+            else
+            {
+                // Play a bad sound here?
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 
@@ -1837,7 +2215,16 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
     Patch_Jump(0x004BE218, &_HouseClass_Begin_Production_Check_For_Unallowed_Buildables);
     Patch_Jump(0x004BBC74, &_Can_Build_Required_Forbidden_Houses);
+    Patch_Jump(0x004BE200, &HouseClassFake::_Begin_Production);
+    Patch_Jump(0x004BE5D0, &HouseClassFake::_Suspend_Production);
     Patch_Jump(0x004BE6A0, &HouseClassFake::_Abandon_Production);
+    Patch_Jump(0x004C2DB0, &HouseClassFake::_Factory_Count);
+    Patch_Jump(0x004C2330, &HouseClassFake::_Factory_Counter);
+    Patch_Jump(0x004C2450, &HouseClassFake::_Active_Add);
+    Patch_Jump(0x004C23B0, &HouseClassFake::_Active_Remove);
+    Patch_Jump(0x004C2CA0, &HouseClassFake::_Fetch_Factory);
+    Patch_Jump(0x004C2D20, &HouseClassFake::_Set_Factory);
+    Patch_Jump(0x0004BEA10, &HouseClassFake::_Place_Object);
     Patch_Jump(0x004BC023, 0x004BC102); // Skip checking the owner of the MCV when building buildings in HouseClass::Can_Build
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
 }
