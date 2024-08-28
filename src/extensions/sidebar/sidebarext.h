@@ -73,7 +73,7 @@ public:
     private:
         enum
         {
-            FLASH_RATE = 7
+            FLASH_RATE = 30
         };
 
     public:

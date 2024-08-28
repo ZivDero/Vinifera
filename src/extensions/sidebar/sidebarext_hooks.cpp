@@ -1187,11 +1187,12 @@ void SidebarClassFake::_Draw_It(bool complete)
 		Power.Draw_Me(true);
 		Waypoint.Draw_Me(true);
 
-		for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
-			SidebarExtension->TabButtons[i].Draw_Me(true);
-
 		RedrawSidebar = true;
 	}
+
+	// Since the tabs might be blinking, draw them all the time
+	for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
+		SidebarExtension->TabButtons[i].Draw_Me(true);
 
 	/*
 	**	Draw the side strip elements by calling their respective draw functions.
