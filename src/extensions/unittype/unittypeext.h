@@ -79,7 +79,7 @@ UnitTypeClassExtension final : public TechnoTypeClassExtension
 
         static bool Is_Naval(RTTIType rtti, int id)
         {
-            if (rtti != RTTI_UNIT)
+            if (rtti != RTTI_UNIT && rtti != RTTI_UNITTYPE)
                 return false;
 
             return Is_Naval(Fetch_Techno_Type(rtti, id));

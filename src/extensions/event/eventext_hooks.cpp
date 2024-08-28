@@ -227,7 +227,7 @@ DECLARE_PATCH(_EventClass_Execute_PLACE)
     GET_REGISTER_STATIC(EventClass*, this_ptr, esi);
     GET_REGISTER_STATIC(HouseClass*, house, ebx);
 
-    HouseClassExtension::Place_Object_IsNaval.Set(UnitTypeClassExtension::Is_Naval(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID));
+    HouseClassExtension::Place_Object_IsNaval.Set(*((bool*)this_ptr + 0x12));
     house->Place_Object(this_ptr->Data.Place.Type, Cell(this_ptr->Data.Place.Cell.X & 0xFFFF, this_ptr->Data.Place.Cell.X >> 16));
     JMP(0x00494666);
 }

@@ -1392,9 +1392,15 @@ bool StripClassFake::_AI(KeyNumType& input, Point2D&)
 						{
 						case RTTI_UNIT:
 						case RTTI_AIRCRAFT:
-							OutList.Add(EventClass(pending->Owner(), EVENT_PLACE, pending->Kind_Of(), &INVALID_CELL));
-							Speak(VOX_UNIT_READY);
-							break;
+						    {
+						        bool naval = pending->Kind_Of() == RTTI_UNIT && Extension::Fetch<UnitTypeClassExtension>(pending->Techno_Type_Class())->IsNaval;
+								EventClass e(pending->Owner(), EVENT_PLACE, pending->Kind_Of(), &INVALID_CELL);
+								// Hack in the naval flag
+						        *((bool*)&e + 0x12) = naval;
+						        OutList.Add(e);
+						        Speak(VOX_UNIT_READY);
+						        break;
+						    }
 
 						case RTTI_BUILDING:
 							SidebarExtension->TabButtons[ID].Start_Flashing();
