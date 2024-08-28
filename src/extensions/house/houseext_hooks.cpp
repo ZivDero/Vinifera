@@ -1547,6 +1547,7 @@ void AdvAI_HouseClass_Expert_AI(HouseClass* house)
     bool is_under_threat = AdvAI_Is_Under_Start_Rush_Threat(house, enemy_aircraft_count);
 
     if (is_under_threat) {
+        HouseClassExtension::Fetch_Factory_IsNaval.Set(false);
         FactoryClass* buildingfactory = house->Fetch_Factory(RTTI_BUILDING);
         if (buildingfactory != nullptr) {
             if (buildingfactory->Get_Object() != nullptr) {
@@ -1708,6 +1709,7 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
     bool suspend = false;
     FactoryClass* fptr;
     TechnoTypeClass const* tech = Fetch_Techno_Type(type, id);
+    bool naval = HouseClassExtension::Begin_Production_IsNaval.Get();
 
     if (!tech->Who_Can_Build_Me(false, true, true, this))
     {
@@ -1719,6 +1721,7 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
         suspend = true;
     }
 
+    HouseClassExtension::Fetch_Factory_IsNaval.Set(naval);
     fptr = Fetch_Factory(type);
 
     /*
@@ -1732,6 +1735,7 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
             DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Unable to create factory\n", tech->FullName);
             return PROD_CANT;
         }
+        HouseClassExtension::Set_Factory_IsNaval.Set(naval);
         Set_Factory(type, fptr);
     }
 
@@ -1739,7 +1743,7 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
     **	If the house is already busy producing the requested object, then
     **	return with this failure code, unless we are restarting production.
     */
-    if (fptr->Is_Building() && !fptr->IsSuspended && type == RTTI_BUILDINGTYPE)
+    if (fptr->Is_Building() && type == RTTI_BUILDINGTYPE)
     {
         DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Cannot queue buildings.\n", tech->FullName);
         return PROD_CANT;
@@ -1798,6 +1802,7 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
     DEBUG_INFO("IsSuspended\t= %d\n", fptr->IsSuspended);
 
     delete fptr;
+    HouseClassExtension::Set_Factory_IsNaval.Set(naval);
     Set_Factory(type, nullptr);
 
     return PROD_CANT;
@@ -1806,6 +1811,8 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
 
 ProdFailType HouseClassFake::_Suspend_Production(RTTIType type)
 {
+    bool naval = HouseClassExtension::Suspend_Production_IsNaval.Get();
+    HouseClassExtension::Fetch_Factory_IsNaval.Set(naval);
     FactoryClass* fptr = Fetch_Factory(type);
 
     /*
@@ -1837,6 +1844,8 @@ ProdFailType HouseClassFake::_Suspend_Production(RTTIType type)
 
 ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
 {
+    bool naval = HouseClassExtension::Abandon_Production_IsNaval.Get();
+    HouseClassExtension::Fetch_Factory_IsNaval.Set(naval);
     FactoryClass* fptr = Fetch_Factory(type);
 
     /*
@@ -1894,6 +1903,7 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
         return PROD_OK;
     }
 
+    HouseClassExtension::Set_Factory_IsNaval.Set(naval);
     Set_Factory(type, nullptr);
     delete fptr;
 
@@ -1903,23 +1913,28 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
 
 int* HouseClassFake::_Factory_Counter(RTTIType rtti)
 {
+    bool naval = HouseClassExtension::Factory_Counter_IsNaval.Get();
+
     switch (rtti)
     {
     case RTTI_UNITTYPE:
     case RTTI_UNIT:
-        return(&UnitFactories);
+        if (naval)
+            return &Extension::Fetch<HouseClassExtension>(this)->ShipFactoryCount;
+
+        return &UnitFactories;
 
     case RTTI_AIRCRAFTTYPE:
     case RTTI_AIRCRAFT:
-        return(&AircraftFactories);
+        return &AircraftFactories;
 
     case RTTI_INFANTRYTYPE:
     case RTTI_INFANTRY:
-        return(&InfantryFactories);
+        return &InfantryFactories;
 
     case RTTI_BUILDINGTYPE:
     case RTTI_BUILDING:
-        return(&BuildingFactories);
+        return &BuildingFactories;
 
     default:
         break;
@@ -1930,6 +1945,9 @@ int* HouseClassFake::_Factory_Counter(RTTIType rtti)
 
 int HouseClassFake::_Factory_Count(RTTIType rtti)
 {
+    bool naval = HouseClassExtension::Factory_Count_IsNaval.Get();
+    HouseClassExtension::Factory_Counter_IsNaval.Set(naval);
+
     const int* ptr = Factory_Counter(rtti);
 
     if (ptr != nullptr)
@@ -1946,6 +1964,7 @@ void HouseClassFake::_Active_Add(TechnoClass const* techno)
 
     if (techno->What_Am_I() == RTTI_BUILDING)
     {
+        HouseClassExtension::Factory_Counter_IsNaval.Set(techno->Techno_Type_Class()->Speed == SPEED_FLOAT);
         int* fptr = Factory_Counter(((BuildingClass*)techno)->Class->ToBuild);
         if (fptr != nullptr)
         {
@@ -1962,6 +1981,7 @@ void HouseClassFake::_Active_Remove(TechnoClass const* techno)
 
     if (techno->What_Am_I() == RTTI_BUILDING)
     {
+        HouseClassExtension::Factory_Counter_IsNaval.Set(techno->Techno_Type_Class()->Speed == SPEED_FLOAT);
         int* fptr = Factory_Counter(((BuildingClass*)techno)->Class->ToBuild);
         if (fptr != nullptr)
         {
@@ -1973,6 +1993,8 @@ void HouseClassFake::_Active_Remove(TechnoClass const* techno)
 
 FactoryClass* HouseClassFake::_Fetch_Factory(RTTIType rtti) const
 {
+    bool naval = HouseClassExtension::Fetch_Factory_IsNaval.Get();
+
     /*
     **	Fetch the pointer to the factory object. If there is
     **	no object factory that matches the specified rtti type, then
@@ -1985,6 +2007,9 @@ FactoryClass* HouseClassFake::_Fetch_Factory(RTTIType rtti) const
 
     case RTTI_UNIT:
     case RTTI_UNITTYPE:
+        if (naval)
+            return Extension::Fetch<HouseClassExtension>(this)->ShipFactory;
+
         return UnitFactory;
 
     case RTTI_BUILDING:
@@ -2003,10 +2028,15 @@ FactoryClass* HouseClassFake::_Fetch_Factory(RTTIType rtti) const
 
 void HouseClassFake::_Set_Factory(RTTIType rtti, FactoryClass* factory)
 {
+    bool naval = HouseClassExtension::Set_Factory_IsNaval.Get();
+
     switch (rtti) {
     case RTTI_UNIT:
     case RTTI_UNITTYPE:
-        UnitFactory = factory;
+        if (naval)
+            Extension::Fetch<HouseClassExtension>(this)->ShipFactory = factory;
+        else
+            UnitFactory = factory;
         break;
 
     case RTTI_INFANTRY:
@@ -2032,7 +2062,9 @@ void HouseClassFake::_Set_Factory(RTTIType rtti, FactoryClass* factory)
 
 bool HouseClassFake::_Place_Object(RTTIType type, Cell& cell)
 {
+    bool naval = HouseClassExtension::Place_Object_IsNaval.Get();
     TechnoClass* tech = nullptr;
+    HouseClassExtension::Fetch_Factory_IsNaval.Set(naval);
     FactoryClass* factory = Fetch_Factory(type);
 
     /*
@@ -2076,6 +2108,7 @@ bool HouseClassFake::_Place_Object(RTTIType type, Cell& cell)
                     */
                     RadarEventClass::LastEventCell = Coord_Cell(builder->Center_Coord());
                     factory->Completed();
+                    HouseClassExtension::Abandon_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(tech));
                     Abandon_Production(type, -1);
                     Just_Built(tech);
                 }
@@ -2087,6 +2120,7 @@ bool HouseClassFake::_Place_Object(RTTIType type, Cell& cell)
                     if (tech->Kind_Of() != RTTI_BUILDING)
                     {
                         DEBUG_INFO("Failed to exit object from factory - refunding money\n");
+                        HouseClassExtension::Abandon_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(tech));
                         Abandon_Production(type, -1);
                     }
                     
@@ -2120,6 +2154,7 @@ bool HouseClassFake::_Place_Object(RTTIType type, Cell& cell)
 
                         factory->Completed();
                         tech->Transmit_Message(RADIO_COMPLETE, builder);
+                        HouseClassExtension::Abandon_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(tech));
                         Abandon_Production(type, -1);
 
                         if (PlayerPtr == this)

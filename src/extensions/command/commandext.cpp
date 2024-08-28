@@ -78,6 +78,7 @@
 #include "asserthandler.h"
 #include "sidebarext.h"
 #include "event.h"
+#include "houseext.h"
 
 
 /**
@@ -248,6 +249,7 @@ bool ManualPlaceCommandClass::Process()
     /**
      *  Fetch the houses factory associated with producing buildings.
      */
+    HouseClassExtension::Fetch_Factory_IsNaval.Set(false);
     FactoryClass *factory = PlayerPtr->Fetch_Factory(RTTI_BUILDING);
     if (!factory) {
         DEV_DEBUG_WARNING("ManualPlaceCommand - Unable to fetch primary factory!\n");
@@ -750,6 +752,7 @@ bool SetStructureTabCommandClass::Process()
         /**
          *  Fetch the houses factory associated with producing buildings.
          */
+        HouseClassExtension::Fetch_Factory_IsNaval.Set(false);
         FactoryClass* factory = PlayerPtr->Fetch_Factory(RTTI_BUILDING);
         if (!factory)
             return result;

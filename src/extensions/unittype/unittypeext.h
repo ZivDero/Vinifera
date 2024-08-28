@@ -27,7 +27,10 @@
  ******************************************************************************/
 #pragma once
 
+#include "extension.h"
+#include "techno.h"
 #include "technotypeext.h"
+#include "tibsun_functions.h"
 #include "unittype.h"
 
 
@@ -60,6 +63,27 @@ UnitTypeClassExtension final : public TechnoTypeClassExtension
         virtual RTTIType What_Am_I() const override { return RTTI_UNITTYPE; }
 
         virtual bool Read_INI(CCINIClass &ini) override;
+
+        static bool Is_Naval(const TechnoClass* techno)
+        {
+            return Is_Naval(techno->Techno_Type_Class());
+        }
+
+        static bool Is_Naval(const TechnoTypeClass* techno)
+        {
+            if (techno->Kind_Of() != RTTI_UNITTYPE)
+                return false;
+
+            return (Extension::Fetch<UnitTypeClassExtension>(techno))->IsNaval;
+        }
+
+        static bool Is_Naval(RTTIType rtti, int id)
+        {
+            if (rtti != RTTI_UNIT)
+                return false;
+
+            return Is_Naval(Fetch_Techno_Type(rtti, id));
+        }
 
     public:
         /**

@@ -72,6 +72,7 @@
 #include "hooker.h"
 #include "hooker_macros.h"
 #include "sidebarext.h"
+#include "vox.h"
 
 
 /**
@@ -88,6 +89,8 @@ public:
     void _Update_Buildables();
     void _Draw_Overlays(Point2D& coord, Rect& rect);
     void _Detach_All(bool all = false);
+    bool _What_Action_Factory_Counter();
+    bool _Toggle_Primary();
 };
 
 
@@ -264,6 +267,7 @@ void BuildingClassFake::_Draw_Overlays(Point2D& coord, Rect& rect)
         {
             if (IsSelected)
             {
+                HouseClassExtension::Fetch_Factory_IsNaval.Set(Class->Speed == SPEED_FLOAT);
                 FactoryClass* factory = House->Is_Human_Control() ? House->Fetch_Factory(Class->ToBuild) : Factory;
                 if (factory != nullptr)
                 {
@@ -301,6 +305,7 @@ void BuildingClassFake::_Detach_All(bool all)
         */
         if (House)
         {
+            HouseClassExtension::Fetch_Factory_IsNaval.Set(Class->Speed == SPEED_FLOAT);
             FactoryClass* factory = House->Fetch_Factory(Class->ToBuild);
 
             /*
@@ -315,6 +320,7 @@ void BuildingClassFake::_Detach_All(bool all)
                 IsInLimbo = true;
                 if (object && !object->Techno_Type_Class()->Who_Can_Build_Me(true, false, false, House))
                 {
+                    HouseClassExtension::Abandon_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(object));
                     House->Abandon_Production(Class->ToBuild, -1);
                 }
                 IsInLimbo = old_limbo;
@@ -329,6 +335,50 @@ void BuildingClassFake::_Detach_All(bool all)
         return TechnoClass::Detach_All(all);
 
     return TechnoClass::Detach_All(false);
+}
+
+
+bool BuildingClassFake::_What_Action_Factory_Counter()
+{
+    HouseClassExtension::Factory_Counter_IsNaval.Set(Class->Speed == SPEED_FLOAT);
+    if (*House->Factory_Counter(Class->ToBuild) > 0)
+        return true;
+    return false;
+}
+
+
+bool BuildingClassFake::_Toggle_Primary()
+{
+    if (Class->ToBuild)
+    {
+        if (IsLeader)
+        {
+            IsLeader = false;
+            Mark(MARK_CHANGE);
+            return IsLeader;
+        }
+        else
+        {
+            for (int index = 0; index < Buildings.Count(); index++)
+            {
+                BuildingClass* building = Buildings[index];
+
+                if (!building->IsInLimbo && building->House == House && building->Class->ToBuild == Class->ToBuild && building->Class->Speed == Class->Speed)
+                {
+                    building->IsLeader = false;
+                }
+            }
+
+            IsLeader = true;
+            if (House->Is_Player_Control())
+                Speak(VOX_PRIMARY_SELECTED);
+            Mark(MARK_CHANGE);
+            return IsLeader;
+        }
+        
+    }
+
+    return IsLeader;
 }
 
 
@@ -2236,6 +2286,17 @@ DECLARE_PATCH(_BuildingClass_Receive_Message_Only_Allow_Dockable_Harvester_Patch
 }
 
 
+DECLARE_PATCH(_BuildingClass_What_Action_Factory_Counter)
+{
+    GET_REGISTER_STATIC(BuildingClassFake*, this_ptr, esi);
+
+    if (this_ptr->_What_Action_Factory_Counter())
+        JMP(0x0042EC7A);
+
+    JMP(0x0042ED68);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -2266,6 +2327,8 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042CE87, &_BuildingClass_Exit_Object_Allow_Rally_Point_For_Naval_Yard_Patch);
     Patch_Jump(0x00428810, &BuildingClassFake::_Draw_Overlays);
     Patch_Jump(0x00434000, &BuildingClassFake::_Detach_All);
+    Patch_Jump(0x0042F590, &BuildingClassFake::_Toggle_Primary);
+    Patch_Jump(0x0042EC6B, &_BuildingClass_What_Action_Factory_Counter);
 
     // NOP out "push 1" instruction so we have an easier time injecting code here
     Patch_Byte(0x0042CE7A, 0x90);

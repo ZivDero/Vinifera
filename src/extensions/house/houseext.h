@@ -130,7 +130,7 @@ HouseClassExtension final : public AbstractClassExtension
 
             T Get()
             {
-                ASSERT_STACKDUMP_PRINT(_isset == true, "Tried to reset an argument that wasn't used!");
+                ASSERT_STACKDUMP_PRINT(_isset == true, "Tried to get an argument that wasn't supplied!");
                 _isset = false;
                 return _value;
             }
@@ -142,7 +142,10 @@ HouseClassExtension final : public AbstractClassExtension
 
         static GlobalArgument<int> Begin_Production_IsNaval;
         static GlobalArgument<int> Suspend_Production_IsNaval;
-        static GlobalArgument<int> Abort_Production_IsNaval;
+        static GlobalArgument<int> Abandon_Production_IsNaval;
         static GlobalArgument<int> Fetch_Factory_IsNaval;
         static GlobalArgument<int> Set_Factory_IsNaval;
+        static GlobalArgument<int> Place_Object_IsNaval;
+        static GlobalArgument<int> Factory_Count_IsNaval;
+        static GlobalArgument<int> Factory_Counter_IsNaval;
 };

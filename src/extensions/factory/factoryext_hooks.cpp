@@ -42,9 +42,11 @@
 #include "mouse.h"
 #include "sidebarext.h"
 #include "techno.h"
+#include "technotypeext.h"
+#include "unittypeext.h"
 
 
- /**
+/**
   *  A fake class for implementing new member functions which allow
   *  access to the "this" pointer of the intended class.
   *
@@ -56,6 +58,7 @@ static class FactoryClassFake final : public FactoryClass
 public:
     void _Verify_Can_Build();
     void _Resume_Queue();
+    bool _Start(bool suspend);
 };
 
 
@@ -127,12 +130,42 @@ void FactoryClassFake::_Resume_Queue()
             const int id = obj->Get_Heap_ID();
             if (id >= 0)
             {
+                HouseClassExtension::Begin_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(obj));
                 House->Begin_Production(obj->Kind_Of(), id, true);
             }
         }
     }
 }
 
+
+bool FactoryClassFake::_Start(bool suspend)
+{
+    if ((Object || SpecialItem) && IsSuspended && !Has_Completed())
+    {
+        if (House->Available_Money() >= Cost_Per_Tick())
+        {
+            int time;
+
+            if (Object)
+            {
+                time = Object->Time_To_Build();
+            }
+
+            int rate = time / STEP_COUNT;
+            rate = std::clamp(rate, 1, 255);
+
+            Set_Rate(rate);
+            IsSuspended = false;
+            IsPlayerSuspended = true;
+
+            if (suspend)
+                Suspend(true);
+
+            return true;
+        }
+    }
+    return false;
+}
 
 
 /**

@@ -62,8 +62,10 @@
 #include "voc.h"
 #include "vox.h"
 #include "event.h"
+#include "houseext.h"
 #include "tooltip.h"
 #include "scenarioext.h"
+#include "unittypeext.h"
 #include "wwmouse.h"
 
 
@@ -369,6 +371,7 @@ void StripClassFake::_Draw_It(bool complete)
 						*/
 						if (obj->Kind_Of() == RTTI_BUILDINGTYPE)
 						{
+							HouseClassExtension::Fetch_Factory_IsNaval.Set(false);
 							darken = PlayerPtr->Fetch_Factory(Buildables[index].BuildableType) != nullptr;
 						}
 
@@ -494,6 +497,7 @@ void StripClassFake::_Draw_It(bool complete)
 			if (obj != nullptr)
 			{
 				RTTIType rtti = obj->Kind_Of();
+				HouseClassExtension::Fetch_Factory_IsNaval.Set(UnitTypeClassExtension::Is_Naval(obj));
 				FactoryClass* factory = PlayerPtr->Fetch_Factory(rtti);
 
 				if (factory != nullptr)
@@ -1577,6 +1581,7 @@ void StripClassFake::_Tab_Button_AI()
 		{
 			if (SidebarExtension->TabButtons[ID].IsFlashing)
 			{
+				HouseClassExtension::Fetch_Factory_IsNaval.Set(false);
 				FactoryClass* fptr = PlayerPtr->Fetch_Factory(RTTI_BUILDINGTYPE);
 				if (fptr == nullptr || !fptr->Has_Completed())
 					SidebarExtension->TabButtons[ID].Stop_Flashing();
@@ -1754,6 +1759,32 @@ DECLARE_PATCH(_SelectClass_Action_Redraw_Column)
 }
 
 
+DECLARE_PATCH(_SelectClass_Action_Fetch_Factory_1)
+{
+	GET_REGISTER_STATIC(RTTIType, rtti, ebx);
+	GET_STACK_STATIC(TechnoTypeClass*, choice, esp, 0x20);
+	static FactoryClass* factory;
+
+	HouseClassExtension::Fetch_Factory_IsNaval.Set(UnitTypeClassExtension::Is_Naval(choice));
+	factory = PlayerPtr->Fetch_Factory(rtti);
+	_asm mov eax, factory
+	JMP_REG(ecx, 0x005F5C20);
+}
+
+
+DECLARE_PATCH(_SelectClass_Action_Fetch_Factory_2)
+{
+	GET_REGISTER_STATIC(RTTIType, rtti, ebx);
+	GET_STACK_STATIC(TechnoTypeClass*, choice, esp, 0x20);
+	static FactoryClass* factory;
+
+	HouseClassExtension::Fetch_Factory_IsNaval.Set(UnitTypeClassExtension::Is_Naval(choice));
+	factory = PlayerPtr->Fetch_Factory(rtti);
+	_asm mov eax, factory
+	JMP_REG(ecx, 0x005F5E45);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -1796,6 +1827,8 @@ void SidebarClassExtension_Hooks()
 	Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
 	Patch_Jump(0x004A9F0F, _GadgetClass_Input_Mouse_Enter_Leave);
 	Patch_Jump(0x005F5C01, _SelectClass_Action_Redraw_Column);
+	Patch_Jump(0x005F5C14, _SelectClass_Action_Fetch_Factory_1);
+	Patch_Jump(0x005F5E39, _SelectClass_Action_Fetch_Factory_2);
 
     //Patch_Jump(0x005F5188, &_SidebarClass_StripClass_ObjectTypeClass_Custom_Cameo_Image_Patch);
     //Patch_Jump(0x005F5216, &_SidebarClass_StripClass_SuperWeaponType_Custom_Cameo_Image_Patch);

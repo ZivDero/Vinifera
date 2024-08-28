@@ -35,9 +35,12 @@
 
 HouseClassExtension::GlobalArgument<int> HouseClassExtension::Begin_Production_IsNaval;
 HouseClassExtension::GlobalArgument<int> HouseClassExtension::Suspend_Production_IsNaval;
-HouseClassExtension::GlobalArgument<int> HouseClassExtension::Abort_Production_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Abandon_Production_IsNaval;
 HouseClassExtension::GlobalArgument<int> HouseClassExtension::Fetch_Factory_IsNaval;
 HouseClassExtension::GlobalArgument<int> HouseClassExtension::Set_Factory_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Place_Object_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Factory_Count_IsNaval;
+HouseClassExtension::GlobalArgument<int> HouseClassExtension::Factory_Counter_IsNaval;
 
 
 /**

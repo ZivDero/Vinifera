@@ -56,6 +56,7 @@
 #include "fatal.h"
 #include "asserthandler.h"
 #include "debughandler.h"
+#include "building.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -72,6 +73,7 @@ static class TechnoClassFake final : public TechnoClass
 {
 public:
     int _Cell_Distance_Squared(const AbstractClass* object) const;
+    int _Time_To_Build();
 };
 
 
@@ -103,6 +105,40 @@ int TechnoClassFake::_Cell_Distance_Squared(const AbstractClass* object) const
     int y_distance = our_cell_y - their_cell_y;
     return x_distance * x_distance + y_distance * y_distance;
 }
+
+
+int TechnoClassFake::_Time_To_Build()
+{
+    int val = Techno_Type_Class()->Time_To_Build();
+    val *= House->BuildSpeedBias;
+
+
+    /*
+    **	Adjust the time to build based on the power output of the owning house.
+    */
+    double power = House->Power_Fraction();
+    if (power > 1.0) power = 1.0;
+    if (power < 1.0 && power > 0.75) power = 0.75;
+    if (power < 0.5) power = 0.5;
+    if (power < Rule->MinProductionSpeed) power = Rule->MinProductionSpeed;
+    val /= power;
+
+    HouseClassExtension::Factory_Count_IsNaval.Set(UnitTypeClassExtension::Is_Naval(this));
+
+    // We can't call Kind_Of() on TechnoTypeClass because it's a pure virtual function
+    // Since we know we will always have an implementation, cast it to some base type to call it
+    RTTIType rtti = ((UnitTypeClass*)this)->Kind_Of();
+
+    const int divisor = House->Factory_Count(rtti);
+    if (divisor > 1 && Rule->MultipleFactory > 0.0)
+        val = 1.0 / ((divisor - 1) * Rule->MultipleFactory) * val;
+
+    if (rtti == RTTI_BUILDING && ((BuildingClass*)this)->Class->IsWall)
+        return val * Rule->WallBuildSpeedCoefficient;
+
+    return val;
+}
+
 
 
 /**
@@ -974,6 +1010,7 @@ void TechnoClassExtension_Hooks()
     Patch_Jump(0x006306B5, &_TechnoClass_Fire_At_Spawn_Aircraft_Patch);
     Patch_Jump(0x00637B83, &_TechnoClass_Draw_Pips_No_Medic_Indicator_In_Shroud_Patch);
     Patch_Call(0x00637FF5, &TechnoClassFake::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
+    Patch_Jump(0x0062A970, &TechnoClassFake::_Time_To_Build);
 
     // Do not trigger "Discovered by Player" when an object is destroyed
     Patch_Jump(0x00633745, (uintptr_t)0x00633762);

@@ -39,9 +39,11 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "houseext.h"
+#include "unittypeext.h"
 
 
- /**
+/**
   *  A fake class for implementing new member functions which allow
   *  access to the "this" pointer of the intended class.
   *
@@ -163,7 +165,7 @@ DECLARE_PATCH(_EventClass_Execute_IDLE_Prevent_Controlling_Enemy_Units_Patch)
  *
  *  Author: Rampastring
  */
-DECLARE_PATCH(_EventClass_Executre_PRIMARY_Prevent_Setting_For_Enemy_Patch)
+DECLARE_PATCH(_EventClass_Execute_PRIMARY_Prevent_Setting_For_Enemy_Patch)
 {
     enum JumpAddresses {
         Continue = 0x004946D8,
@@ -188,6 +190,49 @@ DECLARE_PATCH(_EventClass_Executre_PRIMARY_Prevent_Setting_For_Enemy_Patch)
 }
 
 
+DECLARE_PATCH(_EventClass_Execute_PRODUCE)
+{
+    GET_REGISTER_STATIC(EventClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(HouseClass*, house, ebx);
+
+    HouseClassExtension::Begin_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID));
+    house->Begin_Production(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID, false);
+    JMP(0x00494682);
+}
+
+
+DECLARE_PATCH(_EventClass_Execute_SUSPEND)
+{
+    GET_REGISTER_STATIC(EventClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(HouseClass*, house, ebx);
+
+    HouseClassExtension::Suspend_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID));
+    house->Suspend_Production(this_ptr->Data.Specific.Type);
+    JMP(0x00494698);
+}
+
+
+DECLARE_PATCH(_EventClass_Execute_ABANDON)
+{
+    GET_REGISTER_STATIC(EventClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(HouseClass*, house, ebx);
+
+    HouseClassExtension::Abandon_Production_IsNaval.Set(UnitTypeClassExtension::Is_Naval(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID));
+    house->Abandon_Production(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID);
+    JMP(0x004946B2);
+}
+
+DECLARE_PATCH(_EventClass_Execute_PLACE)
+{
+    GET_REGISTER_STATIC(EventClass*, this_ptr, esi);
+    GET_REGISTER_STATIC(HouseClass*, house, ebx);
+
+    HouseClassExtension::Place_Object_IsNaval.Set(UnitTypeClassExtension::Is_Naval(this_ptr->Data.Specific.Type, this_ptr->Data.Specific.ID));
+    house->Place_Object(this_ptr->Data.Place.Type, Cell(this_ptr->Data.Place.Cell.X & 0xFFFF, this_ptr->Data.Place.Cell.X >> 16));
+    JMP(0x00494666);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -195,7 +240,11 @@ void EventClassExtension_Hooks()
 {
     Patch_Jump(0x004946FF, &_EventClass_Execute_MEGAMISSION_Prevent_Controlling_Enemy_Units_Patch);
     Patch_Jump(0x004949AF, &_EventClass_Execute_IDLE_Prevent_Controlling_Enemy_Units_Patch);
-    Patch_Jump(0x004946CD, &_EventClass_Executre_PRIMARY_Prevent_Setting_For_Enemy_Patch);
+    Patch_Jump(0x004946CD, &_EventClass_Execute_PRIMARY_Prevent_Setting_For_Enemy_Patch);
+    Patch_Jump(0x00494671, &_EventClass_Execute_PRODUCE);
+    Patch_Jump(0x0049468D, &_EventClass_Execute_SUSPEND);
+    Patch_Jump(0x004946A3, &_EventClass_Execute_ABANDON);
+    Patch_Jump(0x00494644, &_EventClass_Execute_PLACE);
 
     Patch_Call(0x005F5DE9, &EventClassFake::_Remember_Last_Building);
 }
