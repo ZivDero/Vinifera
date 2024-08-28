@@ -455,7 +455,7 @@ void StripClassFake::_Draw_It(bool complete)
 				/*
 				**	Draw a selection box around the cameo if we're currently hovering over it
 				*/
-				bool overbutton = SidebarExtension->SelectButton[ID][index].MousedOver;
+				bool overbutton = SidebarExtension->SelectButton[ID][index - TopIndex].MousedOver;
 
 				if (overbutton)
 				{

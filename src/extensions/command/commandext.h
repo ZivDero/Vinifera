@@ -97,7 +97,7 @@ class ManualPlaceCommandClass : public ViniferaCommandClass
         virtual const char *Get_Description() const override;
         virtual bool Process() override;
 
-        virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Z); }
+        virtual KeyNumType Default_Key() const override { return KeyNumType(KN_NONE); }
 };
 
 
