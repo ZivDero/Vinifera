@@ -547,7 +547,7 @@ void StripClassFake::_Draw_It(bool complete)
 					/*
 					**	Display text showing that the construction is temporarily on hold.
 					*/
-					if (factory && (!factory->Is_Building() || factory->IsSuspended))
+					if (factory && !factory->Is_Building())
 					{
 						if (hasqueuecount)
 						{

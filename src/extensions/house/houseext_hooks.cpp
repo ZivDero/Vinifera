@@ -1691,33 +1691,7 @@ bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass*
 
 ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
 {
-    FactoryClass* fptr;
-
-    switch (type)
-    {
-    case RTTI_UNIT:
-    case RTTI_UNITTYPE:
-        fptr = UnitFactory;
-        break;
-
-    case RTTI_AIRCRAFT:
-    case RTTI_AIRCRAFTTYPE:
-        fptr = AircraftFactory;
-        break;
-
-    case RTTI_BUILDING:
-    case RTTI_BUILDINGTYPE:
-        fptr = BuildingFactory;
-        break;
-
-    case RTTI_INFANTRY:
-    case RTTI_INFANTRYTYPE:
-        fptr = InfantryFactory;
-        break;
-
-    default:
-        return PROD_CANT;
-    }
+    FactoryClass* fptr = Fetch_Factory(type);
 
     /*
     **	If there is no factory to abandon, then return with a failure code.
@@ -1725,6 +1699,9 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
     if (fptr == nullptr)
         return PROD_CANT;
 
+    /*
+    **	Tell the sidebar that it needs to be redrawn because of this.
+    */
     if (fptr->Queued_Object_Count() > 0 && id > 0)
     {
         const TechnoTypeClass* technotype = Fetch_Techno_Type(type, id);
