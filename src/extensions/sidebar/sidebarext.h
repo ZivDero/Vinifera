@@ -76,7 +76,10 @@ public:
     private:
         enum
         {
-            FLASH_RATE = 30
+            FLASH_FRAME_COUNT = 5,
+            FLASH_FRAME_MIN = 3,
+            FLASH_FRAME_MAX = FLASH_FRAME_MIN + (FLASH_FRAME_COUNT - 1),
+            FLASH_RATE = 60 / (FLASH_FRAME_COUNT * 2) // Roughly one cycle per second
         };
 
     public:
@@ -110,7 +113,8 @@ public:
          */
         bool IsFlashing;
         CDTimerClass<SystemTimerClass> FlashTimer;
-        bool FlashState;
+        bool FlashDirection;
+        int FlashFrame;
 
         /**
          *  State
