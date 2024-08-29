@@ -105,10 +105,25 @@ HRESULT SidebarClassExtension::Load(IStream *pStm)
 
     new (this) SidebarClassExtension(NoInitClass());
 
-    Init_Strips();
+    /**
+     *  We need to swizzle the factory pointers to restore their link to buildables.
+     */
+    for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
+    {
+        for (int j = 0 ; j < SidebarClass::StripClass::MAX_BUILDABLES; j++)
+        {
+            VINIFERA_SWIZZLE_REQUEST_POINTER_REMAP(Column[i].Buildables[j].Factory, "Factory");
+        }
+    }
+
+    /**
+     *  Reinitialize all the UI elements.
+     *  If we've loaded a savegame, they will be erased by the constructor.
+     */
+
     Init_IO();
-    Init_For_House();
     entry_84();
+    Init_For_House();
     
     return hr;
 }

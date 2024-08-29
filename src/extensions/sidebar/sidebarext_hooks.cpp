@@ -243,8 +243,8 @@ void SidebarClassFake::_Init_IO()
     /*
     ** Add the sidebar's buttons only if we're not in editor mode.
     */
-    if (!Debug_Map) {
-
+    if (!Debug_Map)
+    {
         Repair.X = TacticalRect.Width + TacticalRect.X;
         Sell.X = TacticalRect.Width + TacticalRect.X + 27;
         Power.X = TacticalRect.Width + TacticalRect.X + 54;
@@ -434,8 +434,8 @@ bool SidebarClassFake::_Activate(int control)
     **	Only if there is a change in the state of the sidebar will anything
     **	be done to change it.
     */
-    if (IsSidebarActive != old) {
-
+    if (IsSidebarActive != old)
+    {
         /*
         **	If the sidebar is activated but was on the right side of the screen, then
         **	activate it on the left side of the screen.
@@ -1323,11 +1323,13 @@ const char* StripClassFake::_Help_Text(int gadget_id)
             const TechnoTypeClassExtension* technotypeext = Extension::Fetch<TechnoTypeClassExtension>(ttype);
             const char* description = technotypeext->Description;
 
-            if (description[0] == '\0') {
+            if (description[0] == '\0')
+            {
                 // If there is no extended description, then simply show the name and price.
                 std::snprintf(_buffer, sizeof(_buffer), "%s@$%d", ttype->Full_Name(), ttype->Cost_Of(PlayerPtr));
             }
-            else {
+            else
+            {
                 // If there is an extended description, then show the name, price, and the description.
                 std::snprintf(_buffer, sizeof(_buffer), "%s@$%d@@%s", ttype->Full_Name(), ttype->Cost_Of(PlayerPtr), technotypeext->Description);
             }
@@ -1523,11 +1525,13 @@ void StripClassFake::_Draw_It(bool complete)
                 if (overbutton)
                 {
                     Rect cameo_hover_rect(x, SidebarRect.Y + y, OBJECT_WIDTH, OBJECT_HEIGHT - 3);
-                    if (ScenExtension->CachedToolTipColorSchemeIndex > -1) {
+                    if (ScenExtension->CachedToolTipColorSchemeIndex > -1)
+                    {
                         RGBClass rgb = ColorSchemes[ScenExtension->CachedToolTipColorSchemeIndex]->field_308.operator RGBClass();
                         SidebarSurface->Draw_Rect(cameo_hover_rect, DSurface::RGB_To_Pixel(rgb));
                     }
-                    else {
+                    else
+                    {
                         SidebarSurface->Draw_Rect(cameo_hover_rect, 0);
                     }
                 }
