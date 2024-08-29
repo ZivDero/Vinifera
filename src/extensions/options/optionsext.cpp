@@ -166,6 +166,11 @@ void OptionsClassExtension::Load_Settings()
         IsClassicMessagePosition = sun_ini.Get_Bool("Options", "ClassicMessageListPosition", IsClassicMessagePosition);
     }
 
+    /**
+     *  Read hardcoded modifier keys from Kerboyard.ini.
+     *
+     *  @author: ZivDero
+     */
     RawFileClass keyboard_file("Keyboard.ini");
     CCINIClass keyboard_ini;
 
@@ -211,6 +216,11 @@ void OptionsClassExtension::Save_Settings()
     // Rampastring: DTA uses Settings.ini rather than SUN.ini
     RawFileClass file("Settings.ini");
 
+    /**
+     *  Save hardcoded modifier keys to Kerboyard.ini.
+     *
+     *  @author: ZivDero
+     */
     RawFileClass keyboard_file("Keyboard.ini");
     CCINIClass keyboard_ini;
 

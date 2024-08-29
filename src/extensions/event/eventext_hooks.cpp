@@ -55,6 +55,11 @@ public:
 };
 
 
+/**
+ *  Remembers the last produced building for the repeat building command.
+ *
+ *  Author: ZivDero
+ */
 void EventClassFake::_Remember_Last_Building(int house, EventType eventtype, RTTIType type, int id)
 {
     if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)

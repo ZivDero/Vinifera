@@ -27,8 +27,6 @@
  ******************************************************************************/
 #include "extension_globals.h"
 
-#include "sidebarext.h"
-
 
 DynamicVectorClass<UnitClassExtension *> UnitExtensions;
 DynamicVectorClass<AircraftClassExtension *> AircraftExtensions;

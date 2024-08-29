@@ -311,7 +311,7 @@ class ToggleSuperTimersCommandClass : public ViniferaCommandClass
 
 
 /**
- *  Switches the sidebar to the buildings tab.
+ *  Switches the sidebar to the Building tab.
  */
 class SetStructureTabCommandClass : public ViniferaCommandClass
 {
@@ -330,7 +330,7 @@ public:
 
 
 /**
- *  Switches the sidebar to the infantry tab.
+ *  Switches the sidebar to the Infantry tab.
  */
 class SetInfantryTabCommandClass : public ViniferaCommandClass
 {
@@ -349,7 +349,7 @@ public:
 
 
 /**
- *  Switches the sidebar to the unit tab.
+ *  Switches the sidebar to the Vehicles tab.
  */
 class SetUnitTabCommandClass : public ViniferaCommandClass
 {
@@ -368,7 +368,7 @@ public:
 
 
 /**
- *  Switches the sidebar to the special tab.
+ *  Switches the sidebar to the Special tab.
  */
 class SetSpecialTabCommandClass : public ViniferaCommandClass
 {
@@ -387,7 +387,7 @@ public:
 
 
 /**
- *  Switches the sidebar to the special tab.
+ *  Queues the last built structure.
  */
 class RepeatStructureCommandClass : public ViniferaCommandClass
 {

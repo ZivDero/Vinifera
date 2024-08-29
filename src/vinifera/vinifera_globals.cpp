@@ -29,8 +29,6 @@
 
 #include "vinifera_globals.h"
 
-#include "tibsun_defines.h"
-
 
 bool Vinifera_DeveloperMode = false;
 

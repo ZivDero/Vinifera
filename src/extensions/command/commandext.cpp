@@ -716,7 +716,7 @@ bool ToggleSuperTimersCommandClass::Process()
 
 
 /**
- *  Switches the sidebar to the Build Tab.
+ *  Switches the sidebar to the Building Tab.
  *
  *  @author: ZivDero
  */
@@ -727,7 +727,7 @@ const char* SetStructureTabCommandClass::Get_Name() const
 
 const char* SetStructureTabCommandClass::Get_UI_Name() const
 {
-    return "Select Structures Tab";
+    return "Select Building Tab";
 }
 
 const char* SetStructureTabCommandClass::Get_Category() const
@@ -745,6 +745,12 @@ bool SetStructureTabCommandClass::Process()
     const SidebarClassExtension::SidebarTabType newtab = SidebarClassExtension::SIDEBAR_TAB_STRUCTURE;
     bool result = SidebarExtension->Change_Tab(newtab);
 
+    /**
+     *  Enter the manual placement mode when a building is complete
+     *  and pending placement on the sidebar.
+     *
+     *  @author: CCHyper (based on research by dkeeton)
+     */
     if (PlayerPtr)
     {
         /**
@@ -827,7 +833,7 @@ bool SetInfantryTabCommandClass::Process()
 
 
 /**
- *  Switches the sidebar to the Unit Tab.
+ *  Switches the sidebar to the Vehicle Tab.
  *
  *  @author: ZivDero
  */
@@ -891,7 +897,8 @@ bool SetSpecialTabCommandClass::Process()
 
 
 /**
- *  Switches the sidebar to the Special Tab.
+ *  Queues the last built structure.
+ *  Based on the implementation from ts-patches by dkeetonx
  *
  *  @author: ZivDero
  */

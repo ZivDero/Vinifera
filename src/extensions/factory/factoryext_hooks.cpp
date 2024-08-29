@@ -53,7 +53,7 @@
 static class FactoryClassFake final : public FactoryClass
 {
 public:
-    void _Verify_Can_Build();
+    void _Sanitize_Queue();
     void _AI();
     bool _Start(bool suspend);
 };
@@ -61,11 +61,11 @@ public:
 
 /**
  *  Checks if this factory should abandon construction because the objects
- *  in the queue are no longer available to build
+ *  in the queue are no longer available to build.
  *
  *  @author: ZivDero
  */
-void FactoryClassFake::_Verify_Can_Build()
+void FactoryClassFake::_Sanitize_Queue()
 {
     const TechnoClass* producing_object = Get_Object();
 
@@ -78,13 +78,13 @@ void FactoryClassFake::_Verify_Can_Build()
 
     bool need_update = false;
 
-    // Check the thing we're currently building separately - it needs special handling
+    // Check the thing we're currently building
     if (!House->Can_Build(producing_type, false, true))
     {
         Abandon();
         need_update = true;
 
-        // Remove map placement if we're doing that
+        // Cancel map placement
         if (is_building && House == PlayerPtr)
         {
             Map.PendingObject = nullptr;
@@ -94,7 +94,7 @@ void FactoryClassFake::_Verify_Can_Build()
         }
     }
 
-    // Now make sure there are no invalid objects in the queue
+    // Make sure there are no unavailable objects in the queue
     for (int i = 0; i < QueuedObjects.Count(); i++)
     {
         if (!House->Can_Build(QueuedObjects[i], false, true))
@@ -116,6 +116,13 @@ void FactoryClassFake::_Verify_Can_Build()
 }
 
 
+/**
+ *  Reimplements the entire FactoryClass::Start function.
+ *  Fixes an issue where if you started construction with < Cost_Per_Tick() credits,
+ *  it would be instantly put on hold.
+ *
+ *  @author: ZivDero
+ */
 bool FactoryClassFake::_Start(bool suspend)
 {
     if ((Object || SpecialItem) && IsSuspended && !Has_Completed())
@@ -147,9 +154,14 @@ bool FactoryClassFake::_Start(bool suspend)
 }
 
 
+/**
+ *  Reimplements the entire FactoryClass::AI function.
+ *
+ *  @author: ZivDero
+ */
 void FactoryClassFake::_AI()
 {
-    _Verify_Can_Build();
+    _Sanitize_Queue();
 
     if (!IsSuspended && (Object != nullptr || SpecialItem))
     {
@@ -179,6 +191,11 @@ void FactoryClassFake::_AI()
                     Balance -= cost;
                 }
 
+                /**
+                 *  Patch for InstantBuildCommandClass
+                 *
+                 *  @author: CCHyper
+                 */
                 if (Vinifera_DeveloperMode)
                 {
                     /*

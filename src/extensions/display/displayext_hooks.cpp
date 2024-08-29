@@ -248,6 +248,10 @@ return_label:
  */
 void DisplayClassExtension_Hooks()
 {
+    /**
+     *  Disabled due to causing bugs with tooltips.
+     *  - ZivDero
+     */
     //Patch_Jump(0x0047AFA6, &_DisplayClass_Help_Text_GetCursorPosition_Patch);
     Patch_Jump(0x00478974, &_DisplayClass_Mouse_Left_Release_PlaceAnywhere_BugFix_Patch);
 

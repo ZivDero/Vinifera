@@ -162,6 +162,11 @@ void SidebarClassExtension::Compute_CRC(WWCRCEngine &crc) const
 }
 
 
+/**
+ *  Initializes the new sidebar strips.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::Init_Strips()
 {
     int max_visible = Max_Visible(true);
@@ -176,6 +181,11 @@ void SidebarClassExtension::Init_Strips()
 }
 
 
+/**
+ *  Initializes the new sidebar buttons.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::Init_IO()
 {
     TabButtons[0].IsSticky = true;
@@ -212,6 +222,11 @@ void SidebarClassExtension::Init_IO()
 }
 
 
+/**
+ *  Positions the new sidebar buttons and create their tooltips.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::entry_84()
 {
     TabButtons[0].Set_Position(SidebarRect.X + TAB_ONE_X_OFFSET, SidebarRect.Y + TAB_Y_OFFSET);
@@ -261,6 +276,11 @@ void SidebarClassExtension::entry_84()
 }
 
 
+/**
+ *  Loads new house-specific sidebar graphics.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::Init_For_House()
 {
     TabButtons[0].Set_Shape(MFCC::RetrieveT<ShapeFileStruct>("TAB-BLD.SHP"));
@@ -277,6 +297,11 @@ void SidebarClassExtension::Init_For_House()
 }
 
 
+/**
+ *  Switches the sidebar tab.
+ *
+ *  @author: ZivDero
+ */
 bool SidebarClassExtension::Change_Tab(SidebarTabType index)
 {
     // Don't switch to the same tab
@@ -300,6 +325,11 @@ bool SidebarClassExtension::Change_Tab(SidebarTabType index)
 }
 
 
+/**
+ *  Returns the first active sidebar tab, or SIDEBAR_TAB_NONE if there are none.
+ *
+ *  @author: ZivDero
+ */
 SidebarClassExtension::SidebarTabType SidebarClassExtension::First_Active_Tab()
 {
     for (int i = 0; i < SIDEBAR_TAB_COUNT; i++)
@@ -313,6 +343,11 @@ SidebarClassExtension::SidebarTabType SidebarClassExtension::First_Active_Tab()
 
 
 
+/**
+ *  Returns which tab a type belongs to.
+ *
+ *  @author: ZivDero
+ */
 SidebarClassExtension::SidebarTabType SidebarClassExtension::Which_Tab(RTTIType type)
 {
     switch (type)
@@ -340,6 +375,11 @@ SidebarClassExtension::SidebarTabType SidebarClassExtension::Which_Tab(RTTIType 
 }
 
 
+/**
+ *  Class constructor.
+ *
+ *  @author: ZivDero
+ */
 SidebarClassExtension::TabButtonClass::TabButtonClass() :
 ControlClass(0, 0, 0, 0, 0, LEFTPRESS | LEFTRELEASE, true),
 DrawX(0),
@@ -355,6 +395,11 @@ IsDrawn(false)
 }
 
 
+/**
+ *  Class constructor.
+ *
+ *  @author: ZivDero
+ */
 SidebarClassExtension::TabButtonClass::TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer, int w, int h) :
     ControlClass(id, x, y, w, h, LEFTPRESS | LEFTRELEASE, true),
 DrawX(0),
@@ -370,6 +415,11 @@ IsDrawn(false)
 }
 
 
+/**
+ *  Handles mouse clicks on the button.
+ *
+ *  @author: ZivDero
+ */
 bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& key)
 {
     /*
@@ -423,6 +473,11 @@ bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& k
 }
 
 
+/**
+ *  Disables the button.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Disable()
 {
     IsSelected = false;
@@ -432,6 +487,11 @@ void SidebarClassExtension::TabButtonClass::Disable()
 }
 
 
+/**
+ *  Enables the button.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Enable()
 {
     IsSelected = false;
@@ -441,12 +501,13 @@ void SidebarClassExtension::TabButtonClass::Enable()
 }
 
 
+/**
+ *  The draw routine for the button.
+ *
+ *  @author: ZivDero
+ */
 bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
 {
-    // IsDisabled - is the button unresponsive to the user's input?
-    // IsPressed - is the user currently pressing the button?
-    // IsOn - is the button currently in the "true" state?
-
     if (!ControlClass::Draw_Me(forced))
         return false;
 
@@ -481,7 +542,7 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     }
     else
     {
-        // Just normal unselected tab
+        // Just the normal unselected tab
         shapenum = 0;
     }
 
@@ -491,6 +552,11 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
 }
 
 
+/**
+ *  Sets the shape of the button.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Set_Shape(const ShapeFileStruct* data, int width, int height)
 {
     ShapeData = data;
@@ -508,6 +574,11 @@ void SidebarClassExtension::TabButtonClass::Set_Shape(const ShapeFileStruct* dat
 }
 
 
+/**
+ *  Makes the button start flashing.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Start_Flashing()
 {
     IsFlashing = true;
@@ -517,7 +588,11 @@ void SidebarClassExtension::TabButtonClass::Start_Flashing()
 }
 
 
-
+/**
+ *  Makes the button stop flashing.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Stop_Flashing()
 {
     IsFlashing = false;
@@ -526,20 +601,34 @@ void SidebarClassExtension::TabButtonClass::Stop_Flashing()
 }
 
 
-
+/**
+ *  Selects the button.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Select()
 {
     IsSelected = true;
 }
 
 
-
+/**
+ *  Deselects the button.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::TabButtonClass::Deselect()
 {
     IsSelected = false;
 }
 
 
+/**
+ *  Function that gets called when the mouse enters the button.
+ *  Used for hover effects.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Enter()
 {
     MousedOver = true;
@@ -549,6 +638,12 @@ void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Enter()
 }
 
 
+/**
+ *  Function that gets called when the mouse leaves the button.
+ *  Used for hover effects.
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Leave()
 {
     MousedOver = false;
@@ -558,6 +653,12 @@ void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Leave()
 }
 
 
+/**
+ *  Function that checks if the mouse has entered/left a button.
+ *  This function is hooked into GadgetClass::Input()
+ *
+ *  @author: ZivDero
+ */
 void SidebarClassExtension::ViniferaSelectClass::Check_Hover(GadgetClass* gadget, int mousex, int mousey)
 {
     GadgetClass* to_enter = gadget->Extract_Gadget_At_Mouse(mousex, mousey);

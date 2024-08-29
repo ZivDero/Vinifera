@@ -122,6 +122,7 @@
 #include "overlaytypeext.h"
 #include "particlesystypeext.h"
 #include "particletypeext.h"
+#include "sidebarext.h"
 #include "smudgetypeext.h"
 #include "superext.h"
 #include "supertypeext.h"
@@ -147,7 +148,6 @@
 
 #include <iostream>
 
-#include "sidebarext.h"
 
 
 extern int Execute_Day;

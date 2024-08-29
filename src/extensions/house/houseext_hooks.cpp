@@ -52,6 +52,7 @@
 #include "extension.h"
 #include "team.h"
 #include "techno.h"
+#include "sidebarext.h"
 #include "super.h"
 #include "rules.h"
 #include "rulesext.h"
@@ -65,7 +66,6 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
-#include "sidebarext.h"
 #include "tibsun_functions.h"
 
 
@@ -1669,6 +1669,11 @@ bool HouseClassFake::_Begin_Production_Additional_Checks(const TechnoTypeClass* 
 }
 
 
+/**
+ *  Reimplements the entire HouseClass::Begin_Production function.
+ *
+ *  @author: ZivDero
+ */
 ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resume)
 {
     bool result = false;
@@ -1706,8 +1711,8 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
     }
 
     /*
-    **	If the house is already busy producing the requested object, then
-    **	return with this failure code, unless we are restarting production.
+    **	If the house is already busy producing a building, then
+    **	return with this failure code.
     */
     if (fptr->Is_Building() && type == RTTI_BUILDINGTYPE)
     {
@@ -1715,6 +1720,9 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
         return PROD_CANT;
     }
 
+    /*
+    **	Check if we have an object of this type currently suspended in production.
+    */
     if (fptr->IsSuspended)
     {
         ObjectClass* obj = fptr->Get_Object();
@@ -1744,12 +1752,12 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
         return PROD_OK;
     }
 
+    DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Factory was unable to create the requested object\n", tech->Full_Name());
 
     /*
     **	If the factory has queued objects or is currently
-    **  holding an object, reject production.
+    **  building an object, reject production.
     */
-    DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Factory was unable to create the requested object\n", tech->Full_Name());
     if (fptr->Queued_Object_Count() > 0 || fptr->Object)
         return PROD_CANT;
 
@@ -1774,6 +1782,11 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
 }
 
 
+/**
+ *  Reimplements the entire HouseClass::Abandon_Production function.
+ *
+ *  @author: ZivDero
+ */
 ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
 {
     FactoryClass* fptr = Fetch_Factory(type);
@@ -1785,7 +1798,7 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
         return PROD_CANT;
 
     /*
-    **	Tell the sidebar that it needs to be redrawn because of this.
+    **	If we're just dequeuing a unit, redraw the strip.
     */
     if (fptr->Queued_Object_Count() > 0 && id > 0)
     {

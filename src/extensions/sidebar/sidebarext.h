@@ -68,6 +68,9 @@ public:
         BUTTON_TAB_4
     };
 
+    /**
+     *  New class for the tab buttons.
+     */
     class TabButtonClass : public ControlClass
     {
     private:
@@ -94,19 +97,32 @@ public:
         void Deselect();
 
     public:
+        /**
+         *  Graphics
+         */
         int DrawX;
         int DrawY;
         ConvertClass* ShapeDrawer;
         const ShapeFileStruct* ShapeData;
 
+        /**
+         *  Flashing
+         */
         bool IsFlashing;
         CDTimerClass<SystemTimerClass> FlashTimer;
         bool FlashState;
 
+        /**
+         *  State
+         */
         bool IsSelected;
         bool IsDrawn;
     };
 
+
+    /**
+     *  An extended SelectClass to support hover effects.
+     */
     class ViniferaSelectClass : public SidebarClass::StripClass::SelectClass
     {
     public:
@@ -187,10 +203,13 @@ public:
         ViniferaSelectClass SelectButton[SIDEBAR_TAB_COUNT][SidebarClass::StripClass::MAX_BUILDABLES];
 
         /**
-        *  Buttons for the tabs.
-        */
+         *  Buttons for the tabs.
+         */
         TabButtonClass TabButtons[SIDEBAR_TAB_COUNT];
 
+        /**
+         *  State for the repeat building command.
+         */
         RTTIType LastBuildingRTTI = RTTI_NONE;
         int LastBuildingHeapID = 0;
 };
