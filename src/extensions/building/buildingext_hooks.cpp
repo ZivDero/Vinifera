@@ -67,6 +67,7 @@
 #include "asserthandler.h"
 #include "debughandler.h"
 #include "infantrytype.h"
+#include "supertype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -111,15 +112,74 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
 /**
  *  Comparison function for sorting sidebar icons (BuildTypes)
  *
- *  @author: Rampastring
+ *  @author: Rampastring, ZivDero
  */
 int __cdecl BuildType_Comparison(const void* p1, const void* p2)
 {
-    SidebarClass::StripClass::BuildType* bt1 = (SidebarClass::StripClass::BuildType*)p1;
-    SidebarClass::StripClass::BuildType* bt2 = (SidebarClass::StripClass::BuildType*)p2;
+    auto firstHouse = [](unsigned owners)
+        {
+            for (int i = 0; i < 32; i++)
+                if (owners & (1 << i))
+                    return i;
+
+            return -1;
+        };
+
+    auto isThisHouse = [](unsigned owners, HouseClass* house)
+        {
+            return (int)((bool)(owners & 1 << house->ActLike));
+        };
+
+    auto bt1 = (SidebarClass::StripClass::BuildType*)p1;
+    auto bt2 = (SidebarClass::StripClass::BuildType*)p2;
 
     if (bt1->BuildableType == bt2->BuildableType)
+    {
+        /**
+         *  If both are SWs, the one that recharges quicker goes first
+         */
+        if ((bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE) &&
+            (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE))
+        {
+            return (int)SuperWeaponTypes[bt1->BuildableID]->RechargeTime - (int)SuperWeaponTypes[bt1->BuildableID]->RechargeTime;
+        }
+
+        const TechnoTypeClass* t1 = Fetch_Techno_Type(bt1->BuildableType, bt1->BuildableID);
+        const TechnoTypeClass* t2 = Fetch_Techno_Type(bt2->BuildableType, bt2->BuildableID);
+
+        /**
+         *  If you own one of the buildings, but not another, yours comes first
+         */
+        if (isThisHouse(t1->Get_Ownable(), PlayerPtr) != isThisHouse(t2->Get_Ownable(), PlayerPtr))
+            return isThisHouse(t2->Get_Ownable(), PlayerPtr) - isThisHouse(t1->Get_Ownable(), PlayerPtr);
+
+        /**
+         *  If they are not of the same house, the one with the smaller index comes first;
+         */
+        int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
+        if (house1 != house2)
+            return house1 - house2;
+
+        /**
+         *  If both are Units, non-naval units come first
+         */
+        if (bt1->BuildableType == RTTI_UNITTYPE && bt2->BuildableType == RTTI_UNITTYPE)
+        {
+            auto ext1 = Extension::Fetch<UnitTypeClassExtension>(t1);
+            auto ext2 = Extension::Fetch<UnitTypeClassExtension>(t2);
+
+            if (ext1->IsNaval != ext2->IsNaval)
+                return (int)ext2->IsNaval - (int)ext1->IsNaval;
+        }
+
+        if (t1->TechLevel != t2->TechLevel)
+            return t1->TechLevel - t2->TechLevel;
+
+        if (t1->Cost_Of(PlayerPtr) != t2->Cost_Of(PlayerPtr))
+            return t1->Cost_Of(PlayerPtr) - t2->Cost_Of(PlayerPtr);
+
         return bt1->BuildableID - bt2->BuildableID;
+    }
 
     if (bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE)
         return -1;
@@ -145,7 +205,7 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
     if (bt2->BuildableType == RTTI_AIRCRAFTTYPE)
         return 1;
 
-    return 0;
+    return bt1->BuildableID - bt2->BuildableID;
 }
 
 
