@@ -104,6 +104,11 @@ HRESULT SidebarClassExtension::Load(IStream *pStm)
     }
 
     new (this) SidebarClassExtension(NoInitClass());
+
+    Init_Strips();
+    Init_IO();
+    Init_For_House();
+    entry_84();
     
     return hr;
 }
