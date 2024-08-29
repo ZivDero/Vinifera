@@ -79,7 +79,7 @@ public:
             FLASH_FRAME_COUNT = 5,
             FLASH_FRAME_MIN = 3,
             FLASH_FRAME_MAX = FLASH_FRAME_MIN + (FLASH_FRAME_COUNT - 1),
-            FLASH_RATE = 60 / (FLASH_FRAME_COUNT * 2) // Roughly one cycle per second
+            FLASH_RATE = 90 / (FLASH_FRAME_COUNT * 2) // Roughly one cycle per second
         };
 
     public:
