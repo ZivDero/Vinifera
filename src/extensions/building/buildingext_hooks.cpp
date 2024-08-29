@@ -148,13 +148,40 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
         const TechnoTypeClass* t2 = Fetch_Techno_Type(bt2->BuildableType, bt2->BuildableID);
 
         /**
-         *  If you own one of the buildings, but not another, yours comes first
+         *  If both are Buildings, non-defenses come first, then walls, then gates, then base defenses
          */
-        if (isThisHouse(t1->Get_Ownable(), PlayerPtr) != isThisHouse(t2->Get_Ownable(), PlayerPtr))
-            return isThisHouse(t2->Get_Ownable(), PlayerPtr) - isThisHouse(t1->Get_Ownable(), PlayerPtr);
+        if (bt1->BuildableType == RTTI_BUILDINGTYPE && bt2->BuildableType == RTTI_BUILDINGTYPE)
+        {
+            auto b1 = (BuildingTypeClass*)t1, b2 = (BuildingTypeClass*)t2;
+
+            auto ext1 = Extension::Fetch<TechnoTypeClassExtension>(t1);
+            auto ext2 = Extension::Fetch<TechnoTypeClassExtension>(t2);
+
+            enum
+            {
+                BCAT_NORMAL,
+                BCAT_WALL,
+                BCAT_GATE,
+                BCAT_DEFENSE
+            };
+
+            int building_category1 = (b1->IsWall || b1->IsFirestormWall) ? BCAT_WALL : (b1->IsGate ? BCAT_GATE : (ext1->SortCameoAsBaseDefense ? BCAT_DEFENSE : BCAT_NORMAL));
+            int building_category2 = (b2->IsWall || b2->IsFirestormWall) ? BCAT_WALL : (b2->IsGate ? BCAT_GATE : (ext2->SortCameoAsBaseDefense ? BCAT_DEFENSE : BCAT_NORMAL));
+
+            // Compare based on category priority
+            if (building_category1 != building_category2)
+                return building_category1 - building_category2;
+        }
 
         /**
-         *  If they are not of the same house, the one with the smaller index comes first;
+         *  If you own one of the buildings, but not another, yours comes first
+         */
+        int owner1 = isThisHouse(t1->Get_Ownable(), PlayerPtr), owner2 = isThisHouse(t2->Get_Ownable(), PlayerPtr);
+        if (owner1 != owner2)
+            return owner2 - owner1;
+
+        /**
+         *  If they are not of the same house, the one with the smaller house index comes first;
          */
         int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
         if (house1 != house2)
@@ -171,12 +198,6 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
             if (ext1->IsNaval != ext2->IsNaval)
                 return (int)ext2->IsNaval - (int)ext1->IsNaval;
         }
-
-        if (t1->TechLevel != t2->TechLevel)
-            return t1->TechLevel - t2->TechLevel;
-
-        if (t1->Cost_Of(PlayerPtr) != t2->Cost_Of(PlayerPtr))
-            return t1->Cost_Of(PlayerPtr) - t2->Cost_Of(PlayerPtr);
 
         return bt1->BuildableID - bt2->BuildableID;
     }
