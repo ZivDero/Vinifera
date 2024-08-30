@@ -81,7 +81,7 @@ public:
             FRAME_DISABLED,
 
             FLASH_TIME = 75,
-            FLASH_FRAME_COUNT = 13,
+            FLASH_FRAME_COUNT = 25,
             FLASH_FRAME_MIN = FRAME_DISABLED + 1,
             FLASH_FRAME_MAX = FLASH_FRAME_MIN + (FLASH_FRAME_COUNT - 1),
             FLASH_FRAME_START = FLASH_FRAME_MIN,

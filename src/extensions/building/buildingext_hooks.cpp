@@ -53,10 +53,13 @@
 #include "dsurface.h"
 #include "convert.h"
 #include "drawshape.h"
+#include "infantrytype.h"
 #include "rules.h"
 #include "rulesext.h"
 #include "scenario.h"
 #include "scenarioext.h"
+#include "sidebarext.h"
+#include "supertype.h"
 #include "terrain.h"
 #include "terraintype.h"
 #include "voc.h"
@@ -66,12 +69,9 @@
 #include "fatal.h"
 #include "asserthandler.h"
 #include "debughandler.h"
-#include "infantrytype.h"
-#include "supertype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
-#include "sidebarext.h"
 
 
 /**
@@ -133,17 +133,21 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
     auto bt1 = (SidebarClass::StripClass::BuildType*)p1;
     auto bt2 = (SidebarClass::StripClass::BuildType*)p2;
 
+    /**
+     *  If both are SWs, the one that recharges quicker goes first,
+     *  otherwise sort by ID.
+     */
+    if ((bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE) &&
+        (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE))
+    {
+        if (SuperWeaponTypes[bt1->BuildableID]->RechargeTime != SuperWeaponTypes[bt2->BuildableID]->RechargeTime)
+            return SuperWeaponTypes[bt1->BuildableID]->RechargeTime - SuperWeaponTypes[bt2->BuildableID]->RechargeTime;
+
+        return bt1->BuildableID - bt2->BuildableID;
+    }
+
     if (bt1->BuildableType == bt2->BuildableType)
     {
-        /**
-         *  If both are SWs, the one that recharges quicker goes first
-         */
-        if ((bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE) &&
-            (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE))
-        {
-            return (int)SuperWeaponTypes[bt1->BuildableID]->RechargeTime - (int)SuperWeaponTypes[bt1->BuildableID]->RechargeTime;
-        }
-
         const TechnoTypeClass* t1 = Fetch_Techno_Type(bt1->BuildableType, bt1->BuildableID);
         const TechnoTypeClass* t2 = Fetch_Techno_Type(bt2->BuildableType, bt2->BuildableID);
 
