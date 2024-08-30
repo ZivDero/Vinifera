@@ -26,43 +26,45 @@
  *
  ******************************************************************************/
 #include "sidebarext_hooks.h"
-#include "tibsun_globals.h"
-#include "sidebar.h"
-#include "technotype.h"
-#include "technotypeext.h"
-#include "supertype.h"
-#include "supertypeext.h"
-#include "spritecollection.h"
+
 #include "bsurface.h"
-#include "drawshape.h"
-#include "extension.h"
-#include "fatal.h"
-#include "asserthandler.h"
+#include "buildingtype.h"
 #include "convert.h"
-#include "debughandler.h"
+#include "drawshape.h"
+#include "event.h"
+#include "extension.h"
 #include "factory.h"
 #include "fetchres.h"
-#include "mouse.h"
-
-#include "hooker.h"
-#include "hooker_macros.h"
-#include "session.h"
-#include "tibsun_functions.h"
 #include "house.h"
 #include "language.h"
+#include "mouse.h"
 #include "playmovie.h"
 #include "rules.h"
+#include "scenarioext.h"
+#include "session.h"
+#include "sidebar.h"
 #include "sidebarext.h"
+#include "spritecollection.h"
 #include "super.h"
+#include "supertype.h"
+#include "supertypeext.h"
 #include "techno.h"
+#include "technotype.h"
+#include "technotypeext.h"
 #include "textprint.h"
+#include "tibsun_functions.h"
+#include "tibsun_globals.h"
+#include "tooltip.h"
+#include "unittypeext.h"
 #include "voc.h"
 #include "vox.h"
-#include "event.h"
-#include "tooltip.h"
-#include "scenarioext.h"
 #include "wwmouse.h"
 
+#include "debughandler.h"
+#include "fatal.h"
+#include "asserthandler.h"
+#include "hooker.h"
+#include "hooker_macros.h"
 
 /**
  *  A fake class for implementing new member functions which allow
@@ -375,6 +377,132 @@ bool SidebarClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int i
 
 
 /**
+ *  Comparison function for sorting sidebar icons (BuildTypes)
+ *
+ *  @author: Rampastring, ZivDero
+ */
+int __cdecl BuildType_Comparison(const void* p1, const void* p2)
+{
+    auto firstHouse = [](unsigned owners)
+        {
+            for (int i = 0; i < 32; i++)
+                if (owners & (1 << i))
+                    return i;
+
+            return -1;
+        };
+
+    auto isThisHouse = [](unsigned owners, HouseClass* house)
+        {
+            return (int)((bool)(owners & 1 << house->ActLike));
+        };
+
+
+    const auto bt1 = static_cast<const SidebarClass::StripClass::BuildType*>(p1);
+    const auto bt2 = static_cast<const SidebarClass::StripClass::BuildType*>(p2);
+
+    if (bt1->BuildableType == bt2->BuildableType)
+    {
+        /**
+         *  If both are SWs, the one that recharges quicker goes first,
+         *  otherwise sort by ID.
+         */
+        if (bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE)
+        {
+            if (SuperWeaponTypes[bt1->BuildableID]->RechargeTime != SuperWeaponTypes[bt2->BuildableID]->RechargeTime)
+                return SuperWeaponTypes[bt1->BuildableID]->RechargeTime - SuperWeaponTypes[bt2->BuildableID]->RechargeTime;
+
+            return bt1->BuildableID - bt2->BuildableID;
+        }
+
+
+        const TechnoTypeClass* t1 = Fetch_Techno_Type(bt1->BuildableType, bt1->BuildableID);
+        const TechnoTypeClass* t2 = Fetch_Techno_Type(bt2->BuildableType, bt2->BuildableID);
+
+        /**
+         *  If both are Buildings, non-defenses come first, then walls, then gates, then base defenses
+         */
+        if (bt1->BuildableType == RTTI_BUILDINGTYPE)
+        {
+            const auto b1 = static_cast<const BuildingTypeClass*>(t1), b2 = static_cast<const BuildingTypeClass*>(t2);
+
+            const auto ext1 = Extension::Fetch<TechnoTypeClassExtension>(t1);
+            const auto ext2 = Extension::Fetch<TechnoTypeClassExtension>(t2);
+
+            enum
+            {
+                BCAT_NORMAL,
+                BCAT_WALL,
+                BCAT_GATE,
+                BCAT_DEFENSE
+            };
+
+            int building_category1 = (b1->IsWall || b1->IsFirestormWall || b1->IsLaserFencePost || b1->IsLaserFence) ? BCAT_WALL : (b1->IsGate ? BCAT_GATE : (ext1->SortCameoAsBaseDefense ? BCAT_DEFENSE : BCAT_NORMAL));
+            int building_category2 = (b2->IsWall || b2->IsFirestormWall || b2->IsLaserFencePost || b2->IsLaserFence) ? BCAT_WALL : (b2->IsGate ? BCAT_GATE : (ext2->SortCameoAsBaseDefense ? BCAT_DEFENSE : BCAT_NORMAL));
+
+            // Compare based on category priority
+            if (building_category1 != building_category2)
+                return building_category1 - building_category2;
+        }
+
+        /**
+         *  If you own one of the buildings, but not another, yours comes first
+         */
+        int owner1 = isThisHouse(t1->Get_Ownable(), PlayerPtr), owner2 = isThisHouse(t2->Get_Ownable(), PlayerPtr);
+        if (owner1 != owner2)
+            return owner2 - owner1;
+
+        /**
+         *  If they are not of the same house, the one with the smaller house index comes first;
+         */
+        int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
+        if (house1 != house2)
+            return house1 - house2;
+
+        /**
+         *  If both are Units, non-naval units come first
+         */
+        if (bt1->BuildableType == RTTI_UNITTYPE)
+        {
+            const auto ext1 = Extension::Fetch<UnitTypeClassExtension>(t1);
+            const auto ext2 = Extension::Fetch<UnitTypeClassExtension>(t2);
+
+            if (ext1->IsNaval != ext2->IsNaval)
+                return (int)ext2->IsNaval - (int)ext1->IsNaval;
+        }
+
+        return bt1->BuildableID - bt2->BuildableID;
+    }
+
+    if (bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE)
+        return 1;
+
+    if (bt1->BuildableType == RTTI_INFANTRYTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_INFANTRYTYPE)
+        return 1;
+
+    if (bt1->BuildableType == RTTI_UNITTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_UNITTYPE)
+        return 1;
+
+    if (bt1->BuildableType == RTTI_AIRCRAFTTYPE)
+        return -1;
+
+    if (bt2->BuildableType == RTTI_AIRCRAFTTYPE)
+        return 1;
+
+    return bt1->BuildableID - bt2->BuildableID;
+}
+
+
+/**
  *  Reimplements the entire SidebarClass::Add function.
  *
  *  @author: ZivDero
@@ -383,16 +511,14 @@ bool SidebarClassFake::_Add(RTTIType type, int id)
 {
     if (!Debug_Map)
     {
-        SidebarClassExtension::SidebarTabType column = SidebarClassExtension::Which_Tab(type);
-
-        if (SidebarExtension->Column[column].Add(type, id))
+        if (SidebarExtension->Get_Tab(type).Add(type, id))
         {
             Activate(1);
             IsToRedraw = true;
             Flag_To_Redraw(false);
+            qsort(&SidebarExtension->Get_Tab(type).Buildables, SidebarExtension->Get_Tab(type).BuildableCount, sizeof(StripClass::BuildType), &BuildType_Comparison);
             return true;
         }
-        return false;
     }
 
     return false;

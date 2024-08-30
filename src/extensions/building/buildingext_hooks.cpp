@@ -35,7 +35,7 @@
 #include "building.h"
 #include "buildingtype.h"
 #include "buildingtypeext.h"
-#include "unit.h";
+#include "unit.h"
 #include "unitext.h"
 #include "unittypeext.h"
 #include "technotype.h"
@@ -56,10 +56,7 @@
 #include "infantrytype.h"
 #include "rules.h"
 #include "rulesext.h"
-#include "scenario.h"
-#include "scenarioext.h"
 #include "sidebarext.h"
-#include "supertype.h"
 #include "terrain.h"
 #include "terraintype.h"
 #include "voc.h"
@@ -106,131 +103,6 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
         return true;
 
     return false;
-}
-
-
-/**
- *  Comparison function for sorting sidebar icons (BuildTypes)
- *
- *  @author: Rampastring, ZivDero
- */
-int __cdecl BuildType_Comparison(const void* p1, const void* p2)
-{
-    auto firstHouse = [](unsigned owners)
-        {
-            for (int i = 0; i < 32; i++)
-                if (owners & (1 << i))
-                    return i;
-
-            return -1;
-        };
-
-    auto isThisHouse = [](unsigned owners, HouseClass* house)
-        {
-            return (int)((bool)(owners & 1 << house->ActLike));
-        };
-
-    auto bt1 = (SidebarClass::StripClass::BuildType*)p1;
-    auto bt2 = (SidebarClass::StripClass::BuildType*)p2;
-
-    /**
-     *  If both are SWs, the one that recharges quicker goes first,
-     *  otherwise sort by ID.
-     */
-    if ((bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE) &&
-        (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE))
-    {
-        if (SuperWeaponTypes[bt1->BuildableID]->RechargeTime != SuperWeaponTypes[bt2->BuildableID]->RechargeTime)
-            return SuperWeaponTypes[bt1->BuildableID]->RechargeTime - SuperWeaponTypes[bt2->BuildableID]->RechargeTime;
-
-        return bt1->BuildableID - bt2->BuildableID;
-    }
-
-    if (bt1->BuildableType == bt2->BuildableType)
-    {
-        const TechnoTypeClass* t1 = Fetch_Techno_Type(bt1->BuildableType, bt1->BuildableID);
-        const TechnoTypeClass* t2 = Fetch_Techno_Type(bt2->BuildableType, bt2->BuildableID);
-
-        /**
-         *  If both are Buildings, non-defenses come first, then walls, then gates, then base defenses
-         */
-        if (bt1->BuildableType == RTTI_BUILDINGTYPE && bt2->BuildableType == RTTI_BUILDINGTYPE)
-        {
-            auto b1 = (BuildingTypeClass*)t1, b2 = (BuildingTypeClass*)t2;
-
-            auto ext1 = Extension::Fetch<TechnoTypeClassExtension>(t1);
-            auto ext2 = Extension::Fetch<TechnoTypeClassExtension>(t2);
-
-            enum
-            {
-                BCAT_NORMAL,
-                BCAT_WALL,
-                BCAT_GATE,
-                BCAT_DEFENSE
-            };
-
-            int building_category1 = (b1->IsWall || b1->IsFirestormWall || b1->IsLaserFencePost || b1->IsLaserFence) ? BCAT_WALL : (b1->IsGate ? BCAT_GATE : (ext1->SortCameoAsBaseDefense ? BCAT_DEFENSE : BCAT_NORMAL));
-            int building_category2 = (b2->IsWall || b2->IsFirestormWall || b2->IsLaserFencePost || b2->IsLaserFence) ? BCAT_WALL : (b2->IsGate ? BCAT_GATE : (ext2->SortCameoAsBaseDefense ? BCAT_DEFENSE : BCAT_NORMAL));
-
-            // Compare based on category priority
-            if (building_category1 != building_category2)
-                return building_category1 - building_category2;
-        }
-
-        /**
-         *  If you own one of the buildings, but not another, yours comes first
-         */
-        int owner1 = isThisHouse(t1->Get_Ownable(), PlayerPtr), owner2 = isThisHouse(t2->Get_Ownable(), PlayerPtr);
-        if (owner1 != owner2)
-            return owner2 - owner1;
-
-        /**
-         *  If they are not of the same house, the one with the smaller house index comes first;
-         */
-        int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
-        if (house1 != house2)
-            return house1 - house2;
-
-        /**
-         *  If both are Units, non-naval units come first
-         */
-        if (bt1->BuildableType == RTTI_UNITTYPE && bt2->BuildableType == RTTI_UNITTYPE)
-        {
-            auto ext1 = Extension::Fetch<UnitTypeClassExtension>(t1);
-            auto ext2 = Extension::Fetch<UnitTypeClassExtension>(t2);
-
-            if (ext1->IsNaval != ext2->IsNaval)
-                return (int)ext2->IsNaval - (int)ext1->IsNaval;
-        }
-
-        return bt1->BuildableID - bt2->BuildableID;
-    }
-
-    if (bt1->BuildableType == RTTI_SPECIAL || bt1->BuildableType == RTTI_SUPERWEAPONTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_SPECIAL || bt2->BuildableType == RTTI_SUPERWEAPONTYPE)
-        return 1;
-
-    if (bt1->BuildableType == RTTI_INFANTRYTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_INFANTRYTYPE)
-        return 1;
-
-    if (bt1->BuildableType == RTTI_UNITTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_UNITTYPE)
-        return 1;
-
-    if (bt1->BuildableType == RTTI_AIRCRAFTTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_AIRCRAFTTYPE)
-        return 1;
-
-    return bt1->BuildableID - bt2->BuildableID;
 }
 
 
@@ -291,8 +163,6 @@ void BuildingClassFake::_Update_Buildables()
         default:
             break;
         }
-
-        qsort(&SidebarExtension->Get_Tab(Class->ToBuild).Buildables, SidebarExtension->Get_Tab(Class->ToBuild).BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
     }
 }
 
