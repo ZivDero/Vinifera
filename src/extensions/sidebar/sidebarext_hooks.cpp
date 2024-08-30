@@ -453,11 +453,17 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
             return owner2 - owner1;
 
         /**
-         *  If they are not of the same house, the one with the smaller house index comes first;
+         *  If your house is not among the owners of both of the buildings, sort by the smaller owner
+         *  house index (but your house still takes precendence).
+         *  In other words, either your house is among the owners of both of them (sort further),
+         *  or neither (sort by house index).
          */
-        int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
-        if (house1 != house2)
-            return house1 - house2;
+        if (!owner1 && !owner2)
+        {
+            int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
+            if (house1 != house2)
+                return house1 - house2;
+        }
 
         /**
          *  If both are Units, non-naval units come first
