@@ -1467,7 +1467,7 @@ void StripClassFake::_Draw_It(bool complete)
 
                     name = SuperWeaponTypes[spc]->FullName;
                     shapefile = Get_Special_Cameo(spc);
-                    auto supertypeext = Extension::Fetch<SuperWeaponTypeClassExtension>(PlayerPtr->SuperWeapon[spc]);
+                    auto supertypeext = Extension::Fetch<SuperWeaponTypeClassExtension>(PlayerPtr->SuperWeapon[spc]->Class);
                     if (supertypeext->CameoImageSurface != nullptr)
                         image_surface = supertypeext->CameoImageSurface;
 
