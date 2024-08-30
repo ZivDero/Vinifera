@@ -76,10 +76,16 @@ public:
     private:
         enum
         {
-            FLASH_FRAME_COUNT = 5,
-            FLASH_FRAME_MIN = 3,
+            FRAME_NORMAL,
+            FRAME_SELECTED,
+            FRAME_DISABLED,
+
+            FLASH_TIME = 120,
+            FLASH_FRAME_COUNT = 13,
+            FLASH_FRAME_MIN = FRAME_DISABLED + 1,
             FLASH_FRAME_MAX = FLASH_FRAME_MIN + (FLASH_FRAME_COUNT - 1),
-            FLASH_RATE = 90 / (FLASH_FRAME_COUNT * 2) // Roughly one cycle per second
+            FLASH_FRAME_START = FLASH_FRAME_MIN + FLASH_FRAME_COUNT / 2,
+            FLASH_RATE = FLASH_TIME / (FLASH_FRAME_COUNT * 2)
         };
 
     public:

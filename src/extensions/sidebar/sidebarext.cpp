@@ -545,12 +545,12 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     // A disabled tab always looks darkened
     if (IsDisabled)
     {
-        shapenum = 2;
+        shapenum = FRAME_DISABLED;
     }
     // Selected
     else if (IsSelected)
     {
-        shapenum = 1;
+        shapenum = FRAME_SELECTED;
     }
     else if (IsFlashing)
     {
@@ -569,7 +569,7 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     else
     {
         // Just the normal unselected tab
-        shapenum = 0;
+        shapenum = FRAME_NORMAL;
     }
 
     CC_Draw_Shape(SidebarSurface, ShapeDrawer, ShapeData, shapenum, &Point2D(X + DrawX, Y + DrawY), &ScreenRect, SHAPE_NORMAL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0);
@@ -611,7 +611,7 @@ void SidebarClassExtension::TabButtonClass::Start_Flashing()
     FlashTimer.Start();
     FlashTimer = FLASH_RATE;
     FlashDirection = true;
-    FlashFrame = FLASH_FRAME_MIN + FLASH_FRAME_COUNT / 2;
+    FlashFrame = FLASH_FRAME_START;
 }
 
 
@@ -625,7 +625,7 @@ void SidebarClassExtension::TabButtonClass::Stop_Flashing()
     IsFlashing = false;
     FlashTimer.Stop();
     FlashDirection = true;
-    FlashFrame = FLASH_FRAME_MIN + FLASH_FRAME_COUNT / 2;
+    FlashFrame = FLASH_FRAME_START;
 }
 
 
