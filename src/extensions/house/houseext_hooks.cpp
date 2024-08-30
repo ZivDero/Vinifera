@@ -1802,7 +1802,7 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
     /*
     **	If we're just dequeuing a unit, redraw the strip.
     */
-    if (fptr->Queued_Object_Count() > 0 && id > 0)
+    if (fptr->Queued_Object_Count() > 0 && id >= 0)
     {
         const TechnoTypeClass* technotype = Fetch_Techno_Type(type, id);
         if (fptr->Remove_From_Queue(*technotype))
