@@ -145,7 +145,6 @@ public:
 
     public:
         bool MousedOver = false;
-
         static ViniferaSelectClass* LastHovered;
     };
 

@@ -1676,7 +1676,7 @@ bool HouseClassFake::_Begin_Production_Additional_Checks(const TechnoTypeClass* 
  */
 ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resume)
 {
-    bool result = false;
+    bool has_suspended = false;
     bool suspend = false;
     FactoryClass* fptr;
     TechnoTypeClass const* tech = Fetch_Techno_Type(type, id);
@@ -1728,13 +1728,13 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
         ObjectClass* obj = fptr->Get_Object();
         if (obj != nullptr && obj->Techno_Type_Class() == tech)
         {
-            result = true;
+            has_suspended = true;
         }
     }
 
-    if (result || fptr->Set(*tech, *this, resume))
+    if (has_suspended || fptr->Set(*tech, *this, resume))
     {
-        if (fptr->Queued_Object_Count() == 0 || resume)
+        if (has_suspended || resume || fptr->Queued_Object_Count() == 0)
         {
             fptr->Start(suspend);
 
@@ -1747,9 +1747,11 @@ ProdFailType HouseClassFake::_Begin_Production(RTTIType type, int id, bool resum
 
             return PROD_OK;
         }
-
-        SidebarExtension->Get_Tab(type).Flag_To_Redraw();
-        return PROD_OK;
+        else
+        {
+            SidebarExtension->Get_Tab(type).Flag_To_Redraw();
+            return PROD_OK;
+        }
     }
 
     DEBUG_INFO("Request to Begin_Production of '%s' was rejected. Factory was unable to create the requested object\n", tech->Full_Name());
