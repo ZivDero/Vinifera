@@ -408,7 +408,6 @@ ShapeDrawer(CameoDrawer),
 ShapeData(nullptr),
 IsFlashing(false),
 FlashTimer(0),
-FlashDirection(true),
 FlashFrame(0),
 IsSelected(false),
 IsDrawn(false)
@@ -429,7 +428,6 @@ ShapeDrawer(drawer),
 ShapeData(shapes),
 IsFlashing(false),
 FlashTimer(0),
-FlashDirection(true),
 FlashFrame(0),
 IsSelected(false),
 IsDrawn(false)
@@ -556,11 +554,12 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     {
         if (FlashTimer.Expired())
         {
-            // If we're at the edge of flashing frames, reverse
-            if (FlashFrame == FLASH_FRAME_MIN || FlashFrame == FLASH_FRAME_MAX)
-                FlashDirection = !FlashDirection;
+            // If we're at the edge of flashing frames, restart
+            if (FlashFrame == FLASH_FRAME_MAX)
+                FlashFrame = FLASH_FRAME_MIN;
+            else
+                FlashFrame++;
 
-            FlashFrame += FlashDirection ? 1 : -1;
             FlashTimer = FLASH_RATE;
         }
 
@@ -610,7 +609,6 @@ void SidebarClassExtension::TabButtonClass::Start_Flashing()
     IsFlashing = true;
     FlashTimer.Start();
     FlashTimer = FLASH_RATE;
-    FlashDirection = true;
     FlashFrame = FLASH_FRAME_START;
 }
 
@@ -624,7 +622,6 @@ void SidebarClassExtension::TabButtonClass::Stop_Flashing()
 {
     IsFlashing = false;
     FlashTimer.Stop();
-    FlashDirection = true;
     FlashFrame = FLASH_FRAME_START;
 }
 

@@ -80,17 +80,17 @@ public:
             FRAME_SELECTED,
             FRAME_DISABLED,
 
-            FLASH_TIME = 120,
+            FLASH_TIME = 75,
             FLASH_FRAME_COUNT = 13,
             FLASH_FRAME_MIN = FRAME_DISABLED + 1,
             FLASH_FRAME_MAX = FLASH_FRAME_MIN + (FLASH_FRAME_COUNT - 1),
-            FLASH_FRAME_START = FLASH_FRAME_MIN + FLASH_FRAME_COUNT / 2,
-            FLASH_RATE = FLASH_TIME / (FLASH_FRAME_COUNT * 2)
+            FLASH_FRAME_START = FLASH_FRAME_MIN,
+            FLASH_RATE = FLASH_TIME / FLASH_FRAME_COUNT
         };
 
     public:
         TabButtonClass();
-        TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer = CameoDrawer, int w = 0, int h = 0);
+        TabButtonClass(unsigned id, const ShapeFileStruct* shapes, int x, int y, ConvertClass* drawer = SidebarDrawer, int w = 0, int h = 0);
         virtual ~TabButtonClass() override = default;
 
         virtual bool Action(unsigned flags, KeyNumType& key) override;
@@ -119,7 +119,6 @@ public:
          */
         bool IsFlashing;
         CDTimerClass<SystemTimerClass> FlashTimer;
-        bool FlashDirection;
         int FlashFrame;
 
         /**
