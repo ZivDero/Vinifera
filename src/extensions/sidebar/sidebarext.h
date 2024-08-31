@@ -4,9 +4,9 @@
  *
  *  @project       Vinifera
  *
- *  @file          SCENARIOEXT.H
+ *  @file          SIDEBAREXT.H
  *
- *  @author        CCHyper
+ *  @author        ZivDero
  *
  *  @brief         Extended SidebarClass class.
  *

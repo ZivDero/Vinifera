@@ -4,7 +4,7 @@
  *
  *  @project       Vinifera
  *
- *  @file          SidebarEXT.CPP
+ *  @file          SIDEBAREXT.CPP
  *
  *  @author        ZivDero
  *
