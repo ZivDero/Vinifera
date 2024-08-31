@@ -34,6 +34,7 @@
 
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "commandext.h"
 #include "extension_globals.h"
 #include "sidebarext.h"
 
@@ -64,8 +65,8 @@ void EventClassFake::_Remember_Last_Building(int house, EventType eventtype, RTT
 {
     if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
     {
-        SidebarExtension->LastBuildingRTTI = type;
-        SidebarExtension->LastBuildingHeapID = id;
+        RepeatStructureCommandClass::LastRTTI = type;
+        RepeatStructureCommandClass::LastHeapID = id;
     }
 
     new (this) EventClass(house, eventtype, type, id);

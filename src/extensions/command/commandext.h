@@ -402,6 +402,9 @@ public:
     virtual bool Process() override;
 
     virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Q | VK_CONTROL); }
+
+    static RTTIType LastRTTI;
+    static int LastHeapID;
 };
 
 

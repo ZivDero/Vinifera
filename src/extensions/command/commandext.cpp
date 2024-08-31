@@ -902,6 +902,10 @@ bool SetSpecialTabCommandClass::Process()
  *
  *  @author: ZivDero
  */
+
+RTTIType RepeatStructureCommandClass::LastRTTI = RTTI_NONE;
+int RepeatStructureCommandClass::LastHeapID = 0;
+
 const char* RepeatStructureCommandClass::Get_Name() const
 {
     return "RepeatStructure";
@@ -924,15 +928,15 @@ const char* RepeatStructureCommandClass::Get_Description() const
 
 bool RepeatStructureCommandClass::Process()
 {
-    if (SidebarExtension->LastBuildingRTTI)
+    if (LastRTTI)
     {
         for (int i = 0; i < SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).BuildableCount; i++)
         {
             SidebarClass::StripClass::BuildType& buildtype = SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).Buildables[i];
-            if (buildtype.BuildableType == SidebarExtension->LastBuildingRTTI &&
-                buildtype.BuildableID == SidebarExtension->LastBuildingHeapID)
+            if (buildtype.BuildableType == LastRTTI &&
+                buildtype.BuildableID == LastHeapID)
             {
-                OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, SidebarExtension->LastBuildingRTTI, SidebarExtension->LastBuildingHeapID));
+                OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, LastRTTI, LastHeapID));
                 return true;
             }
         }

@@ -170,7 +170,7 @@ class TechnoTypeClassExtension : public ObjectTypeClassExtension
         long ForbiddenHouses;
 
         /**
-         *  Should this be considered a base defense when sorting cameos on the sidebar?.
+         *  Should this be considered a base defense when sorting cameos on the sidebar?
          */
         bool SortCameoAsBaseDefense;
 
