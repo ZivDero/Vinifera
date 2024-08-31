@@ -393,7 +393,7 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
             return -1;
         };
 
-    auto isThisHouse = [](unsigned owners, HouseClass* house)
+    auto houseOwns = [](unsigned owners, HouseClass* house)
         {
             return (int)((bool)(owners & 1 << house->ActLike));
         };
@@ -447,17 +447,14 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
         }
 
         /**
-         *  If you own one of the buildings, but not another, yours comes first
+         *  If you own one of the objects, but not another, yours comes first
          */
-        int owner1 = isThisHouse(t1->Get_Ownable(), PlayerPtr), owner2 = isThisHouse(t2->Get_Ownable(), PlayerPtr);
+        int owner1 = houseOwns(t1->Get_Ownable(), PlayerPtr), owner2 = houseOwns(t2->Get_Ownable(), PlayerPtr);
         if (owner1 != owner2)
             return owner2 - owner1;
 
         /**
-         *  If your house is not among the owners of both of the buildings, sort by the smaller owner
-         *  house index (but your house still takes precendence).
-         *  In other words, either your house is among the owners of both of them (sort further),
-         *  or neither (sort by house index).
+         *  If you don't own either of the objects, then sort by house index
          */
         if (!owner1 && !owner2)
         {
