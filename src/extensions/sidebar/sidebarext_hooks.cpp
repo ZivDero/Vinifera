@@ -119,6 +119,8 @@ public:
     void _Draw_It(bool complete);
     bool _Factory_Link(FactoryClass* factory, RTTIType type, int id);
     void _Tab_Button_AI();
+    void _Fake_Flag_To_Redraw_Special();
+    void _Fake_Flag_To_Redraw_Current();
 };
 
 
@@ -922,8 +924,9 @@ bool SidebarClassFake::_Abandon_Production(RTTIType type, FactoryClass* factory)
 void SidebarClassFake::_entry_84()
 {
     /*
-    **  Load the sidebar itself.
+    **  Position the sidebar itself.
     */
+
     SidebarRect.X = Options.SidebarOn ? TacticalRect.X + TacticalRect.Width : 0;
     SidebarRect.Y = 148;
     SidebarRect.Width = 168;
@@ -966,6 +969,7 @@ void SidebarClassFake::_entry_84()
     /*
     **  Create the tooltips for the sidebar.
     */
+
     if (ToolTipHandler)
     {
         ToolTip tooltip;
@@ -1859,6 +1863,28 @@ void StripClassFake::_Tab_Button_AI()
 
 
 /**
+ *  Fake function to patch calls to redraw a specific vanilla strip.
+ *
+ *  @author: ZivDero
+ */
+void StripClassFake::_Fake_Flag_To_Redraw_Special()
+{
+    SidebarExtension->Get_Tab(RTTI_SPECIAL).Flag_To_Redraw();
+}
+
+
+/**
+ *  Fake function to patch calls to redraw a specific vanilla strip.
+ *
+ *  @author: ZivDero
+ */
+void StripClassFake::_Fake_Flag_To_Redraw_Current()
+{
+    SidebarExtension->Current_Tab().Flag_To_Redraw();
+}
+
+
+/**
  *  Patch in GadgetClass::Input to handle hover effects for SelectClass.
  *
  *  @author: ZivDero
@@ -1987,6 +2013,21 @@ void SidebarClassExtension_Hooks()
     Patch_Jump(0x004A9F0F, _GadgetClass_Input_Mouse_Enter_Leave);
     Patch_Jump(0x005AB4CF, _PowerClass_Draw_It_Move_Power_Bar);
     Patch_Jump(0x005F5C01, _SelectClass_Action_Redraw_Column);
+
+    // There are a bunch of calls to vanilla strips to redraw them.
+    // We patch them to either redraw the supers' strip or the current strip
+    Patch_Call(0x00458ADB, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+    Patch_Call(0x004BD32D, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+    Patch_Call(0x004CB585, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+    Patch_Call(0x004CB6F8, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+    Patch_Call(0x00619F9A, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+    Patch_Call(0x0061C09C, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+    Patch_Call(0x0061C0FD, &StripClassFake::_Fake_Flag_To_Redraw_Special);
+
+    Patch_Call(0x004BD1E0, &StripClassFake::_Fake_Flag_To_Redraw_Current);
+    Patch_Call(0x004BD1EA, &StripClassFake::_Fake_Flag_To_Redraw_Current);
+    Patch_Call(0x004C9859, &StripClassFake::_Fake_Flag_To_Redraw_Current);
+    Patch_Call(0x004C9863, &StripClassFake::_Fake_Flag_To_Redraw_Current);
     
     // NOP away tooltip length check for formatting
     Patch_Byte(0x0044E486, 0x90);
