@@ -65,6 +65,7 @@
 #include "asserthandler.h"
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "optionsext.h"
 
 /**
  *  A fake class for implementing new member functions which allow
@@ -420,7 +421,7 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
         /**
          *  If both are Buildings, non-defenses come first, then walls, then gates, then base defenses
          */
-        if (bt1->BuildableType == RTTI_BUILDINGTYPE)
+        if (bt1->BuildableType == RTTI_BUILDINGTYPE && OptionsExtension->SortDefensesAsLast)
         {
             const auto b1 = static_cast<const BuildingTypeClass*>(t1), b2 = static_cast<const BuildingTypeClass*>(t2);
 

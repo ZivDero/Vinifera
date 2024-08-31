@@ -43,7 +43,9 @@
  */
 OptionsClassExtension::OptionsClassExtension(const OptionsClass *this_ptr) :
     GlobalExtensionClass(this_ptr),
-    FilterBandBoxSelection(true)
+    FilterBandBoxSelection(true),
+    IsClassicMessagePosition(false),
+    SortDefensesAsLast(true)
 {
     //EXT_DEBUG_TRACE("OptionsClassExtension::OptionsClassExtension - 0x%08X\n", (uintptr_t)(This()));
 }
@@ -164,10 +166,11 @@ void OptionsClassExtension::Load_Settings()
 
         FilterBandBoxSelection = sun_ini.Get_Bool("Options", "FilterBandBoxSelection", FilterBandBoxSelection);
         IsClassicMessagePosition = sun_ini.Get_Bool("Options", "ClassicMessageListPosition", IsClassicMessagePosition);
+        SortDefensesAsLast = sun_ini.Get_Bool("Options", "SortDefensesAsLast", SortDefensesAsLast);
     }
 
     /**
-     *  Read hardcoded modifier keys from Kerboyard.ini.
+     *  Read hardcoded modifier keys from Keyboard.ini.
      *
      *  @author: ZivDero
      */
@@ -217,7 +220,7 @@ void OptionsClassExtension::Save_Settings()
     RawFileClass file("Settings.ini");
 
     /**
-     *  Save hardcoded modifier keys to Kerboyard.ini.
+     *  Save hardcoded modifier keys to Keyboard.ini.
      *
      *  @author: ZivDero
      */
