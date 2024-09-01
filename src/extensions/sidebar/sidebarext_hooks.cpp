@@ -385,7 +385,7 @@ bool SidebarClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int i
  */
 int __cdecl BuildType_Comparison(const void* p1, const void* p2)
 {
-    auto firstSide = [](unsigned owners)
+    auto firstSide = [](unsigned owners) -> int
         {
             int side = INT_MAX;
 
@@ -401,7 +401,7 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
             return side != INT_MAX ? side : SIDE_NONE;
         };
 
-    auto isSideOwner = [](const HouseClass* house, unsigned owners)
+    auto isSideOwner = [](const HouseClass* house, unsigned owners) -> int
         {
             // The house owns the object directly
             if (owners & 1 << house->ActLike)
@@ -468,7 +468,9 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
         /**
          *  If your side owns one of the objects, but not another, yours comes first
          */
-        int owner1 = isSideOwner(PlayerPtr, t1->Get_Ownable()), owner2 = isSideOwner(PlayerPtr, t2->Get_Ownable());
+        const int owner1 = isSideOwner(PlayerPtr, t1->Get_Ownable()),
+                  owner2 = isSideOwner(PlayerPtr, t2->Get_Ownable());
+
         if (owner1 != owner2)
             return owner2 - owner1;
 
@@ -477,7 +479,9 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
          */
         if (!owner1 && !owner2)
         {
-            int house1 = firstSide(t1->Get_Ownable()), house2 = firstSide(t2->Get_Ownable());
+            const int house1 = firstSide(t1->Get_Ownable()),
+                      house2 = firstSide(t2->Get_Ownable());
+
             if (house1 != house2)
                 return house1 - house2;
         }
