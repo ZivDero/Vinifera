@@ -36,6 +36,7 @@
 #include "factory.h"
 #include "fetchres.h"
 #include "house.h"
+#include "housetype.h"
 #include "language.h"
 #include "mouse.h"
 #include "playmovie.h"
@@ -384,18 +385,36 @@ bool SidebarClassFake::_Factory_Link(FactoryClass* factory, RTTIType type, int i
  */
 int __cdecl BuildType_Comparison(const void* p1, const void* p2)
 {
-    auto firstHouse = [](unsigned owners)
+    auto firstSide = [](unsigned owners)
         {
-            for (int i = 0; i < 32; i++)
-                if (owners & (1 << i))
-                    return i;
+            int side = INT_MAX;
 
-            return -1;
+            for (int i = 0; i < HouseTypes.Count(); i++)
+            {
+                if (owners & (1 << i))
+                {
+                    if (HouseTypes[i]->Side < side)
+                        side = HouseTypes[i]->Side;
+                }
+            }
+
+            return side != INT_MAX ? side : SIDE_NONE;
         };
 
-    auto houseOwns = [](unsigned owners, HouseClass* house)
+    auto isSideOwner = [](const HouseClass* house, unsigned owners)
         {
-            return (int)((bool)(owners & 1 << house->ActLike));
+            // The house owns the object directly
+            if (owners & 1 << house->ActLike)
+                return true;
+
+            const SideType side = house->Class->Side;
+            for (int i = 0; i < HouseTypes.Count(); i++)
+            {
+                if ((owners & 1 << i) && HouseTypes[i]->Side == side)
+                    return true;
+            }
+
+            return false;
         };
 
 
@@ -447,18 +466,18 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
         }
 
         /**
-         *  If you own one of the objects, but not another, yours comes first
+         *  If your side owns one of the objects, but not another, yours comes first
          */
-        int owner1 = houseOwns(t1->Get_Ownable(), PlayerPtr), owner2 = houseOwns(t2->Get_Ownable(), PlayerPtr);
+        int owner1 = isSideOwner(PlayerPtr, t1->Get_Ownable()), owner2 = isSideOwner(PlayerPtr, t2->Get_Ownable());
         if (owner1 != owner2)
             return owner2 - owner1;
 
         /**
-         *  If you don't own either of the objects, then sort by house index
+         *  If you don't own either of the objects, then sort by side index
          */
         if (!owner1 && !owner2)
         {
-            int house1 = firstHouse(t1->Get_Ownable()), house2 = firstHouse(t2->Get_Ownable());
+            int house1 = firstSide(t1->Get_Ownable()), house2 = firstSide(t2->Get_Ownable());
             if (house1 != house2)
                 return house1 - house2;
         }
