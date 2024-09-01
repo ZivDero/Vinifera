@@ -1858,7 +1858,7 @@ ProdFailType HouseClassFake::_Abandon_Production(RTTIType type, int id)
 /**
  *  Adds a check to Can_Build to check for RequiredHouses and ForbiddenHouses
  *
- *  Author: ZivDero
+ *  @author: ZivDero
  */
 DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
 {
@@ -1893,6 +1893,31 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
 
 
 /**
+ *  Patch FreeRadar to work when low power
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_HouseClass_Radar_Outage_Free_Radar_Low_Power)
+{
+    GET_REGISTER_STATIC(HouseClass*, this_ptr, esi);
+
+    // If we have a free radar, don't check if we are low power
+    if (Scen->IsFreeRadar)
+    {
+        JMP(0x004C966A);
+    }
+
+    // Stolen instructions
+    if (this_ptr->Power >= this_ptr->Drain)
+    {
+        JMP(0x004C95B5);
+    }
+
+    JMP(0x004C966F);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void HouseClassExtension_Hooks()
@@ -1917,4 +1942,5 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004BE6A0, &HouseClassFake::_Abandon_Production);
     Patch_Jump(0x004BC023, 0x004BC102); // Skip checking the owner of the MCV when building buildings in HouseClass::Can_Build
     // Patch_Jump(0x004C10E8, &_HouseClass_AI_Building_Intercept);
+    Patch_Jump(0x004C958D, &_HouseClass_Radar_Outage_Free_Radar_Low_Power);
 }
