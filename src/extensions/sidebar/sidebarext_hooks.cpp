@@ -468,22 +468,22 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
         /**
          *  If your side owns one of the objects, but not another, yours comes first
          */
-        const int owner1 = isSideOwner(PlayerPtr, t1->Get_Ownable()),
-                  owner2 = isSideOwner(PlayerPtr, t2->Get_Ownable());
+        const int owns1 = isSideOwner(PlayerPtr, t1->Get_Ownable()),
+                  owns2 = isSideOwner(PlayerPtr, t2->Get_Ownable());
 
-        if (owner1 != owner2)
-            return owner2 - owner1;
+        if (owns1 != owns2)
+            return owns2 - owns1;
 
         /**
          *  If you don't own either of the objects, then sort by side index
          */
-        if (!owner1 && !owner2)
+        if (!owns1 && !owns2)
         {
-            const int house1 = firstSide(t1->Get_Ownable()),
-                      house2 = firstSide(t2->Get_Ownable());
+            const int side1 = firstSide(t1->Get_Ownable()),
+                      side2 = firstSide(t2->Get_Ownable());
 
-            if (house1 != house2)
-                return house1 - house2;
+            if (side1 != side2)
+                return side1 - side2;
         }
 
         /**
