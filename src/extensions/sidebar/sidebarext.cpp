@@ -404,7 +404,7 @@ SidebarClassExtension::TabButtonClass::TabButtonClass() :
 ControlClass(0, 0, 0, 0, 0, LEFTPRESS | LEFTRELEASE, true),
 DrawX(0),
 DrawY(0),
-ShapeDrawer(CameoDrawer),
+ShapeDrawer(SidebarDrawer),
 ShapeData(nullptr),
 IsFlashing(false),
 FlashTimer(0),
