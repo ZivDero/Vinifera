@@ -460,8 +460,7 @@ bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& k
     Sticky_Process(flags);
 
     /*
-    **	Flag the button to show the pressed down imagery if this mouse button
-    **	was pressed over this gadget.
+    **	Pass the mouse press.
     */
     if (flags & LEFTPRESS)
     {
@@ -471,6 +470,9 @@ bool SidebarClassExtension::TabButtonClass::Action(unsigned flags, KeyNumType& k
         return true;		                // stop processing other buttons now
     }
 
+    /*
+    **	Act on mouse release.
+    */
     if (flags & LEFTRELEASE)
     {
         bool overbutton = (WWMouse->Get_Mouse_X() - X) < Width && (WWMouse->Get_Mouse_Y() - Y) < Height;
