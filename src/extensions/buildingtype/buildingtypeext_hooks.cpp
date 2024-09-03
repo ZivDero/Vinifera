@@ -45,7 +45,7 @@
  *  @note: This must not contain a constructor or destructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-class BuildingTypeClassExt final : public BuildingTypeClass
+class BuildingTypeClassFake final : public BuildingTypeClass
 {
     public:
         void _Free_Buildup_Image();
@@ -59,7 +59,7 @@ class BuildingTypeClassExt final : public BuildingTypeClass
  *
  *  @author: CCHyper
  */
-void BuildingTypeClassExt::_Free_Buildup_Image()
+void BuildingTypeClassFake::_Free_Buildup_Image()
 {
     if (IsFreeBuildup && BuildupData) {
         DEV_DEBUG_WARNING("Freeing loaded buildup image for %s\n", Name());
@@ -222,7 +222,7 @@ void BuildingTypeClassExtension_Hooks()
 
     //Patch_Jump(0x00440365, &_BuildingTypeClass_Get_Image_Data_Assertion_Patch);
 
-    Patch_Jump(0x00443CF0, &BuildingTypeClassExt::_Free_Buildup_Image);
+    Patch_Jump(0x00443CF0, &BuildingTypeClassFake::_Free_Buildup_Image);
 
     Patch_Jump(0x0044403B, &_BuildingTypeClass_SDDTOR_Free_Image_Patch);
     Patch_Jump(0x0043FD83, &_BuildingTypeClass_Init_Free_Image_Patch);

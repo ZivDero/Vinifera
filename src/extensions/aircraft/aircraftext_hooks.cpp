@@ -484,7 +484,6 @@ void AircraftClassExtension_Hooks()
     Patch_Jump(0x0040C054, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_OK_Patch);
     Patch_Jump(0x0040BF9D, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_FACING_Patch);
     Patch_Jump(0x0040C0AC, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_DEFAULT_Patch);
-    Patch_Jump(0x0040917A, &_AircraftClass_AI_Spawned_Return_To_Owner_Patch);
     Patch_Jump(0x0040917A, &_AircraftClass_AI_Hook_Patch);
     Patch_Jump(0x00409910, &AircraftClassFake::_Mission_Retreat);
 

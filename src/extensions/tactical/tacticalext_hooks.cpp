@@ -302,7 +302,6 @@ DECLARE_PATCH(_Tactical_Render_Overlay_Patch)
      *  Various developer only debugging.
      */
     //Tactical_Debug_Draw_Facings();
-#endif
 
     /**
      *  Draw the version number on screen for non-release builds.

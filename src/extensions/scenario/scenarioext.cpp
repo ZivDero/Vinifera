@@ -212,6 +212,9 @@ bool ScenarioClassExtension::Read_INI(CCINIClass &ini)
     static const char * const BASIC = "Basic";
 
     IsIceDestruction = ini.Get_Bool(BASIC, "IceDestructionEnabled", IsIceDestruction);
+    ScorePlayerColor = ini.Get_RGB(BASIC, "ScorePlayerColor", ScorePlayerColor);
+    ScoreEnemyColor = ini.Get_RGB(BASIC, "ScoreEnemyColor", ScoreEnemyColor);
+    ini.Get_String(BASIC, "UIColorName", UIColorOverrideName, std::size(UIColorOverrideName));
 
     /**
      *  #issue-123

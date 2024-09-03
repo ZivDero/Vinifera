@@ -521,10 +521,10 @@ bool Vinifera_Prep_For_Side(SideType side)
         SideMixFiles.Delete(i);
     }
 
-    if (Addon_Enabled(ADDON_ANY) == ADDON_FIRESTORM) {
+    //if (Addon_Enabled(ADDON_ANY) == ADDON_FIRESTORM) {
 
-        for (int i = 99; i >= 0; --i) {
-            std::snprintf(buffer, sizeof(buffer), "E%02dSC%02d.MIX", i, sidenum);
+    //    for (int i = 99; i >= 0; --i) {
+            std::snprintf(buffer, sizeof(buffer), "SIDECD%02d.MIX", sidenum);
             if (CCFileClass(buffer).Is_Available()) {
                 mix = new MFCC(buffer, &FastKey);
                 ASSERT(mix);
@@ -539,9 +539,9 @@ bool Vinifera_Prep_For_Side(SideType side)
                 ExpansionMixFiles.Add(mix);
                 DEBUG_INFO(" %s\n", buffer);
             }
-        }
+    //    }
 
-    }
+    //}
 
     std::snprintf(buffer, sizeof(buffer), "SIDEC%02d.MIX", sidenum);
     if (CCFileClass(buffer).Is_Available()) {
@@ -571,7 +571,8 @@ bool Vinifera_Prep_For_Side(SideType side)
 
     if (Session.Type == GAME_NORMAL) {
         if (Addon_Enabled(ADDON_ANY) == ADDON_FIRESTORM) {
-            std::snprintf(buffer, sizeof(buffer), "E%02dSCD%02d.MIX", Get_Required_Addon(), sidenum);
+            // Ported over ts-patches hack to load SIDECD%02d.MIX instead of E%02dSC%02d.mix
+            std::snprintf(buffer, sizeof(buffer), "SIDECD%02d.MIX", sidenum);
         } else {
             std::snprintf(buffer, sizeof(buffer), "SIDECD%02d.MIX", sidenum);
         }

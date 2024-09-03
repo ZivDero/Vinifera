@@ -923,7 +923,7 @@ int _UnitClass_Try_To_Deploy_Transform_To_Vehicle_Patch_Func(UnitClass* this_ptr
         }
 
         this_ptr->Mark(MARK_UP);
-        this_ptr->Locomotor_Ptr()->Mark_All_Occupation_Bits(0);
+        this_ptr->Locomotor_Ptr()->Mark_All_Occupation_Bits(MARK_UP);
 
         UnitClass* newunit = Create_Transform_Unit(this_ptr);
 
