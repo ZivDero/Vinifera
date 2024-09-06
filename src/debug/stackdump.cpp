@@ -29,7 +29,10 @@
 #include "debughlp.h"
 #include <Windows.h>
 #include <eh.h>
- 
+#include <cstring>
+#include <cstdio>
+#include <stdlib.h>
+
 
 #define PRIPTRSIZE "08"
 
