@@ -243,7 +243,7 @@ void SidebarClassExtension::Init_IO()
 
 
 /**
- *  Positions the new sidebar buttons and create their tooltips.
+ *  Positions the new sidebar buttons and creates their tooltips.
  *
  *  @author: ZivDero
  */
@@ -547,7 +547,6 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     {
         shapenum = FRAME_DISABLED;
     }
-    // Selected
     else if (IsSelected)
     {
         shapenum = FRAME_SELECTED;

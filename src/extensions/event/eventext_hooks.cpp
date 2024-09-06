@@ -42,37 +42,6 @@
 #include "hooker_macros.h"
 
 
- /**
-  *  A fake class for implementing new member functions which allow
-  *  access to the "this" pointer of the intended class.
-  *
-  *  @note: This must not contain a constructor or deconstructor!
-  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
-  */
-static class EventClassFake final : public EventClass
-{
-public:
-    void _Remember_Last_Building(int house, EventType eventtype, RTTIType type, int id);
-};
-
-
-/**
- *  Remembers the last produced building for the repeat building command.
- *
- *  Author: ZivDero
- */
-void EventClassFake::_Remember_Last_Building(int house, EventType eventtype, RTTIType type, int id)
-{
-    if (type == RTTI_BUILDING || type == RTTI_BUILDINGTYPE)
-    {
-        RepeatStructureCommandClass::LastRTTI = type;
-        RepeatStructureCommandClass::LastHeapID = id;
-    }
-
-    new (this) EventClass(house, eventtype, type, id);
-}
-
-
 /**
  *  Fixes a cheat in the original game where players are able to issue
  *  commands to technos that are not owned by them.
@@ -202,6 +171,4 @@ void EventClassExtension_Hooks()
     Patch_Jump(0x004946FF, &_EventClass_Execute_MEGAMISSION_Prevent_Controlling_Enemy_Units_Patch);
     Patch_Jump(0x004949AF, &_EventClass_Execute_IDLE_Prevent_Controlling_Enemy_Units_Patch);
     Patch_Jump(0x004946CD, &_EventClass_Executre_PRIMARY_Prevent_Setting_For_Enemy_Patch);
-
-    Patch_Call(0x005F5DE9, &EventClassFake::_Remember_Last_Building);
 }

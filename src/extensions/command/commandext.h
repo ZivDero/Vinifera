@@ -389,11 +389,11 @@ public:
 /**
  *  Queues the last built structure.
  */
-class RepeatStructureCommandClass : public ViniferaCommandClass
+class JustBuiltCommandClass : public ViniferaCommandClass
 {
 public:
-    RepeatStructureCommandClass() : ViniferaCommandClass() {}
-    virtual ~RepeatStructureCommandClass() {}
+    JustBuiltCommandClass() : ViniferaCommandClass() {}
+    virtual ~JustBuiltCommandClass() {}
 
     virtual const char* Get_Name() const override;
     virtual const char* Get_UI_Name() const override;
@@ -402,9 +402,6 @@ public:
     virtual bool Process() override;
 
     virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Q | VK_CONTROL); }
-
-    static RTTIType LastRTTI;
-    static int LastHeapID;
 };
 
 

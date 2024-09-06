@@ -1742,13 +1742,12 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Seek_Building_Position)
     _asm { retn 4 }
 }
 
-bool Check_Factory(BuildingClass* factory, TechnoClass* exiting)
+bool Factory_Can_Produce_Techno(BuildingClass* factory, TechnoClass* exiting)
 {
     if (factory->Class->IsWeaponsFactory && exiting->Techno_Type_Class()->Speed == SPEED_FLOAT) {
 
         /**
          *  We are a war factory with a production anim and a ship is trying to exit us.
-         *  No continuing beyond this part. Exit the function and return -2 (refund).
          */
 
         return false;
@@ -1771,8 +1770,11 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Check_Factory_Type)
      */
     GET_REGISTER_STATIC(TechnoClass*, techno, edi);
 
-    if (!Check_Factory(this_ptr, techno))
+    if (!Factory_Can_Produce_Techno(this_ptr, techno))
     {
+        /**
+         *  No continuing beyond this part. Exit the function and return -2 (refund).
+         */
         JMP(0x0042D77E);
     }
 

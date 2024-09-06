@@ -778,16 +778,16 @@ bool SetStructureTabCommandClass::Process()
         BuildingClass* pending_bptr = reinterpret_cast<BuildingClass*>(pending);
 
         /**
+         *  Are we already trying to place this building? No need to re-enter placement mode...
+         */
+        if (Map.PendingObjectPtr == pending_bptr)
+            return result;
+
+        /**
          *  Fetch the factory building that can build this object.
          */
         BuildingClass* builder = pending_bptr->Who_Can_Build_Me();
         if (!builder)
-            return result;
-
-        /**
-         *  Are we already trying to place this building? No need to re-enter placement mode...
-         */
-        if (Map.PendingObjectPtr == pending_bptr)
             return result;
 
         /**
@@ -897,52 +897,70 @@ bool SetSpecialTabCommandClass::Process()
 
 
 /**
- *  Queues the last built structure.
- *  Based on the implementation from ts-patches by dkeetonx
+ *  #issue-168
  *
- *  @author: ZivDero
+ *  Reproduces the last structure that was built.
+ *
+ *  @author: CCHyper (based on research by dkeeton)
  */
-
-RTTIType RepeatStructureCommandClass::LastRTTI = RTTI_NONE;
-int RepeatStructureCommandClass::LastHeapID = 0;
-
-const char* RepeatStructureCommandClass::Get_Name() const
+const char* JustBuiltCommandClass::Get_Name() const
 {
     return "RepeatStructure";
 }
 
-const char* RepeatStructureCommandClass::Get_UI_Name() const
+const char* JustBuiltCommandClass::Get_UI_Name() const
 {
     return "Repeat Structure";
 }
 
-const char* RepeatStructureCommandClass::Get_Category() const
+const char* JustBuiltCommandClass::Get_Category() const
 {
     return Text_String(TXT_INTERFACE);
 }
 
-const char* RepeatStructureCommandClass::Get_Description() const
+const char* JustBuiltCommandClass::Get_Description() const
 {
     return "Start building the last produced structure.";
 }
 
-bool RepeatStructureCommandClass::Process()
+bool JustBuiltCommandClass::Process()
 {
-    if (LastRTTI)
+    if (!PlayerPtr)
+        return false;
+
+    /**
+     *  Fetch the houses factory associated with producing building. This is
+     *  done to make sure the house still has a factory.
+     */
+    if (!PlayerPtr->Factory_Count(RTTI_BUILDING))
     {
-        for (int i = 0; i < SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).BuildableCount; i++)
-        {
-            SidebarClass::StripClass::BuildType& buildtype = SidebarExtension->Get_Tab(RTTI_BUILDINGTYPE).Buildables[i];
-            if (buildtype.BuildableType == LastRTTI &&
-                buildtype.BuildableID == LastHeapID)
-            {
-                OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, LastRTTI, LastHeapID));
-                return true;
-            }
-        }
+        DEV_DEBUG_WARNING("RepeatStructureCommandClass - Unable to fetch primary factory!\n");
+        return false;
     }
 
-    return false;
+    /**
+     *  Nothing built? Nothing to reproduce...
+     */
+    BuildingType building = PlayerPtr->JustBuiltStructure;
+    if (building == BUILDING_NONE)
+        return false;
+
+    const BuildingTypeClass* buildingtype = BuildingTypeClass::As_Pointer(building);
+    if (!buildingtype)
+        return false;
+
+
+    /**
+     *  Is the item currently available to build on the sidebar?
+     */
+    if (!SidebarExtension->Is_On_Sidebar(RTTI_BUILDINGTYPE, building))
+        return false;
+
+    DEBUG_INFO("JustBuiltBuildingCommandClass - \"%s\"\n", buildingtype->Full_Name());
+
+    OutList.Add(EventClass(PlayerPtr->ID, EVENT_PRODUCE, RTTI_BUILDINGTYPE, building));
+
+    return true;
 }
 
 

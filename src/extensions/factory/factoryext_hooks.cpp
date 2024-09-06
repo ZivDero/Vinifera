@@ -127,13 +127,7 @@ bool FactoryClassFake::_Start(bool suspend)
 {
     if ((Object || SpecialItem) && IsSuspended && !Has_Completed())
     {
-        int time;
-
-        if (Object)
-        {
-            time = Object->Time_To_Build();
-        }
-
+        const int time = Object ? Object->Time_To_Build() : 0;
         int rate = time / STEP_COUNT;
         rate = std::clamp(rate, 1, 255);
 
@@ -165,79 +159,75 @@ void FactoryClassFake::_AI()
 
     if (!IsSuspended && (Object != nullptr || SpecialItem))
     {
-        for (int index = 0; index < 1; index++)
+        if (!Has_Completed() && Graphic_Logic())
         {
-            if (!Has_Completed() && Graphic_Logic())
+            IsDifferent = true;
+
+            int cost = Cost_Per_Tick();
+            cost = std::min(cost, Balance);
+
+            /*
+            **	Enough time has expired so that another production step can occur.
+            **	If there is insufficient funds, then go back one production step and
+            **	continue the countdown. The idea being that by the time the next
+            **	production step occurs, there may be sufficient funds available.
+            */
+            if (cost > House->Available_Money())
             {
-                IsDifferent = true;
+                Set_Stage(Fetch_Stage() - 1);
+            }
+            else
+            {
+                House->Spend_Money(cost);
+                Balance -= cost;
+            }
 
-                int cost = Cost_Per_Tick();
-
-                cost = std::min(cost, Balance);
-
+            /**
+             *  Patch for InstantBuildCommandClass
+             *
+             *  @author: CCHyper
+             */
+            if (Vinifera_DeveloperMode)
+            {
                 /*
-                **	Enough time has expired so that another production step can occur.
-                **	If there is insufficient funds, then go back one production step and
-                **	continue the countdown. The idea being that by the time the next
-                **	production step occurs, there may be sufficient funds available.
+                **	If AIInstantBuild is toggled on, make sure this is a non-human AI house.
                 */
-                if (cost > House->Available_Money())
+                if (Vinifera_Developer_AIInstantBuild
+                    && !House->Is_Human_Control() && House != PlayerPtr)
                 {
-                    Set_Stage(Fetch_Stage() - 1);
-                }
-                else
-                {
-                    House->Spend_Money(cost);
-                    Balance -= cost;
-                }
-
-                /**
-                 *  Patch for InstantBuildCommandClass
-                 *
-                 *  @author: CCHyper
-                 */
-                if (Vinifera_DeveloperMode)
-                {
-                    /*
-                    **	If AIInstantBuild is toggled on, make sure this is a non-human AI house.
-                    */
-                    if (Vinifera_Developer_AIInstantBuild
-                        && !House->Is_Human_Control() && House != PlayerPtr)
-                    {
-                        Set_Stage(STEP_COUNT);
-                    }
-
-                    /*
-                    **	If InstantBuild is toggled on, make sure the local player is a human house.
-                    */
-                    if (Vinifera_Developer_InstantBuild
-                        && House->Is_Human_Control() && House == PlayerPtr)
-                    {
-                        Set_Stage(STEP_COUNT);
-                    }
-
-                    /*
-                    **	If the AI has taken control of the player house, it needs a special
-                    **	case to handle the "player" instant build mode.
-                    */
-                    if (Vinifera_Developer_InstantBuild)
-                    {
-                        if (Vinifera_Developer_AIControl && House == PlayerPtr)
-                            Set_Stage(STEP_COUNT);
-                    }
-
+                    Set_Stage(STEP_COUNT);
                 }
 
                 /*
-                **	If the production has completed, then suspend further production.
+                **	If InstantBuild is toggled on, make sure the local player is a human house.
                 */
-                if (Fetch_Stage() == STEP_COUNT)
+                if (Vinifera_Developer_InstantBuild
+                    && House->Is_Human_Control() && House == PlayerPtr)
                 {
-                    IsSuspended = true;
-                    Set_Rate(0);
-                    House->Spend_Money(Balance);
-                    Balance = 0;
+                    Set_Stage(STEP_COUNT);
                 }
+
+                /*
+                **	If the AI has taken control of the player house, it needs a special
+                **	case to handle the "player" instant build mode.
+                */
+                if (Vinifera_Developer_InstantBuild)
+                {
+                    if (Vinifera_Developer_AIControl && House == PlayerPtr)
+                        Set_Stage(STEP_COUNT);
+                }
+
+            }
+
+            /*
+            **	If the production has completed, then suspend further production.
+            */
+            if (Fetch_Stage() == STEP_COUNT)
+            {
+                IsSuspended = true;
+                Set_Rate(0);
+                House->Spend_Money(Balance);
+                Balance = 0;
             }
         }
     }

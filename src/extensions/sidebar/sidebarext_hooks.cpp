@@ -698,6 +698,8 @@ void SidebarClassFake::_AI(KeyNumType& input, Point2D& xy)
     if (!Debug_Map)
     {
         Activate(1);
+        // The original code deducts the X coordinate by 480 here. Why? No one knows, but let's do the same
+        // 480 also appears as the draw offset of the sidebar buttons
         Point2D newpoint(xy.X - 480, xy.Y);
         for (int i = 0; i < SidebarClassExtension::SIDEBAR_TAB_COUNT; i++)
             SidebarExtension->Column[i].AI(input, newpoint);
@@ -1566,8 +1568,8 @@ void StripClassFake::_Draw_It(bool complete)
                         darken = false;
 
                         /*
-                        **	If there is already a factory producing this kind of object, then all
-                        **	objects of this type are displays in a disabled state.
+                        **	If there is already a factory producing a building, then all
+                        **	buildings are displayed in a disabled state.
                         */
                         if (obj->Kind_Of() == RTTI_BUILDINGTYPE)
                         {
@@ -1577,10 +1579,10 @@ void StripClassFake::_Draw_It(bool complete)
                         /*
                         **	If there is no factory that can produce this, or the factory that
                         *	can produce this is currently busy,
-                        **	objects of this type are displays in a disabled state.
+                        **	objects of this type are displayed in a disabled state.
                         */
                         if (!obj->Who_Can_Build_Me(true, true, true, PlayerPtr)
-                            || !darken && PlayerPtr->Can_Build(Fetch_Techno_Type(Buildables[index].BuildableType, Buildables[index].BuildableID), false, false) == -1)
+                            || (!darken && PlayerPtr->Can_Build(Fetch_Techno_Type(Buildables[index].BuildableType, Buildables[index].BuildableID), false, false) == -1))
                         {
                             darken = true;
                         }
@@ -1973,8 +1975,11 @@ DECLARE_PATCH(_PowerClass_Draw_It_Move_Power_Bar)
 
     static int max_visible;
     max_visible = SidebarClassExtension::Max_Visible(true);
-    _asm mov eax, max_visible
-    _asm mov ecx, max_visible
+    _asm
+    {
+        mov eax, max_visible
+        mov ecx, max_visible
+    }
 
     JMP_REG(ebx, 0x005AB4D9);
 }

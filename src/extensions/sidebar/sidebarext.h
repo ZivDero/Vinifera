@@ -176,6 +176,12 @@ public:
 
         static SidebarTabType Which_Tab(RTTIType type);
 
+        bool Is_On_Sidebar(RTTIType type, int id) const
+        {
+            const int column = Which_Tab(type);
+            return Column[column].Is_On_Sidebar(type, id);
+        }
+
         static int Max_Visible(bool one_strip = false)
         {
             if (SidebarSurface && SidebarClass::SidebarShape)

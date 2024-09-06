@@ -258,7 +258,7 @@ void Init_Vinifera_Commands()
     cmdptr = new SetSpecialTabCommandClass;
     Commands.Add(cmdptr);
 
-    cmdptr = new RepeatStructureCommandClass;
+    cmdptr = new JustBuiltCommandClass;
     Commands.Add(cmdptr);
 
     /**
