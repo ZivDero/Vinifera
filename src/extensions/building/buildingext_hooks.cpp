@@ -79,7 +79,7 @@
  *  @note: This must not contain a constructor or deconstructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-static class BuildingClassFake final : public BuildingClass
+static class BuildingClassExt final : public BuildingClass
 {
 public:
     bool _Can_Have_Rally_Point();
@@ -87,7 +87,7 @@ public:
 };
 
 
-bool BuildingClassFake::_Can_Have_Rally_Point()
+bool BuildingClassExt::_Can_Have_Rally_Point()
 {
     RTTIType tobuild = this->Class->ToBuild;
     if (tobuild == RTTI_UNITTYPE || tobuild == RTTI_INFANTRYTYPE || tobuild == RTTI_AIRCRAFTTYPE)
@@ -150,7 +150,7 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
  *
  *  @author: ZivDero
  */
-void BuildingClassFake::_Update_Buildables()
+void BuildingClassExt::_Update_Buildables()
 {
     if (House == PlayerPtr && !IsInLimbo && IsDiscoveredByPlayer && IsPowerOn)
     {
@@ -2133,7 +2133,7 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0043266C, &_BuildingClass_Mission_Repair_ReloadRate_Patch);
     Patch_Jump(0x00432184, &_BuildingClass_Mission_Repair_Assign_Rally_Destination_When_No_Repair_Needed);
     Patch_Jump(0x00431DAB, &_BuildingClass_Mission_Repair_Assign_Rally_Destination_After_Repair_Complete);
-    Patch_Jump(0x00439D10, &BuildingClassFake::_Can_Have_Rally_Point);
+    Patch_Jump(0x00439D10, &BuildingClassExt::_Can_Have_Rally_Point);
     Patch_Jump(0x004325F9, &_BuildingClass_Mission_Repair_ReloadRate_Patch);
     Patch_Jump(0x0043266C, &_BuildingClass_Mission_Repair_ReloadRate_Patch);
     Patch_Jump(0x0042B6CC, &_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch);
@@ -2151,5 +2151,5 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042C624, &_BuildingClass_Assign_Target_No_Deconstruction_With_Null_UndeploysInto);
     Patch_Jump(0x00426A7E, &_BuildingClass_Receive_Message_Only_Allow_Dockable_Harvester_Patch);
 
-    Patch_Jump(0x0042D9A0, &BuildingClassFake::_Update_Buildables);
+    Patch_Jump(0x0042D9A0, &BuildingClassExt::_Update_Buildables);
 }

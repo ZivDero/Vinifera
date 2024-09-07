@@ -49,7 +49,7 @@
   *  @note: This must not contain a constructor or deconstructor!
   *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
   */
-static class FootClassFake final : public FootClass
+static class FootClassExt final : public FootClass
 {
 public:
     Cell _Search_For_Tiberium(int rad, bool a2);
@@ -63,7 +63,7 @@ public:
  *
  * Author: Rampastring
  */
-Cell FootClassFake::_Search_For_Tiberium(int rad, bool a2)
+Cell FootClassExt::_Search_For_Tiberium(int rad, bool a2)
 {
     return Vinifera_FootClass_Search_For_Tiberium(this, rad, a2);
 }
@@ -313,5 +313,5 @@ void FootClassExtension_Hooks()
     Patch_Jump(0x004A2BE7, &_FootClass_Mission_Guard_Area_Can_Passive_Acquire_Patch);
     Patch_Jump(0x004A1AAE, &_FootClass_Mission_Guard_Can_Passive_Acquire_Patch);
     Patch_Jump(0x004A102F, &_FootClass_Mission_Move_Can_Passive_Acquire_Patch);
-    Patch_Jump(0x004A76F0, &FootClassFake::_Search_For_Tiberium);
+    Patch_Jump(0x004A76F0, &FootClassExt::_Search_For_Tiberium);
 }

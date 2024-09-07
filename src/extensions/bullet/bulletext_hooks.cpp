@@ -56,7 +56,7 @@
  *  @note: This must not contain a constructor or deconstructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-static class BulletClassFake final : public BulletClass
+static class BulletClassExt final : public BulletClass
 {
 public:
     void _BulletClass_AI_Replacement(void);
@@ -571,7 +571,7 @@ DECLARE_PATCH(_BulletClass_AI_Jump_To_Custom_Function_If_ROT_Over_Zero)
  *
  *  @author: Rampastring (bits taken from Red Alert 1 source code by Electronic Arts)
  */
-void BulletClassFake::_BulletClass_AI_Replacement(void)
+void BulletClassExt::_BulletClass_AI_Replacement(void)
 {
     ObjectClass::AI();
 
@@ -673,7 +673,7 @@ void BulletClassFake::_BulletClass_AI_Replacement(void)
 
 
 // Custom replacement for BulletClass::Shape_Number
-int BulletClassFake::_Shape_Number()
+int BulletClassExt::_Shape_Number()
 {
     static const double halfpi = 1.570796326794897;
     static const double magic = -10430.06004058427;
@@ -711,7 +711,7 @@ int BulletClassFake::_Shape_Number()
 
 static void _BulletClass_AI_Custom_Implementation(BulletClass* this_ptr)
 {
-    BulletClassFake* converted = reinterpret_cast<BulletClassFake*>(this_ptr);
+    BulletClassExt* converted = reinterpret_cast<BulletClassExt*>(this_ptr);
     converted->_BulletClass_AI_Replacement();
 }
 
@@ -746,5 +746,5 @@ void BulletClassExtension_Hooks()
     Patch_Jump(0x00446652, &_BulletClass_Logic_ShakeScreen_Patch);
     Patch_Jump(0x004447BF, &_BulletClass_AI_SpawnDelay_Patch);
     Patch_Jump(0x00444A3E, &_BulletClass_AI_Jump_To_Custom_Function_If_ROT_Over_Zero);
-    Patch_Jump(0x00445B70, &BulletClassFake::_Shape_Number);
+    Patch_Jump(0x00445B70, &BulletClassExt::_Shape_Number);
 }

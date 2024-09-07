@@ -54,14 +54,14 @@
  *  @note: This must not contain a constructor or deconstructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-static class SuperClassFake final : public SuperClass
+static class SuperClassExt final : public SuperClass
 {
 public:
     void _Do_DropPods(Cell* cell);
 };
 
 
-void SuperClassFake::_Do_DropPods(Cell* cell)
+void SuperClassExt::_Do_DropPods(Cell* cell)
 {
 	char buffer[24];
 	
@@ -148,5 +148,5 @@ void SuperClassExtension_Hooks()
      */
     SuperClassExtension_Init();
 
-	Patch_Jump(0x0060C880, &SuperClassFake::_Do_DropPods);
+	Patch_Jump(0x0060C880, &SuperClassExt::_Do_DropPods);
 }

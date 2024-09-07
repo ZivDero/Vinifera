@@ -117,7 +117,7 @@ return_false:
  *  @note: This must not contain a constructor or deconstructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-static class TechnoClassFake final : public TechnoClass
+static class TechnoClassExt final : public TechnoClass
 {
 public:
     int _Cell_Distance_Squared(const AbstractClass* object) const;
@@ -135,7 +135,7 @@ public:
  *
  *  @author: Rampastring
  */
-int TechnoClassFake::_Cell_Distance_Squared(const AbstractClass* object) const
+int TechnoClassExt::_Cell_Distance_Squared(const AbstractClass* object) const
 {
     if (!object)
         return 0;
@@ -1026,7 +1026,7 @@ void TechnoClassExtension_Hooks()
     Patch_Jump(0x0063381A, &_TechnoClass_Record_The_Kill_Strengthen_Killer_Patch);
     Patch_Jump(0x006306B5, &_TechnoClass_Fire_At_Spawn_Aircraft_Patch);
     Patch_Jump(0x00637B83, &_TechnoClass_Draw_Pips_No_Medic_Indicator_In_Shroud_Patch);
-    Patch_Call(0x00637FF5, &TechnoClassFake::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
+    Patch_Call(0x00637FF5, &TechnoClassExt::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
 
     // Do not trigger "Discovered by Player" when an object is destroyed
     Patch_Jump(0x00633745, (uintptr_t)0x00633762);

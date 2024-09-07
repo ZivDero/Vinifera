@@ -47,7 +47,7 @@
   *  @note: This must not contain a constructor or deconstructor!
   *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
   */
-static class CargoClassFake final : public CargoClass
+static class CargoClassExt final : public CargoClass
 {
 public:
     void _Attach_One(FootClass* object);
@@ -72,7 +72,7 @@ public:
  *  Authors: 10/31/1994 JLB: CargoClass::Attach from Red Alert 1 source code
  *           08/17/2024 Rampastring: Changes to only attach one object.
  */
-void CargoClassFake::_Attach_One(FootClass* object) {
+void CargoClassExt::_Attach_One(FootClass* object) {
 
     // If there is no object, then no action is necessary.
     if (object == NULL) return;
@@ -93,8 +93,8 @@ void CargoClassFake::_Attach_One(FootClass* object) {
  */
 void CargoClassExtension_Hooks()
 {
-    Patch_Call(0x00651617, &CargoClassFake::_Attach_One);
-    Patch_Call(0x004D39FB, &CargoClassFake::_Attach_One);
-    Patch_Call(0x004D3A82, &CargoClassFake::_Attach_One);
-    Patch_Call(0x0065431A, &CargoClassFake::_Attach_One);
+    Patch_Call(0x00651617, &CargoClassExt::_Attach_One);
+    Patch_Call(0x004D39FB, &CargoClassExt::_Attach_One);
+    Patch_Call(0x004D3A82, &CargoClassExt::_Attach_One);
+    Patch_Call(0x0065431A, &CargoClassExt::_Attach_One);
 }

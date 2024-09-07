@@ -74,7 +74,7 @@
  *  @note: This must not contain a constructor or deconstructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-static class HouseClassFake final : public HouseClass
+static class HouseClassExt final : public HouseClass
 {
 public:
     bool _AI_Target_MultiMissile(SuperClass* super);
@@ -402,7 +402,7 @@ bool Vinifera_HouseClass_AI_Target_MultiMissile(HouseClass* this_ptr, SuperClass
 }
 
 
-bool HouseClassFake::_AI_Target_MultiMissile(SuperClass* super)
+bool HouseClassExt::_AI_Target_MultiMissile(SuperClass* super)
 {
     return Vinifera_HouseClass_AI_Target_MultiMissile(this, super);
 }
@@ -1365,7 +1365,7 @@ int Vinifera_HouseClass_AI_Building(HouseClass* this_ptr)
 }
 
 
-int HouseClassFake::_AI_Building_Replacement() 
+int HouseClassExt::_AI_Building_Replacement() 
 {
     return Vinifera_HouseClass_AI_Building(this);
 }
@@ -1666,7 +1666,7 @@ DECLARE_PATCH(_HouseClass_Begin_Production_Check_For_Unallowed_Buildables)
  *
  *  Author: ZivDero
  */
-bool HouseClassFake::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type)
+bool HouseClassExt::_Can_Build_Required_Forbidden_Houses(const TechnoTypeClass* techno_type)
 {
     TechnoTypeClassExtension* technotypeext = Extension::Fetch<TechnoTypeClassExtension>(techno_type);
 
@@ -1700,7 +1700,7 @@ DECLARE_PATCH(_Can_Build_Required_Forbidden_Houses)
     };
 
     GET_REGISTER_STATIC(TechnoTypeClass*, techno_type, edi);
-    GET_REGISTER_STATIC(HouseClassFake*, this_ptr, ebp);
+    GET_REGISTER_STATIC(HouseClassExt*, this_ptr, ebp);
     static bool can_build;
 
     can_build = this_ptr->_Can_Build_Required_Forbidden_Houses(techno_type);
@@ -1737,8 +1737,8 @@ void HouseClassExtension_Hooks()
     Patch_Jump(0x004BD30B, &_HouseClass_Super_Weapon_Handler_InstantRecharge_Patch);
     Patch_Jump(0x004CB777, &_HouseClass_ShouldDisableCameo_BuildLimit_Fix);
     Patch_Jump(0x004BC187, _HouseClass_Can_Build_BuildLimit_Handle_Vehicle_Transform);
-    Patch_Jump(0x004CA4A0, &HouseClassFake::_AI_Target_MultiMissile);
-    // Patch_Jump(0x004C10E0, &HouseClassFake::_AI_Building_Replacement);
+    Patch_Jump(0x004CA4A0, &HouseClassExt::_AI_Target_MultiMissile);
+    // Patch_Jump(0x004C10E0, &HouseClassExt::_AI_Building_Replacement);
     Patch_Jump(0x004C10F2, &_HouseClass_AI_Building_Intercept);
     Patch_Jump(0x004C063F, &_HouseClass_Expert_AI_Advanced_AI_Intercept);
     Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);

@@ -45,7 +45,7 @@
  *  @note: This must not contain a constructor or destructor!
  *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
  */
-class BuildingTypeClassFake final : public BuildingTypeClass
+class BuildingTypeClassExt final : public BuildingTypeClass
 {
     public:
         void _Free_Buildup_Image();
@@ -59,7 +59,7 @@ class BuildingTypeClassFake final : public BuildingTypeClass
  *
  *  @author: CCHyper
  */
-void BuildingTypeClassFake::_Free_Buildup_Image()
+void BuildingTypeClassExt::_Free_Buildup_Image()
 {
     if (IsFreeBuildup && BuildupData) {
         DEV_DEBUG_WARNING("Freeing loaded buildup image for %s\n", Name());
@@ -193,7 +193,7 @@ DECLARE_PATCH(_BuildingTypeClass_Get_Image_Data_Assertion_Patch)
  * 
  *  Author: Rampastring
  */
-int BuildingTypeClassFake::_Raw_Cost()
+int BuildingTypeClassExt::_Raw_Cost()
 {
     return TechnoTypeClass::Raw_Cost();
 }
@@ -205,7 +205,7 @@ int BuildingTypeClassFake::_Raw_Cost()
  *
  *  Author: Rampastring
  */
-int BuildingTypeClassFake::_Cost_Of(HouseClass* house)
+int BuildingTypeClassExt::_Cost_Of(HouseClass* house)
 {
     return TechnoTypeClass::Cost_Of(house);
 }
@@ -222,7 +222,7 @@ void BuildingTypeClassExtension_Hooks()
 
     //Patch_Jump(0x00440365, &_BuildingTypeClass_Get_Image_Data_Assertion_Patch);
 
-    Patch_Jump(0x00443CF0, &BuildingTypeClassFake::_Free_Buildup_Image);
+    Patch_Jump(0x00443CF0, &BuildingTypeClassExt::_Free_Buildup_Image);
 
     Patch_Jump(0x0044403B, &_BuildingTypeClass_SDDTOR_Free_Image_Patch);
     Patch_Jump(0x0043FD83, &_BuildingTypeClass_Init_Free_Image_Patch);
@@ -230,6 +230,6 @@ void BuildingTypeClassExtension_Hooks()
     Patch_Jump(0x00444052, &_BuildingTypeClass_SDDTOR_Free_Buildup_Image_Patch);
     Patch_Jump(0x0043FDB0, &_BuildingTypeClass_Init_Free_Buildup_Image_Patch);
     Patch_Jump(0x0043F936, &_BuildingTypeClass_DTOR_Free_Buildup_Image_Patch);
-    Patch_Jump(0x00440000, &BuildingTypeClassFake::_Raw_Cost);
-    Patch_Jump(0x00440080, &BuildingTypeClassFake::_Cost_Of);
+    Patch_Jump(0x00440000, &BuildingTypeClassExt::_Raw_Cost);
+    Patch_Jump(0x00440080, &BuildingTypeClassExt::_Cost_Of);
 }

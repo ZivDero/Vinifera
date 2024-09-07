@@ -48,7 +48,7 @@
   *  @note: This must not contain a constructor or deconstructor!
   *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
   */
-static class TechnoTypeClassFake final : public TechnoTypeClass
+static class TechnoTypeClassExt final : public TechnoTypeClass
 {
 public:
     int _Time_To_Build();
@@ -85,7 +85,7 @@ DECLARE_PATCH(_TechnoTypeClass_In_Range_Disable_Arcing_Bonus_Range_Patch)
  *
  *  Author: Rampastring
  */
-int TechnoTypeClassFake::_Time_To_Build()
+int TechnoTypeClassExt::_Time_To_Build()
 {
     // TechnoClass::Time_To_Build calls this, so we only need to hook this function
 
@@ -111,5 +111,5 @@ int TechnoTypeClassFake::_Time_To_Build()
 void TechnoTypeClassExtension_Hooks()
 {
     Patch_Jump(0x0063D5A7, &_TechnoTypeClass_In_Range_Disable_Arcing_Bonus_Range_Patch);
-    Patch_Jump(0x0063B8B0, &TechnoTypeClassFake::_Time_To_Build);
+    Patch_Jump(0x0063B8B0, &TechnoTypeClassExt::_Time_To_Build);
 }

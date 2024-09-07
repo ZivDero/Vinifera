@@ -57,7 +57,7 @@
   *  @note: This must not contain a constructor or deconstructor!
   *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
   */
-static class AircraftClassFake final : public AircraftClass
+static class AircraftClassExt final : public AircraftClass
 {
 public:
     int _Mission_Retreat();
@@ -70,7 +70,7 @@ public:
  *
  *  @author: Rampastring
  */
-int AircraftClassFake::_Mission_Retreat() 
+int AircraftClassExt::_Mission_Retreat() 
 {
     return FootClass::Mission_Retreat();
 }
@@ -485,7 +485,7 @@ void AircraftClassExtension_Hooks()
     Patch_Jump(0x0040BF9D, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_FACING_Patch);
     Patch_Jump(0x0040C0AC, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_DEFAULT_Patch);
     Patch_Jump(0x0040917A, &_AircraftClass_AI_Hook_Patch);
-    Patch_Jump(0x00409910, &AircraftClassFake::_Mission_Retreat);
+    Patch_Jump(0x00409910, &AircraftClassExt::_Mission_Retreat);
 
     // Fix bug where aircraft are unable to attack targets in shroud in campaign games
     // and instead get stuck in mid-air

@@ -49,7 +49,7 @@
   *  @note: This must not contain a constructor or deconstructor!
   *  @note: All functions must be prefixed with "_" to prevent accidental virtualization.
   */
-static class FactoryClassFake final : public FactoryClass
+static class FactoryClassExt final : public FactoryClass
 {
 public:
     void _Verify_Can_Build();
@@ -62,7 +62,7 @@ public:
  *
  *  @author: ZivDero
  */
-void FactoryClassFake::_Verify_Can_Build()
+void FactoryClassExt::_Verify_Can_Build()
 {
     const TechnoClass* producing_object = Get_Object();
 
@@ -184,7 +184,7 @@ production_completed:
  */
 DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
 {
-    GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
+    GET_REGISTER_STATIC(FactoryClassExt*, this_ptr, ecx);
 
     this_ptr->_Verify_Can_Build();
 
