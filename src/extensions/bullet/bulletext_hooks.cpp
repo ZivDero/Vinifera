@@ -40,6 +40,8 @@
 #include "session.h"
 #include "fastmath.h"
 #include "iomap.h"
+#include "unit.h"
+#include "unittype.h"
 #include "extension.h"
 #include "fatal.h"
 #include "asserthandler.h"
@@ -47,6 +49,7 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "jumpjetlocomotion.h"
 
 
 /**
@@ -736,6 +739,65 @@ DECLARE_PATCH(_BulletClass_AI_Intercept)
     JMP_REG(ecx, 0x00444707); // Jump to IsActive check
 }
 
+
+/**
+ *  Halves the distance from the explosion to the unit for units in air.
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_Explosion_Damage_In_Air_Distance)
+{
+    GET_STACK_STATIC(TechnoClass*, techno, esp, 0x18);
+    GET_REGISTER_STATIC(int, distance, esi);
+
+    if (techno->What_Am_I() == RTTI_AIRCRAFT || techno->In_Air())
+    {
+        distance /= 2;
+    }
+
+    _asm mov esi, distance;
+    JMP(0x0045F64B);
+}
+
+
+/**
+ *  Checks if a unit is a Jellyfish or JumpJet.
+ *
+ *  @author: ZivDero
+ */
+bool Is_Unit_Airborne(UnitClass* unit)
+{
+    if (unit->Class->IsJellyfish)
+        return true;
+
+    CLSID clsid;
+    ((LocomotionClass*)unit->Locomotor_Ptr())->GetClassID(&clsid);
+
+    if (clsid == __uuidof(JumpjetLocomotionClass))
+        return true;
+
+    return false;
+}
+
+
+/**
+ *  Patch to have JumpJets take damage in air.
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_Explosion_Damage_JumpJet_Units)
+{
+    GET_REGISTER_STATIC(UnitClass*, unit, esi);
+
+    if (Is_Unit_Airborne(unit))
+    {
+        JMP(0x0045F23F);
+    }
+
+    JMP(0x0045F335);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -747,4 +809,6 @@ void BulletClassExtension_Hooks()
     Patch_Jump(0x004447BF, &_BulletClass_AI_SpawnDelay_Patch);
     Patch_Jump(0x00444A3E, &_BulletClass_AI_Jump_To_Custom_Function_If_ROT_Over_Zero);
     Patch_Jump(0x00445B70, &BulletClassFake::_Shape_Number);
+    Patch_Jump(0x0045F632, _Explosion_Damage_In_Air_Distance);
+    Patch_Jump(0x0045F22B, _Explosion_Damage_JumpJet_Units);
 }
