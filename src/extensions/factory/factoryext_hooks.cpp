@@ -33,11 +33,13 @@
 #include "fatal.h"
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "extension_globals.h"
 #include "technotype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
 #include "mouse.h"
+#include "sidebarext.h"
 #include "techno.h"
 
 
@@ -51,17 +53,19 @@
 static class FactoryClassFake final : public FactoryClass
 {
 public:
-    void _Verify_Can_Build();
+    void _Sanitize_Queue();
+    void _AI();
+    bool _Start(bool suspend);
 };
 
 
 /**
  *  Checks if this factory should abandon construction because the objects
- *  in the queue are no longer available to build
+ *  in the queue are no longer available to build.
  *
  *  @author: ZivDero
  */
-void FactoryClassFake::_Verify_Can_Build()
+void FactoryClassFake::_Sanitize_Queue()
 {
     const TechnoClass* producing_object = Get_Object();
 
@@ -74,13 +78,13 @@ void FactoryClassFake::_Verify_Can_Build()
 
     bool need_update = false;
 
-    // Check the thing we're currently building separately - it needs special handling
+    // Check the thing we're currently building
     if (!House->Can_Build(producing_type, false, true))
     {
         Abandon();
         need_update = true;
 
-        // Remove map placement if we're doing that
+        // Cancel map placement
         if (is_building && House == PlayerPtr)
         {
             Map.PendingObject = nullptr;
@@ -90,7 +94,7 @@ void FactoryClassFake::_Verify_Can_Build()
         }
     }
 
-    // Now make sure there are no invalid objects in the queue
+    // Make sure there are no unavailable objects in the queue
     for (int i = 0; i < QueuedObjects.Count(); i++)
     {
         if (!House->Can_Build(QueuedObjects[i], false, true))
@@ -104,7 +108,7 @@ void FactoryClassFake::_Verify_Can_Build()
     if (need_update)
     {
         if (House == PlayerPtr)
-            Map.Column[is_building ? 0 : 1].Flag_To_Redraw();
+            SidebarExtension->Get_Tab(type).Flag_To_Redraw();
 
         House->Update_Factories(type);
         Resume_Queue();
@@ -113,88 +117,120 @@ void FactoryClassFake::_Verify_Can_Build()
 
 
 /**
- *  Patch for InstantBuildCommandClass
- * 
- *  @author: CCHyper
+ *  Reimplements the entire FactoryClass::Start function.
+ *  Fixes an issue where if you started construction with < Cost_Per_Tick() credits,
+ *  it would be instantly put on hold.
+ *
+ *  @author: ZivDero
  */
-DECLARE_PATCH(_FactoryClass_AI_InstantBuild_Patch)
+bool FactoryClassFake::_Start(bool suspend)
 {
-    GET_REGISTER_STATIC(FactoryClass *, this_ptr, esi);
+    if ((Object || SpecialItem) && IsSuspended && !Has_Completed())
+    {
+        const int time = Object ? Object->Time_To_Build() : 0;
+        int rate = time / STEP_COUNT;
+        rate = std::clamp(rate, 1, 255);
 
-    if (Vinifera_DeveloperMode) {
+        Set_Rate(rate);
+        IsSuspended = false;
 
-        /**
-         *  If AIInstantBuild is toggled on, make sure this is a non-human AI house.
-         */
-        if (Vinifera_Developer_AIInstantBuild
-            && !this_ptr->House->Is_Human_Control() && this_ptr->House != PlayerPtr) {
+        if (House->Available_Money() >= Cost_Per_Tick())
+        {
+            IsPlayerSuspended = true;
 
-            this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-            goto production_completed;
+            if (suspend)
+                Suspend(true);
+
+            return true;
         }
-
-        /**
-         *  If InstantBuild is toggled on, make sure the local player is a human house.
-         */
-        if (Vinifera_Developer_InstantBuild
-            && this_ptr->House->Is_Human_Control() && this_ptr->House == PlayerPtr) {
-
-            this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-            goto production_completed;
-        }
-
-        /**
-         *  If the AI has taken control of the player house, it needs a special
-         *  case to handle the "player" instant build mode.
-         */
-        if (Vinifera_Developer_InstantBuild) {
-            if (Vinifera_Developer_AIControl && this_ptr->House == PlayerPtr) {
-
-                this_ptr->StageClass::Set_Stage(FactoryClass::STEP_COUNT);
-                goto production_completed;
-            }
-        }
-
     }
-
-    /**
-     *  Stolen bytes/code.
-     */
-    if (this_ptr->StageClass::Fetch_Stage() == FactoryClass::STEP_COUNT) {
-        goto production_completed;
-    }
-
-function_return:
-    JMP(0x00496FA3);
-
-    /**
-     *  Production Completed, then suspend further production.
-     */
-production_completed:
-    JMP(0x00496F73);
+    return false;
 }
 
 
 /**
- *  Update the queue and remove any items that are no
- *  longer buildable by the factory owner's house
+ *  Reimplements the entire FactoryClass::AI function.
  *
  *  @author: ZivDero
  */
-DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
+void FactoryClassFake::_AI()
 {
-    GET_REGISTER_STATIC(FactoryClassFake*, this_ptr, ecx);
+    _Sanitize_Queue();
 
-    this_ptr->_Verify_Can_Build();
+    if (!IsSuspended && (Object != nullptr || SpecialItem))
+    {
+        if (!Has_Completed() && Graphic_Logic())
+        {
+            IsDifferent = true;
 
-    // Stolen bytes / code.
-    if (this_ptr->IsSuspended) {
-        // Factory is suspended, exit from function.
-        JMP(0x00496FA3);
+            int cost = Cost_Per_Tick();
+            cost = std::min(cost, Balance);
+
+            /*
+            **	Enough time has expired so that another production step can occur.
+            **	If there is insufficient funds, then go back one production step and
+            **	continue the countdown. The idea being that by the time the next
+            **	production step occurs, there may be sufficient funds available.
+            */
+            if (cost > House->Available_Money())
+            {
+                Set_Stage(Fetch_Stage() - 1);
+            }
+            else
+            {
+                House->Spend_Money(cost);
+                Balance -= cost;
+            }
+
+            /**
+             *  Patch for InstantBuildCommandClass
+             *
+             *  @author: CCHyper
+             */
+            if (Vinifera_DeveloperMode)
+            {
+                /*
+                **	If AIInstantBuild is toggled on, make sure this is a non-human AI house.
+                */
+                if (Vinifera_Developer_AIInstantBuild
+                    && !House->Is_Human_Control() && House != PlayerPtr)
+                {
+                    Set_Stage(STEP_COUNT);
+                }
+
+                /*
+                **	If InstantBuild is toggled on, make sure the local player is a human house.
+                */
+                if (Vinifera_Developer_InstantBuild
+                    && House->Is_Human_Control() && House == PlayerPtr)
+                {
+                    Set_Stage(STEP_COUNT);
+                }
+
+                /*
+                **	If the AI has taken control of the player house, it needs a special
+                **	case to handle the "player" instant build mode.
+                */
+                if (Vinifera_Developer_InstantBuild)
+                {
+                    if (Vinifera_Developer_AIControl && House == PlayerPtr)
+                        Set_Stage(STEP_COUNT);
+                }
+
+            }
+
+            /*
+            **	If the production has completed, then suspend further production.
+            */
+            if (Fetch_Stage() == STEP_COUNT)
+            {
+                IsSuspended = true;
+                Set_Rate(0);
+                House->Spend_Money(Balance);
+                Balance = 0;
+            }
+        }
     }
-    
-    // Continue factory AI logic.
-    JMP(0x00496EB2);
 }
 
 
@@ -203,6 +239,6 @@ DECLARE_PATCH(_FactoryClass_AI_Abandon_If_Cant_Build)
  */
 void FactoryClassExtension_Hooks()
 {
-    Patch_Jump(0x00496F6D, &_FactoryClass_AI_InstantBuild_Patch);
-    Patch_Jump(0x00496EA7, &_FactoryClass_AI_Abandon_If_Cant_Build);
+    Patch_Jump(0x00496EA0, &FactoryClassFake::_AI);
+    Patch_Jump(0x004971E0, &FactoryClassFake::_Start);
 }

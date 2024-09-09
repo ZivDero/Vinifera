@@ -34,6 +34,9 @@
 
 #include "debughandler.h"
 #include "asserthandler.h"
+#include "commandext.h"
+#include "extension_globals.h"
+#include "sidebarext.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"

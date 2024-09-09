@@ -74,4 +74,9 @@ class OptionsClassExtension final : public GlobalExtensionClass<OptionsClass>
          *  Are messages drawn top-left rather than bottom-left?
          */
         bool IsClassicMessagePosition;
+
+        /**
+         *  Should cameos of defenses (including walls and gates) be sorted to the bottom of the sidebar?
+         */
+        bool SortDefensesAsLast;
 };

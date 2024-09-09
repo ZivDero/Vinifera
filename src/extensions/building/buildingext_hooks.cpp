@@ -35,7 +35,7 @@
 #include "building.h"
 #include "buildingtype.h"
 #include "buildingtypeext.h"
-#include "unit.h";
+#include "unit.h"
 #include "unitext.h"
 #include "unittypeext.h"
 #include "technotype.h"
@@ -53,10 +53,10 @@
 #include "dsurface.h"
 #include "convert.h"
 #include "drawshape.h"
+#include "infantrytype.h"
 #include "rules.h"
 #include "rulesext.h"
-#include "scenario.h"
-#include "scenarioext.h"
+#include "sidebarext.h"
 #include "terrain.h"
 #include "terraintype.h"
 #include "voc.h"
@@ -66,7 +66,6 @@
 #include "fatal.h"
 #include "asserthandler.h"
 #include "debughandler.h"
-#include "infantrytype.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -108,41 +107,6 @@ bool BuildingClassFake::_Can_Have_Rally_Point()
 
 
 /**
- *  Comparison function for sorting sidebar icons (BuildTypes)
- *
- *  @author: Rampastring
- */
-int __cdecl BuildType_Comparison(const void* p1, const void* p2)
-{
-    SidebarClass::StripClass::BuildType* bt1 = (SidebarClass::StripClass::BuildType*)p1;
-    SidebarClass::StripClass::BuildType* bt2 = (SidebarClass::StripClass::BuildType*)p2;
-
-    if (bt1->BuildableType == bt2->BuildableType)
-        return bt1->BuildableID - bt2->BuildableID;
-
-    if (bt1->BuildableType == RTTI_INFANTRYTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_INFANTRYTYPE)
-        return 1;
-
-    if (bt1->BuildableType == RTTI_UNITTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_UNITTYPE)
-        return 1;
-
-    if (bt1->BuildableType == RTTI_AIRCRAFTTYPE)
-        return -1;
-
-    if (bt2->BuildableType == RTTI_AIRCRAFTTYPE)
-        return 1;
-
-    return 0;
-}
-
-
-/**
  *  Makes the game check whether you can actually build the object before adding it to the sidebar,
  *  preventing grayed out cameos (except for build limited types)
  *
@@ -164,7 +128,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_AIRCRAFTTYPE, i);
                 }
             }
-            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_BUILDINGTYPE:
@@ -175,7 +138,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_BUILDINGTYPE, i);
                 }
             }
-            qsort(&Map.Column[0].Buildables, Map.Column[0].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_INFANTRYTYPE:
@@ -186,7 +148,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_INFANTRYTYPE, i);
                 }
             }
-            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         case RTTI_UNITTYPE:
@@ -197,7 +158,6 @@ void BuildingClassFake::_Update_Buildables()
                     Map.Add(RTTI_UNITTYPE, i);
                 }
             }
-            qsort(&Map.Column[1].Buildables, Map.Column[1].BuildableCount, sizeof(SidebarClass::StripClass::BuildType), &BuildType_Comparison);
             break;
 
         default:
@@ -753,7 +713,7 @@ DECLARE_PATCH(_BuildingClass_Draw_Spied_Cameo_Palette_Patch)
          *  Original code used NormalDrawer, which is the old Red Alert shape
          *  drawer, so we need to use CameoDrawer here for the correct palette.
          */
-        CC_Draw_Shape(TempSurface, CameoDrawer, cameo_shape, 0, pos_xy, window_rect, ShapeFlagsType(SHAPE_CENTER|SHAPE_400|SHAPE_ALPHA|SHAPE_NORMAL));
+        CC_Draw_Shape(TempSurface, CameoDrawer, cameo_shape, 0, pos_xy, window_rect, ShapeFlagsType(SHAPE_CENTER|SHAPE_WIN_REL|SHAPE_ALPHA|SHAPE_NORMAL));
     }
 
     JMP(0x00428B13);
@@ -1782,11 +1742,25 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Seek_Building_Position)
     _asm { retn 4 }
 }
 
+bool Factory_Can_Produce_Techno(BuildingClass* factory, TechnoClass* exiting)
+{
+    if (factory->Class->IsWeaponsFactory && exiting->Techno_Type_Class()->Speed == SPEED_FLOAT) {
+
+        /**
+         *  We are a war factory with a production anim and a ship is trying to exit us.
+         */
+
+        return false;
+    }
+
+    return true;
+}
+
 
 /**
  *  Prevents ships from "exiting" a weapons factory.
  */
-DECLARE_PATCH(_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory)
+DECLARE_PATCH(_BuildingClass_Exit_Object_Check_Factory_Type)
 {
     GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
     static BuildingTypeClass* buildingtype;
@@ -1796,13 +1770,11 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory)
      */
     GET_REGISTER_STATIC(TechnoClass*, techno, edi);
 
-    if (this_ptr->Class->IsWeaponsFactory && techno->Techno_Type_Class()->Speed == SPEED_FLOAT) {
-
+    if (!Factory_Can_Produce_Techno(this_ptr, techno))
+    {
         /**
-         *  We are a war factory with a production anim and a ship is trying to exit us.
          *  No continuing beyond this part. Exit the function and return -2 (refund).
          */
-
         JMP(0x0042D77E);
     }
 
@@ -1816,11 +1788,23 @@ DECLARE_PATCH(_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory)
 }
 
 
-
 BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass* exiting_object)
 {
     int closest_distance = INT_MAX;
     BuildingClass* closest_match = nullptr;
+
+    TechnoTypeClass* technotype = exiting_object->Techno_Type_Class();
+
+    bool is_naval;
+    if (exiting_object->What_Am_I() == RTTI_UNIT)
+    {
+        UnitTypeClassExtension* unitext = Extension::Fetch<UnitTypeClassExtension>(technotype);
+        is_naval = unitext->IsNaval;
+    }
+    else
+    {
+        is_naval = false;
+    }
 
     for (int i = 0; i < Buildings.Count(); i++)
     {
@@ -1832,7 +1816,6 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
             // if (bldg->Class != this_ptr->Class)
             //     continue;
 
-            TechnoTypeClass* technotype = exiting_object->Techno_Type_Class();
 
             // Check ownable, so only factories of a faction that owns the object can
             // build the object
@@ -1842,23 +1825,10 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
 
             // Do not allow naval yards to push out vehicles and war factories
             // to push out ships
-            if (bldg->Class->Speed == SPEED_FLOAT) 
+            bool is_shipyard = bldg->Class->Speed == SPEED_FLOAT;
+            if (is_shipyard != is_naval)
             {
-                bool is_naval = true;
-
-                if (exiting_object->What_Am_I() == RTTI_UNIT) {
-                    UnitTypeClassExtension* unitext = Extension::Fetch<UnitTypeClassExtension>(technotype);
-                    is_naval = unitext->IsNaval;
-                }
-
-                if (!is_naval)
-                    continue;
-            }
-            else 
-            {
-                if (exiting_object->Techno_Type_Class()->Speed == SPEED_FLOAT) {
-                    continue;
-                }
+                continue;
             }
 
             // All checks have passed. Check the distance to find the closest factory to exit from.
@@ -2136,7 +2106,7 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0043266C, &_BuildingClass_Mission_Repair_ReloadRate_Patch);
     Patch_Jump(0x0042B6CC, &_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch);
     Patch_Jump(0x0042D3B8, &_BuildingClass_Exit_Object_Seek_Building_Position);
-    Patch_Jump(0x0042C9D9, &_BuildingClass_Exit_Object_Prevent_Ship_In_Weapons_Factory);
+    Patch_Jump(0x0042C9D9, &_BuildingClass_Exit_Object_Check_Factory_Type);
     Patch_Jump(0x0042CAB9, &_BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic);
     Patch_Jump(0x0042CE87, &_BuildingClass_Exit_Object_Allow_Rally_Point_For_Naval_Yard_Patch);
 

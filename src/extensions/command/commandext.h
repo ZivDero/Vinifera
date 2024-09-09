@@ -97,7 +97,7 @@ class ManualPlaceCommandClass : public ViniferaCommandClass
         virtual const char *Get_Description() const override;
         virtual bool Process() override;
 
-        virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Z); }
+        virtual KeyNumType Default_Key() const override { return KeyNumType(KN_NONE); }
 };
 
 
@@ -307,6 +307,101 @@ class ToggleSuperTimersCommandClass : public ViniferaCommandClass
         virtual bool Process() override;
 
         virtual KeyNumType Default_Key() const override { return KeyNumType(KN_NONE); }
+};
+
+
+/**
+ *  Switches the sidebar to the Building tab.
+ */
+class SetStructureTabCommandClass : public ViniferaCommandClass
+{
+public:
+    SetStructureTabCommandClass() : ViniferaCommandClass() {}
+    virtual ~SetStructureTabCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Q); }
+};
+
+
+/**
+ *  Switches the sidebar to the Infantry tab.
+ */
+class SetInfantryTabCommandClass : public ViniferaCommandClass
+{
+public:
+    SetInfantryTabCommandClass() : ViniferaCommandClass() {}
+    virtual ~SetInfantryTabCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_W); }
+};
+
+
+/**
+ *  Switches the sidebar to the Vehicles tab.
+ */
+class SetUnitTabCommandClass : public ViniferaCommandClass
+{
+public:
+    SetUnitTabCommandClass() : ViniferaCommandClass() {}
+    virtual ~SetUnitTabCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_E); }
+};
+
+
+/**
+ *  Switches the sidebar to the Special tab.
+ */
+class SetSpecialTabCommandClass : public ViniferaCommandClass
+{
+public:
+    SetSpecialTabCommandClass() : ViniferaCommandClass() {}
+    virtual ~SetSpecialTabCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_R); }
+};
+
+
+/**
+ *  Queues the last built structure.
+ */
+class JustBuiltCommandClass : public ViniferaCommandClass
+{
+public:
+    JustBuiltCommandClass() : ViniferaCommandClass() {}
+    virtual ~JustBuiltCommandClass() {}
+
+    virtual const char* Get_Name() const override;
+    virtual const char* Get_UI_Name() const override;
+    virtual const char* Get_Category() const override;
+    virtual const char* Get_Description() const override;
+    virtual bool Process() override;
+
+    virtual KeyNumType Default_Key() const override { return KeyNumType(KN_Q | VK_CONTROL); }
 };
 
 
