@@ -742,6 +742,7 @@ DECLARE_PATCH(_BulletClass_AI_Intercept)
 
 /**
  *  Halves the distance from the explosion to the unit for units in air.
+ *  The game already performs this for Aircraft, In_Air() was added in YR.
  *
  *  @author: ZivDero
  */
