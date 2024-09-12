@@ -28,6 +28,9 @@
 #include "debughlp.h"
 #include "debughandler.h"
 
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
 
 /**
  *  The process we initialised the symbols of.
