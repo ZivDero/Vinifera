@@ -58,16 +58,16 @@ DECLARE_PATCH(_Init_Theater_Patch)
     LEA_STACK_STATIC(char *, root_name, esp, 0x14); // char [16]
     LEA_STACK_STATIC(char *, iso_root, esp, 0x34); // char [16]
     LEA_STACK_STATIC(char *, suffix_name, esp, 0x24); // char [16]
-    static const char *root;
+    static const char* root;
 
     std::snprintf(root_name, 16, "%s.MIX", TheaterTypeClass::Root_From(theater));
     std::snprintf(iso_root, 16, "%s.MIX", TheaterTypeClass::IsoRoot_From(theater));
     std::snprintf(suffix_name, 16, "%s.MIX", TheaterTypeClass::Suffix_From(theater));
-    
+
     DEBUG_INFO("Init theater \"%s\"\n"
-               "  %s\n"
-               "  %s\n"
-               "  %s\n",
+        "  %s\n"
+        "  %s\n"
+        "  %s\n",
         TheaterTypeClass::Name_From(theater), root_name, iso_root, suffix_name);
 
     /**

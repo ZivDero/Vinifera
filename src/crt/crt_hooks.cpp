@@ -30,6 +30,7 @@
 #include "vinifera_newdel.h"
 #include "asserthandler.h"
 #include "debughandler.h"
+#include <cstring>
 
 #include "hooker.h"
 #include "hooker_macros.h"

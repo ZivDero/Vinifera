@@ -78,12 +78,21 @@ endif()
 # Configure C++ standard
 ################################################################################
 
-# Require that we have at least C++14.
-# We can not use C++ 17 due to a issue with MSVC and COM
-# See: https://developercommunity.visualstudio.com/content/problem/297914/c-intellisense-not-working-for-com-ptr-t-with-c17.html
-set(CMAKE_CXX_STANDARD 14)
+# Require that we have at least C++17.
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# /Zc:__cplusplus is required to make __cplusplus accurate
+# /Zc:__cplusplus is available starting with Visual Studio 2017 version 15.7
+# (according to https://docs.microsoft.com/en-us/cpp/build/reference/zc-cplusplus)
+# That version is equivalent to _MSC_VER==1914
+# (according to https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros?view=vs-2019)
+# CMake's ${MSVC_VERSION} is equivalent to _MSC_VER
+# (according to https://cmake.org/cmake/help/latest/variable/MSVC_VERSION.html#variable:MSVC_VERSION)
+if ((MSVC) AND (MSVC_VERSION GREATER_EQUAL 1914))
+    add_compile_options("/Zc:__cplusplus")
+endif()
 
 #enable_language(C)
 enable_language(CXX)
@@ -174,6 +183,9 @@ endif()
 ################################################################################
 # Set warning level 4
 add_compile_options(/W4)
+
+# Set /permissive (default is /permissive- starting with C++20/VS2019)
+add_compile_options("/permissive")
 
 # For catching unreferenced local variables, we do not need to worry about this when compiling debug builds.
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /wd4189")
