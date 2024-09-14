@@ -624,6 +624,13 @@ target_compile_options(${PROJECT_NAME} PUBLIC /MP2)
 target_link_libraries(${PROJECT_NAME} TSpp)
 add_dependencies(${PROJECT_NAME} TSpp)
 
+# Remove /Zc:__cplusplus from TS++ compiler options because MASM reads it as /Zs, which is "only check syntax".
+get_target_property(TSPP_COMPILE_OPTIONS TSpp COMPILE_OPTIONS)
+if(TSPP_COMPILE_OPTIONS)
+  string(REPLACE "/Zc:__cplusplus" "" TSPP_COMPILE_OPTIONS "${TSPP_COMPILE_OPTIONS}")
+  set_target_properties(TSpp PROPERTIES COMPILE_OPTIONS "${TSPP_COMPILE_OPTIONS}")
+endif()
+
 # Ensure the launcher is built with the main project.
 add_dependencies(${PROJECT_NAME} Launch${PROJECT_NAME})
 
