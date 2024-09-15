@@ -98,7 +98,9 @@ public:
         virtual void Enable() override;
         virtual bool Draw_Me(bool forced = false) override;
         virtual void Set_Shape(const ShapeFileStruct* data, int width = 0, int height = 0);
-        
+        virtual void On_Mouse_Enter();
+        virtual void On_Mouse_Leave();
+
         const ShapeFileStruct* Get_Shape_Data() const { return ShapeData; }
         void Start_Flashing();
         void Stop_Flashing();
@@ -126,6 +128,8 @@ public:
          */
         bool IsSelected;
         bool IsDrawn;
+
+        bool MousedOver = false;
     };
 
 
@@ -141,11 +145,8 @@ public:
         virtual void On_Mouse_Enter();
         virtual void On_Mouse_Leave();
 
-        static void Check_Hover(GadgetClass* gadget, int mousex, int mousey);
-
     public:
         bool MousedOver = false;
-        static ViniferaSelectClass* LastHovered;
     };
 
 public:
@@ -220,4 +221,14 @@ public:
          *  Buttons for the tabs.
          */
         TabButtonClass TabButtons[SIDEBAR_TAB_COUNT];
+
+        /**
+         *  Reference to last gadget that the user has hovered their mouse cursor on.
+         */
+        static GadgetClass* LastHovered;
+
+        /**
+         *  Function for checking which gadget has been hovered over.
+         */
+        static void Check_Hover(GadgetClass* gadget, int mousex, int mousey);
 };

@@ -1675,11 +1675,11 @@ void StripClassFake::_Draw_It(bool complete)
 
 
                 /*
-                **	Draw a selection box around the cameo if we're currently hovering over it
+                **	Draw a selection box around the cameo if we're currently hovering over it.
                 */
                 bool overbutton = SidebarExtension->SelectButton[ID][index - TopIndex].MousedOver;
 
-                if (overbutton)
+                if (overbutton && !Scen->UserInputLocked /* && !darken */ )
                 {
                     Rect cameo_hover_rect(x, SidebarRect.Y + y, OBJECT_WIDTH, OBJECT_HEIGHT - 3);
                     if (ScenExtension->CachedToolTipColorSchemeIndex > -1)
@@ -1921,7 +1921,7 @@ DECLARE_PATCH(_GadgetClass_Input_Mouse_Enter_Leave)
 
     _asm push eax
     _asm push edx
-    SidebarClassExtension::ViniferaSelectClass::Check_Hover(this_ptr, mousex, mousey);
+    SidebarClassExtension::Check_Hover(this_ptr, mousex, mousey);
     _asm pop edx
     _asm pop eax
 

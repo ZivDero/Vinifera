@@ -32,6 +32,7 @@
 #include "ccini.h"
 #include "noinit.h"
 #include "swizzle.h"
+#include "scenarioext.h"
 #include "vinifera_saveload.h"
 #include "asserthandler.h"
 #include "debughandler.h"
@@ -42,7 +43,7 @@
 #include "wwmouse.h"
 
 
-SidebarClassExtension::ViniferaSelectClass* SidebarClassExtension::ViniferaSelectClass::LastHovered;
+GadgetClass* SidebarClassExtension::LastHovered;
 
 /**
  *  Class constructor.
@@ -539,7 +540,6 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     if (!ShapeDrawer)
         return false;
 
-
     int shapenum;
 
     // A disabled tab always looks darkened
@@ -573,7 +573,23 @@ bool SidebarClassExtension::TabButtonClass::Draw_Me(bool forced)
     }
 
     CC_Draw_Shape(SidebarSurface, ShapeDrawer, ShapeData, shapenum, &Point2D(X + DrawX, Y + DrawY), &ScreenRect, SHAPE_NORMAL, 0, 0, ZGRAD_GROUND, 1000, nullptr, 0, 0);
+
+    if (MousedOver && !Scen->UserInputLocked && !IsDisabled && !IsSelected)
+    {
+        Rect hover_rect(X + DrawX, Y + DrawY, Width - 1, Height - 1);
+
+        if (ScenExtension->CachedToolTipColorSchemeIndex > -1) {
+            RGBClass rgb = ColorSchemes[ScenExtension->CachedToolTipColorSchemeIndex]->field_308.operator RGBClass();
+            SidebarSurface->Draw_Rect(hover_rect, DSurface::RGB_To_Pixel(rgb));
+        }
+        else
+        {
+            SidebarSurface->Draw_Rect(hover_rect, 0);
+        }
+    }
+
     IsDrawn = true;
+
     return true;
 }
 
@@ -597,6 +613,36 @@ void SidebarClassExtension::TabButtonClass::Set_Shape(const ShapeFileStruct* dat
 
     if (height != 0)
         Height = height;
+}
+
+
+/**
+ *  Function that gets called when the mouse enters the button.
+ *  Used for hover effects.
+ *
+ *  @author: Rampastring
+ */
+void SidebarClassExtension::TabButtonClass::On_Mouse_Enter()
+{
+    MousedOver = true;
+    Map.IsToFullRedraw = true;
+    Map.Flag_To_Redraw();
+    RedrawSidebar = true;
+}
+
+
+/**
+ *  Function that gets called when the mouse leaves the button.
+ *  Used for hover effects.
+ *
+ *  @author: Rampastring
+ */
+void SidebarClassExtension::TabButtonClass::On_Mouse_Leave()
+{
+    MousedOver = false;
+    Map.IsToFullRedraw = true;
+    Map.Flag_To_Redraw();
+    RedrawSidebar = true;
 }
 
 
@@ -683,22 +729,36 @@ void SidebarClassExtension::ViniferaSelectClass::On_Mouse_Leave()
  *  Function that checks if the mouse has entered/left a button.
  *  This function is hooked into GadgetClass::Input()
  *
- *  @author: ZivDero
+ *  @author: ZivDero, Rampastring
  */
-void SidebarClassExtension::ViniferaSelectClass::Check_Hover(GadgetClass* gadget, int mousex, int mousey)
+void SidebarClassExtension::Check_Hover(GadgetClass* gadget, int mousex, int mousey)
 {
     GadgetClass* to_enter = gadget->Extract_Gadget_At_Mouse(mousex, mousey);
     if (to_enter != LastHovered)
     {
         if (LastHovered)
         {
-            LastHovered->On_Mouse_Leave();
+            // The hovered-on control can be an instance of either ViniferaSelectClass or TabButtonClass
+            if (auto select = dynamic_cast<ViniferaSelectClass*>(LastHovered))
+            {
+                select->On_Mouse_Leave();
+            }
+            else if (auto select = dynamic_cast<TabButtonClass*>(LastHovered))
+            {
+                select->On_Mouse_Leave();
+            }
+
             LastHovered = nullptr;
         }
 
         if (to_enter)
         {
             if (auto select = dynamic_cast<ViniferaSelectClass*>(to_enter))
+            {
+                LastHovered = select;
+                select->On_Mouse_Enter();
+            }
+            else if (auto select = dynamic_cast<TabButtonClass*>(to_enter))
             {
                 LastHovered = select;
                 select->On_Mouse_Enter();
