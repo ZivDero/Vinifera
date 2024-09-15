@@ -1675,11 +1675,12 @@ void StripClassFake::_Draw_It(bool complete)
 
 
                 /*
-                **	Draw a selection box around the cameo if we're currently hovering over it.
+                **	Draw a selection box around the cameo if we're currently hovering over it
+                **	and it is available.
                 */
                 bool overbutton = SidebarExtension->SelectButton[ID][index - TopIndex].MousedOver;
 
-                if (overbutton && !Scen->UserInputLocked /* && !darken */ )
+                if (overbutton && !Scen->UserInputLocked && !darken)
                 {
                     Rect cameo_hover_rect(x, SidebarRect.Y + y, OBJECT_WIDTH, OBJECT_HEIGHT - 3);
                     if (ScenExtension->CachedToolTipColorSchemeIndex > -1)
