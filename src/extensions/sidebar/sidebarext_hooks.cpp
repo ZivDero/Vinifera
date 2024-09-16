@@ -495,7 +495,7 @@ int __cdecl BuildType_Comparison(const void* p1, const void* p2)
             const auto ext2 = Extension::Fetch<UnitTypeClassExtension>(t2);
 
             if (ext1->IsNaval != ext2->IsNaval)
-                return (int)ext2->IsNaval - (int)ext1->IsNaval;
+                return (int)ext1->IsNaval - (int)ext2->IsNaval;
         }
 
         return bt1->BuildableID - bt2->BuildableID;
