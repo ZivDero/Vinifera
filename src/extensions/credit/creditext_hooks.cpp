@@ -155,7 +155,7 @@ DECLARE_PATCH(_TabClass_Draw_It_Faction_Specific_Options_Button_Color_Scheme_Pat
     colorscheme = ColorSchemes[ScenExtension->CachedUIColorSchemeIndex];
 
     _asm { mov edx, dword ptr ds : colorscheme }
-    _asm { mov ecx, dword ptr ds : 0x0074C5E4 } // Restore TempSurface to ecx
+    _asm { mov ecx, dword ptr ds : 0x0074C5E4 } // Restore LogicSurface to ecx
     JMP(0x0060E5B4);
 }
 
@@ -194,7 +194,7 @@ DECLARE_PATCH(_TechnoClass_Draw_Power_Level_Text_Faction_Specific_Color_Scheme_P
     _asm { mov eax, dword ptr ds : colorschemeindex }
     _asm { push eax }
     _asm { push 149h }
-    _asm { mov edx, dword ptr ds : 0x0074C5E4 } // Restore TempSurface to edx
+    _asm { mov edx, dword ptr ds : 0x0074C5E4 } // Restore LogicSurface to edx
     JMP(0x00637DE4);
 }
 
@@ -211,7 +211,7 @@ DECLARE_PATCH(_TechnoClass_Draw_Primary_Text_Faction_Specific_Color_Scheme_Patch
     _asm { mov eax, dword ptr ds : colorschemeindex }
     _asm { push eax }
     _asm { push 149h }
-    _asm { mov ecx, dword ptr ds : 0x0074C5E4 } // Restore TempSurface to ecx
+    _asm { mov ecx, dword ptr ds : 0x0074C5E4 } // Restore LogicSurface to ecx
     JMP(0x00637E33);
 }
 

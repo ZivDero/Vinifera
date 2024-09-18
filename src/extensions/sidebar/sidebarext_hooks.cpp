@@ -813,8 +813,8 @@ void SidebarClassFake::_Draw_It(bool complete)
     Map.field_1214 = Rect();
     PowerClass::Draw_It(complete);
 
-    DSurface* oldsurface = TempSurface;
-    TempSurface = SidebarSurface;
+    DSurface* oldsurface = LogicSurface;
+    LogicSurface = SidebarSurface;
 
     Rect rect(0, 0, SidebarSurface->Get_Width(), SidebarSurface->Get_Height());
 
@@ -904,7 +904,7 @@ void SidebarClassFake::_Draw_It(bool complete)
     IsToRedraw = false;
     IsToFullRedraw = false;
     Blit_Sidebar(complete);
-    TempSurface = oldsurface;
+    LogicSurface = oldsurface;
 }
 
 
