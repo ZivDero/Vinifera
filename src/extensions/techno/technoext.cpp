@@ -115,7 +115,6 @@ HRESULT TechnoClassExtension::Save(IStream *pStm, BOOL fClearDirty)
         return hr;
     }
 
-    delete ElectricBolt;
     ElectricBolt = nullptr;
 
     return hr;
