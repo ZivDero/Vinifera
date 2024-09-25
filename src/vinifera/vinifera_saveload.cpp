@@ -107,6 +107,7 @@
 #include "session.h"
 #include "addon.h"
 #include "ccini.h"
+#include "cstream.h"
 
 
 /**
@@ -703,4 +704,135 @@ bool Vinifera_Remap_Extension_Pointers()
     }
 
     return true;
+}
+
+
+bool Vinifera_Save_Game(const char* file_name, const char* descr, bool)
+{
+    IStorage* pstgOpen = nullptr;
+    IStream* docfile = nullptr;
+    IUnknown* pUnknown = nullptr;
+    ILinkStream* pLinkStream;
+    WCHAR wide_file_name[64];
+
+    DEBUG_INFO("SAVING GAME [%s - %s]\n", file_name, descr);
+
+    // Convert the file name to a wide string.
+    MultiByteToWideChar(CP_ACP, 0, file_name, -1, wide_file_name, std::size(wide_file_name));
+
+    // Create the compound file.
+    DEBUG_INFO("Creating DocFile\n");
+    HRESULT hr = StgCreateDocfile(wide_file_name, STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, &pstgOpen);
+    if (FAILED(hr)) {
+        DEBUG_FATAL("Failed to create storage.\n");
+        return false;
+    }
+
+    // Save version information.
+    //versionInfo.SaveVersionInfo();
+    //versionInfo.Set_Internal_Version(1);  // Placeholder for GameVersion
+    //versionInfo.Set_Scenario_Description(descr);
+    //versionInfo.Set_Version(1);
+    //versionInfo.Set_Player_House("PlayerHouse");  // Placeholder for player house
+    //versionInfo.Set_Campaign_Number(1);           // Placeholder for campaign number
+    //versionInfo.Set_Scenario_Number(1);           // Placeholder for scenario number
+    //versionInfo.Set_Executable_Name("SUN.EXE");
+    //versionInfo.Set_Game_Type(1);                 // Placeholder for game type
+    //CoFileTimeNow(&fileTime);
+    //versionInfo.Set_Last_Time(&fileTime);
+    //versionInfo.Set_Start_Time(&fileTime);
+    //versionInfo.Set_Play_Time(&fileTime);
+
+    // Create the content stream.
+    DEBUG_INFO("Creating content stream.\n");
+    hr = pstgOpen->CreateStream(L"CONTENTS", STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &docfile);
+    if (FAILED(hr)) {
+        DEBUG_FATAL("Failed to create content stream.\n");
+        pstgOpen->Release();
+        return false;
+    }
+
+    DEBUG_INFO("Saving savefile metadata.\n");
+    if (!Vinifera_Save_Header(docfile)) {
+        DEBUG_FATAL("Failed to write savefile metadata.\n");
+        pstgOpen->Release();
+        return false;
+    }
+
+    // Compressing the stream
+    DEBUG_INFO("Linking content stream to compressor.\n");
+    hr = CoCreateInstance(__uuidof(CStreamClass), nullptr, CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER, IID_IUnknown, (void**)&pUnknown);
+    if (SUCCEEDED(hr)) {
+        hr = OleRun(pUnknown);
+        if (SUCCEEDED(hr)) {
+            pUnknown->QueryInterface(__uuidof(ILinkStream), (void**)&pLinkStream);
+        }
+        pUnknown->Release();
+    }
+
+    hr = pLinkStream->Link_Stream(docfile);
+    if (FAILED(hr)) {
+        DEBUG_FATAL("Failed to link stream to compressor.\n");
+        pstgOpen->Release();
+        return false;
+    }
+
+    pLinkStream->QueryInterface()
+
+    // Simulating the writing of the game data.
+    DEBUG_INFO("Calling Vinifera_Put_All().\n");
+    bool result = Vinifera_Put_All(docfile, false);
+
+    // Unlinking the content stream from the compressor.
+    DEBUG_INFO("Unlinking content stream from compressor.\n");
+    hr = pLinkStream->Unlink_Stream(nullptr);
+    if (FAILED(hr)) {
+        DEBUG_FATAL("Failed to link unstream from compressor.\n");
+        pstgOpen->Release();
+        return false;
+    }
+
+    // Release the content stream.
+    DEBUG_INFO("Releasing content stream.\n");
+    if (docfile) {
+        docfile->Release();
+    }
+
+    // Commit the changes to the storage.
+    DEBUG_INFO("Closing DocFile.\n");
+    hr = pstgOpen->Commit(STGC_DEFAULT);
+    if (FAILED(hr)) {
+        DEBUG_FATAL("Failed to commit storage.\n");
+        pstgOpen->Release();
+        return false;
+    }
+
+    DEBUG_INFO("SAVING GAME [%s] - Complete.\n");
+
+    // Release the storage.
+    if (docfile)
+    {
+        docfile->Release();
+    }
+    if (pLinkStream)
+    {
+        pLinkStream->Release();
+    }
+    if (docfile)
+    {
+        docfile->Release();
+    }
+    if (pstgOpen)
+    {
+        pstgOpen->Release();
+    }
+
+    
+    return result;
+}
+
+
+bool Vinifera_Load_Game(char* filename)
+{
+
 }
