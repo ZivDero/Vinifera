@@ -34,11 +34,16 @@
 #include "vinifera_globals.h"
 #include "vinifera_saveload.h"
 
+#define MODIFIER_DEFAULT DBL_MAX
+#define FORCEFIRE_DEFAULT UCHAR_MAX
+#define PASSIVEACQUIRE_DEFAULT UCHAR_MAX
+#define RETALIATE_DEFAULT UCHAR_MAX
+
+
 std::vector<std::vector<double>> Verses::Modifier;
 std::vector<std::vector<unsigned char>> Verses::ForceFire;
 std::vector<std::vector<unsigned char>> Verses::PassiveAcquire;
 std::vector<std::vector<unsigned char>> Verses::Retaliate;
-
 
 /**
  *  Saves all the Verses arrays to the stream.
@@ -106,19 +111,19 @@ void Verses::Resize()
     // Resize the old arrays for new warheads and set defaults
     for (int i = 0; i < old_armor_count; i++)
     {
-        Modifier[i].resize(WarheadTypes.Count(), DBL_MAX);
-        ForceFire[i].resize(WarheadTypes.Count(), UCHAR_MAX);
-        PassiveAcquire[i].resize(WarheadTypes.Count(), UCHAR_MAX);
-        Retaliate[i].resize(WarheadTypes.Count(), UCHAR_MAX);
+        Modifier[i].resize(WarheadTypes.Count(), MODIFIER_DEFAULT);
+        ForceFire[i].resize(WarheadTypes.Count(), FORCEFIRE_DEFAULT);
+        PassiveAcquire[i].resize(WarheadTypes.Count(), PASSIVEACQUIRE_DEFAULT);
+        Retaliate[i].resize(WarheadTypes.Count(), RETALIATE_DEFAULT);
     }
 
     // Create new arrays for new armors
     for (int i = old_armor_count; i < ArmorTypes.Count(); i++)
     {
-        Modifier[i] = std::vector<double>(WarheadTypes.Count(), DBL_MAX);
-        ForceFire[i] = std::vector<unsigned char>(WarheadTypes.Count(), UCHAR_MAX);
-        PassiveAcquire[i] = std::vector<unsigned char>(WarheadTypes.Count(), UCHAR_MAX);
-        Retaliate[i] = std::vector<unsigned char>(WarheadTypes.Count(), UCHAR_MAX);
+        Modifier[i] = std::vector<double>(WarheadTypes.Count(), MODIFIER_DEFAULT);
+        ForceFire[i] = std::vector<unsigned char>(WarheadTypes.Count(), FORCEFIRE_DEFAULT);
+        PassiveAcquire[i] = std::vector<unsigned char>(WarheadTypes.Count(), PASSIVEACQUIRE_DEFAULT);
+        Retaliate[i] = std::vector<unsigned char>(WarheadTypes.Count(), RETALIATE_DEFAULT);
     }
 }
 
@@ -147,7 +152,7 @@ double Verses::Get_Modifier(ArmorType armor, WarheadType warhead)
     ASSERT(armor >= ARMOR_FIRST && armor < ArmorTypes.Count());
     ASSERT(warhead >= WARHEAD_FIRST && warhead < WarheadTypes.Count());
 
-    if (Modifier[armor][warhead] == DBL_MAX)
+    if (Modifier[armor][warhead] == MODIFIER_DEFAULT)
         return ArmorTypes[armor]->Modifier;
 
     return Modifier[armor][warhead];
@@ -178,7 +183,7 @@ bool Verses::Get_ForceFire(ArmorType armor, WarheadType warhead)
     ASSERT(armor >= ARMOR_FIRST && armor < ArmorTypes.Count());
     ASSERT(warhead >= WARHEAD_FIRST && warhead < WarheadTypes.Count());
 
-    if (ForceFire[armor][warhead] == UCHAR_MAX)
+    if (ForceFire[armor][warhead] == FORCEFIRE_DEFAULT)
         return ArmorTypes[armor]->ForceFire;
 
     return static_cast<bool>(ForceFire[armor][warhead]);
@@ -209,7 +214,7 @@ bool Verses::Get_PassiveAcquire(ArmorType armor, WarheadType warhead)
     ASSERT(armor >= ARMOR_FIRST && armor < ArmorTypes.Count());
     ASSERT(warhead >= WARHEAD_FIRST && warhead < WarheadTypes.Count());
 
-    if (PassiveAcquire[armor][warhead] == UCHAR_MAX)
+    if (PassiveAcquire[armor][warhead] == PASSIVEACQUIRE_DEFAULT)
         return ArmorTypes[armor]->PassiveAcquire;
 
     return static_cast<bool>(PassiveAcquire[armor][warhead]);
@@ -240,7 +245,7 @@ bool Verses::Get_Retaliate(ArmorType armor, WarheadType warhead)
     ASSERT(armor >= ARMOR_FIRST && armor < ArmorTypes.Count());
     ASSERT(warhead >= WARHEAD_FIRST && warhead < WarheadTypes.Count());
 
-    if (Retaliate[armor][warhead] == UCHAR_MAX)
+    if (Retaliate[armor][warhead] == RETALIATE_DEFAULT)
         return ArmorTypes[armor]->Retaliate;
 
     return static_cast<bool>(Retaliate[armor][warhead]);

@@ -443,14 +443,14 @@ bool TechnoClassExt::_Is_Allowed_To_Retaliate(TechnoClass* source, WarheadTypeCl
         return false;
 
     /**
-     *   Human-controlled units that have a target don't retaliate.
+     *  Human-controlled units that have a target don't retaliate.
      */
     if (House->Is_Human_Control() && this->TarCom)
         return false;
 
     /**
-     *   If the source of the damage is a Veinhole, retaliate, unless this is a player-controlled
-     *   ground unit and it's moving somewhere.
+     *  If the source of the damage is a Veinhole, retaliate, unless this is a player-controlled
+     *  ground unit and it's moving somewhere.
      */
     if (warhead != nullptr && warhead->IsVeinhole)
     {
@@ -459,26 +459,26 @@ bool TechnoClassExt::_Is_Allowed_To_Retaliate(TechnoClass* source, WarheadTypeCl
     }
 
     /**
-     *   If there is no source of the damage, then retaliation cannot occur.
+     *  If there is no source of the damage, then retaliation cannot occur.
      */
     if (source == nullptr)
         return false;
 
     /**
-     *   If the source of the damage is an ally, then retaliation shouldn't
+     *  If the source of the damage is an ally, then retaliation shouldn't
      *  occur either.
      */
     if (House->Is_Ally(source))
         return false;
 
     /**
-     *   Only objects that have a damaging weapon are allowed to retaliate.
+     *  Only objects that have a damaging weapon are allowed to retaliate.
      */
     if (Combat_Damage() <= 0 || !Is_Weapon_Equipped())
         return false;
 
     /**
-     *   If this is not equipped with a weapon that can attack the molester, then
+     *  If this is not equipped with a weapon that can attack the molester, then
      *  don't allow retaliation.
      */
     const WeaponInfoStruct* weapon_info = Get_Weapon(What_Weapon_Should_I_Use(source));
@@ -489,7 +489,7 @@ bool TechnoClassExt::_Is_Allowed_To_Retaliate(TechnoClass* source, WarheadTypeCl
     }
 
     /**
-     *   Don't allow retaliation if it isn't equipped with a weapon that can deal with the threat.
+     *  Don't allow retaliation if it isn't equipped with a weapon that can deal with the threat.
      */
     if (source->What_Am_I() == RTTI_AIRCRAFT && !weapon_info->Weapon->Bullet->IsAntiAircraft) return(false);
 
@@ -511,7 +511,7 @@ bool TechnoClassExt::_Is_Allowed_To_Retaliate(TechnoClass* source, WarheadTypeCl
     }
 
     /**
-     *   Artillery that need to deploy to fire don't retaliate.
+     *  Artillery that need to deploy to fire don't retaliate.
      */
     if (House->Is_Human_Control() && What_Am_I() == RTTI_UNIT)
     {
@@ -521,7 +521,7 @@ bool TechnoClassExt::_Is_Allowed_To_Retaliate(TechnoClass* source, WarheadTypeCl
     }
 
     /**
-     *   If a human house is not allowed to retaliate automatically, then don't
+     *  If a human house is not allowed to retaliate automatically, then don't
      */
     if (House->Is_Human_Control() && !Rule->IsSmartDefense && What_Am_I() != RTTI_BUILDING)
     {
@@ -530,7 +530,7 @@ bool TechnoClassExt::_Is_Allowed_To_Retaliate(TechnoClass* source, WarheadTypeCl
     }
 
     /**
-     *   If this object is part of a team that prevents retaliation then don't allow retaliation.
+     *  If this object is part of a team that prevents retaliation then don't allow retaliation.
      */
     if (Is_Foot() && reinterpret_cast<FootClass const*>(this)->Team != nullptr && reinterpret_cast<FootClass const*>(this)->Team->Class->IsSuicide)
         return false;
@@ -582,7 +582,7 @@ double TechnoClassExt::_Target_Threat(TechnoClass* target, Coordinate& firing_co
     /**
      *  Nothing is not a threat.
      */
-    if (target->Class_Of() == nullptr)
+    if (!target->Class_Of())
         return 0;
     
     if (House->IsThreatRatingNodeActive)
@@ -607,19 +607,13 @@ double TechnoClassExt::_Target_Threat(TechnoClass* target, Coordinate& firing_co
 
     if (target_rtti == RTTI_BUILDING || target_rtti == RTTI_INFANTRY || target_rtti == RTTI_UNIT || target_rtti == RTTI_AIRCRAFT)
     {
-        if (target != nullptr)
+        if (target)
         {
             const WeaponTypeClass* target_weapon = target->Get_Weapon(target->What_Weapon_Should_I_Use(target))->Weapon;
-            if (target_weapon != nullptr && target_weapon->WarheadPtr != nullptr)
+            if (target_weapon && target_weapon->WarheadPtr)
             {
-                if (target->TarCom == this)
-                {
-                    threat = -(target_effectiveness_coefficient * Verses::Get_Modifier(ttype->Armor, target_weapon->WarheadPtr));
-                }
-                else
-                {
-                    threat = target_effectiveness_coefficient * Verses::Get_Modifier(ttype->Armor, target_weapon->WarheadPtr);
-                }
+                const int sign = target->TarCom == this ? -1 : 1;
+                threat = sign * target_effectiveness_coefficient * Verses::Get_Modifier(ttype->Armor, target_weapon->WarheadPtr);
             }
 
             threat += target_special_threat_coefficient * target->Techno_Type_Class()->SpecialThreatValue;
@@ -629,18 +623,18 @@ double TechnoClassExt::_Target_Threat(TechnoClass* target, Coordinate& firing_co
     }
 
     const WeaponTypeClass* weapon = Get_Weapon(What_Weapon_Should_I_Use(target))->Weapon;
-    if (weapon != nullptr && weapon->WarheadPtr != nullptr)
+    if (weapon && weapon->WarheadPtr)
         threat += my_effectiveness_coefficient * Verses::Get_Modifier(target->Class_Of()->Armor, weapon->WarheadPtr);
 
     threat += target->Health_Ratio() * target_strength_coefficient + threat;
 
-    const LEPTON threat_range = weapon != nullptr ? weapon->Range : Techno_Type_Class()->ThreatRange;
+    const LEPTON threat_range = weapon ? weapon->Range : Techno_Type_Class()->ThreatRange;
 
     LEPTON dist;
     if (firing_coord == Coordinate())
-        dist = (Center_Coord() - target->Center_Coord()).Length() / 256;
-    else
-        dist = (firing_coord - target->Center_Coord()).Length() / 256;
+        firing_coord = Center_Coord();
+
+    dist = (firing_coord - target->Center_Coord()).Length() / 256;
 
     if (dist > threat_range)
         threat += (dist - threat_range) * target_distance_coefficient;
@@ -665,9 +659,10 @@ int TechnoClassExt::_Anti_Infantry() const
         if (Get_Weapon(WEAPON_SLOT_PRIMARY)->Weapon->Bullet->IsAntiGround)
             return 0;
 
+        constexpr int minrange = 0x0400;
         WeaponTypeClass const* weapon = Get_Weapon(WEAPON_SLOT_PRIMARY)->Weapon;
         BulletTypeClass const* bullet = weapon->Bullet;
-        const int mrange = std::min(static_cast<int>(weapon->Range), 0x0400);
+        const int mrange = std::min(static_cast<int>(weapon->Range), minrange);
 
         int value = ((weapon->Attack * Verses::Get_Modifier(ARMOR_NONE, weapon->WarheadPtr)) * mrange * weapon->WarheadPtr->SpreadFactor) / weapon->ROF;
         if (Techno_Type_Class()->Is_Two_Shooter())
@@ -772,19 +767,14 @@ DECLARE_PATCH(_TechnoClass_Evaluate_Object_PassiveAcquire_Armor_Patch)
      *  Determine if the target object has an armor type that this warhead is not allowed to passive acquire.
      */
     weapon = const_cast<WeaponTypeClass*>(this_ptr->Get_Weapon(WEAPON_SLOT_PRIMARY)->Weapon);
-    if (weapon != nullptr && weapon->WarheadPtr != nullptr &&
-        !Verses::Get_PassiveAcquire(object->Techno_Type_Class()->Armor, weapon->WarheadPtr))
-    {
+    if (weapon && weapon->WarheadPtr && !Verses::Get_PassiveAcquire(object->Techno_Type_Class()->Armor, weapon->WarheadPtr))
         goto return_false;
-    }
 
     /**
      *  An object with no health shouldn't be targeted.
      */
     if (!object->Strength)
-    {
         goto return_false;
-    }
 
 continue_checks:
     JMP(0x0062D129);
@@ -843,7 +833,7 @@ DECLARE_PATCH(_TechnoClass_Base_Is_Attacked_Armor1_Patch)
     GET_STACK_STATIC(TechnoClass*, enemy, esp, 0x84);
     GET_REGISTER_STATIC(UnitClass*, unit, esi);
 
-    if (Verses::Get_Modifier(enemy->Techno_Type_Class()->Armor, unit->Get_Weapon(WEAPON_SLOT_PRIMARY)->Weapon->WarheadPtr) != 0)
+    if (Verses::Get_Modifier(enemy->Techno_Type_Class()->Armor, unit->Get_Weapon(WEAPON_SLOT_PRIMARY)->Weapon->WarheadPtr))
     {
         _asm mov esi, unit
         JMP(0x00636C36);
@@ -1480,7 +1470,7 @@ DECLARE_PATCH(_TechnoClass_Null_House_Warning_Patch)
  */
 DECLARE_PATCH(_TechnoClass_AI_Abandon_Invalid_Target_Patch)
 {
-    GET_REGISTER_STATIC(TechnoClass *, this_ptr, esi);
+    GET_REGISTER_STATIC(TechnoClass*, this_ptr, esi);
 
     static FireErrorType fire;
 

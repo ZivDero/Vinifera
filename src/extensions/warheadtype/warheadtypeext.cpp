@@ -216,22 +216,22 @@ bool WarheadTypeClassExtension::Read_INI(CCINIClass &ini)
     /**
      *  Reload the legacy version Verses, ForceFire, PassiveAcquire, Retaliate entries into the new Modifier array.
      */
-    if (ini.Get_String(ini_name, "Verses", ArmorTypeClass::Get_Modifier_Default_String(), buffer, sizeof(buffer)) > 0) {
-        char *aval = std::strtok(buffer, ",");
+    if (ini.Get_String(ini_name, "Verses", nullptr, buffer, sizeof(buffer)) > 0) {
+        char *token = std::strtok(buffer, ",");
         for (int armor = 0; armor < ArmorTypes.Count(); ++armor) {
 
             // Fix: if there are not enough verses specified, use the defaults
-            if (aval == nullptr) {
+            if (token == nullptr) {
                 break;
             }
 
-            if (std::strchr(aval, '%')) {
-                Verses::Set_Modifier(static_cast<ArmorType>(armor), warheadtype, std::atoi(aval) * 0.01);
+            if (std::strchr(token, '%')) {
+                Verses::Set_Modifier(static_cast<ArmorType>(armor), warheadtype, std::atoi(token) * 0.01);
             } else {
-                Verses::Set_Modifier(static_cast<ArmorType>(armor), warheadtype, std::atof(aval));
+                Verses::Set_Modifier(static_cast<ArmorType>(armor), warheadtype, std::atof(token));
             }
 
-            aval = std::strtok(nullptr, ",");
+            token = std::strtok(nullptr, ",");
         }
     }
 
@@ -261,30 +261,30 @@ bool WarheadTypeClassExtension::Read_INI(CCINIClass &ini)
     };
 
     auto read_bools = [&](const char* key_name, int type) {
-        if (ini.Get_String(ini_name, key_name, ArmorTypeClass::Get_Boolean_Default_String(), buffer, sizeof(buffer)) > 0) {
-            char* aval = std::strtok(buffer, ",");
+        if (ini.Get_String(ini_name, key_name, nullptr, buffer, sizeof(buffer)) > 0) {
+            char* token = std::strtok(buffer, ",");
             for (int armor = 0; armor < ArmorTypes.Count(); ++armor) {
 
                 // If there are not enough values, use the defaults
-                if (aval == nullptr) {
+                if (token == nullptr) {
                     break;
                 }
 
                 switch (type) {
                 case FORCEFIRE:
-                    Verses::Set_ForceFire(static_cast<ArmorType>(armor), warheadtype, parse_bool(aval, Verses::Get_ForceFire(static_cast<ArmorType>(armor), warheadtype)));
+                    Verses::Set_ForceFire(static_cast<ArmorType>(armor), warheadtype, parse_bool(token, Verses::Get_ForceFire(static_cast<ArmorType>(armor), warheadtype)));
                     break;
                 case PASSIVEACQUIRE:
-                    Verses::Set_PassiveAcquire(static_cast<ArmorType>(armor), warheadtype, parse_bool(aval, Verses::Get_PassiveAcquire(static_cast<ArmorType>(armor), warheadtype)));
+                    Verses::Set_PassiveAcquire(static_cast<ArmorType>(armor), warheadtype, parse_bool(token, Verses::Get_PassiveAcquire(static_cast<ArmorType>(armor), warheadtype)));
                     break;
                 case RETALIATE:
-                    Verses::Set_Retaliate(static_cast<ArmorType>(armor), warheadtype, parse_bool(aval, Verses::Get_Retaliate(static_cast<ArmorType>(armor), warheadtype)));
+                    Verses::Set_Retaliate(static_cast<ArmorType>(armor), warheadtype, parse_bool(token, Verses::Get_Retaliate(static_cast<ArmorType>(armor), warheadtype)));
                     break;
                 default:
                     break;
                 }
 
-                aval = std::strtok(nullptr, ",");
+                token = std::strtok(nullptr, ",");
             }
         }
         };

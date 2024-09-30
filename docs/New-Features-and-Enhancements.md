@@ -140,7 +140,7 @@ PassiveAcquire=yes  ; boolean, whether warheads can by default passive acquire t
 Vanilla ArmorTypes are present implicitly, redeclaring them has no effect. However, it is possible to override default values for them in their respective sections.
 ```
 
-- The new armor can be assigned to a Techno normally.
+- The new armor can be assigned to a Techno as any default armor.
 
 ```{note}
 Armor names are case-sensitive, including when part of `INI` keys.
@@ -154,7 +154,7 @@ Armor=myarmor  ; ArmorType
 
 - Verses for the new armor are appended to the end of the vanilla Verses key.
 - Additionally, it is possible to customize whether a unit using a certain warhead can force-fire, retaliate or passively acquire units with a certain armor type. This mimics the special behavior of RA2's 0% and 1%, as well as Ares's 2%.
-- It is also possible to override the game's default harcoded behavior for infantry using warheads with 0% verses against armor "steel".
+- It is also possible to override the game's default hardcoded behavior for infantry using warheads with 0% verses against armor "heavy".
 
 In `RULES.INI`:
 ```ini
@@ -179,7 +179,7 @@ Organic=no                  ; boolean, whether an infantry using this warhead ca
 ```
 
 ```{warning}
-It is recommended to set both `Retaliate.X` and `PassiveAcquire.X` to `no` if `ForceFire.X` is disabled. Otherwise, units may lock onto targets they are not permitted to fire at, potentially causing them to remain in an unresponsive state.
+It is recommended to set both `Retaliate.X` and `PassiveAcquire.X` to `no` if `ForceFire.X` is disabled. Otherwise, units may lock onto targets they are not permitted to fire at and continue to target them until they receive another order.
 ```
 
 ### AILegalTarget

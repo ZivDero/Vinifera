@@ -130,10 +130,10 @@ bool ArmorTypeClass::Read_INI(CCINIClass& ini)
         return false;
     }
 
-    Modifier = ini.Get_Double(Name, "Modifier", 1.0);
-    ForceFire = ini.Get_Bool(Name, "ForceFire", true);
-    PassiveAcquire = ini.Get_Bool(Name, "PassiveAcquire", true);
-    Retaliate = ini.Get_Bool(Name, "Retaliate", true);
+    Modifier = ini.Get_Double(Name, "Modifier", Modifier);
+    ForceFire = ini.Get_Bool(Name, "ForceFire", ForceFire);
+    PassiveAcquire = ini.Get_Bool(Name, "PassiveAcquire", PassiveAcquire);
+    Retaliate = ini.Get_Bool(Name, "Retaliate", Retaliate);
 
     return true;
 }
@@ -171,48 +171,4 @@ bool ArmorTypeClass::One_Time()
     ASSERT(armor != nullptr);
 
     return true;
-}
-
-
-/**
- *  Build the default Verses value string representing all the available ArmorTypes.
- *
- *  @author: CCHyper
- */
-const char *ArmorTypeClass::Get_Modifier_Default_String()
-{
-    static char _buffer[1024];
-
-    std::memset(_buffer, 0, sizeof(_buffer));
-
-    for (ArmorType index = ARMOR_FIRST; index < ArmorTypes.Count(); index++) {
-        std::strcat(_buffer, "100%%");
-        if (index < ArmorTypes.Count() - 1) {
-            std::strcat(_buffer, ",");
-        }
-    }
-
-    return _buffer;
-}
-
-
-/**
- *  Build the default boolean flag value string representing all the available ArmorTypes.
- *
- *  @author: ZivDero
- */
-const char* ArmorTypeClass::Get_Boolean_Default_String()
-{
-    static char _buffer[1024];
-
-    std::memset(_buffer, 0, sizeof(_buffer));
-
-    for (ArmorType index = ARMOR_FIRST; index < ArmorTypes.Count(); index++) {
-        std::strcat(_buffer, "yes");
-        if (index < ArmorTypes.Count() - 1) {
-            std::strcat(_buffer, ",");
-        }
-    }
-
-    return _buffer;
 }

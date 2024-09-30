@@ -71,7 +71,8 @@ int Vinifera_Modify_Damage(int damage, WarheadTypeClass* warhead, ArmorType armo
      */
     if (damage < 0)
     {
-        if (distance < 0x008 && armor == ARMOR_NONE)
+        enum { MAX_HEAL_DISTANCE = 8 };
+        if (distance < MAX_HEAL_DISTANCE)
             return damage;
 
         return 0;
