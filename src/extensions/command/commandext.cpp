@@ -3959,7 +3959,7 @@ bool StartingWaypointsCommandClass::Process()
     if (Map.PendingObject) {
         Map.Set_Cursor_Pos(Cell(0,0));
     }
-    Map.Follow_This(nullptr);
+    Map.Set_To_Follow(nullptr);
 
     Map.Flag_To_Redraw(true);
 

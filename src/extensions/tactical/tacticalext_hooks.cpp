@@ -839,7 +839,7 @@ original_code:
  */
 DECLARE_PATCH(_Tactical_Center_On_Location_Unfollow_Object_Patch)
 {
-    Map.Follow_This(nullptr);
+    Map.Set_To_Follow(nullptr);
 
     // Rebuild function epilogue
     _asm { pop  edi }

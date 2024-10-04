@@ -35,6 +35,7 @@
 
 
 class PrerequisiteGroupClass;
+class HouseClass;
 class KamikazeTrackerClass;
 class AircraftTrackerClass;
 class SpawnManagerClass;
@@ -44,7 +45,7 @@ class ArmorTypeClass;
 class RocketTypeClass;
 class MouseTypeClass;
 class ActionTypeClass;
-class PrerequisiteGroupClass;
+class SpawnerConfig;
 
 
 extern bool Vinifera_DeveloperMode;
@@ -98,7 +99,17 @@ extern bool Vinifera_NoTacticalVersionString;
 
 extern bool Vinifera_ShowSuperWeaponTimers;
 
+extern SpawnerConfig* Vinifera_SpawnerConfig;
+extern bool Vinifera_SpawnerActive;
+
+extern HouseClass* Vinifera_ObserverPtr;
+
+extern bool Vinifera_DoSave;
+extern int Vinifera_NextAutoSaveFrame;
+extern int Vinifera_NextAutoSaveNumber;
+
 extern unsigned Vinifera_TotalPlayTime;
+extern unsigned Vinifera_PlaythroughID;
 
 extern DynamicVectorClass<MFCD *> ViniferaMapsMixes;
 extern DynamicVectorClass<MFCD *> ViniferaMoviesMixes;
