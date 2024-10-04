@@ -7,6 +7,7 @@ This page lists all the individual contributions to the project by their author.
 - **Belonit (Gluk-v48)**:
   - Check for Changelog/Documentation/Credits in Pull Requests.
   - Docs dark theme switcher.
+  - Porting the YR MP spawner from C to C++ and YR++, used as a base for the Vinifera spawner.
 - **CCHyper/tomsons26**:
   - Vinifera foundations: TS++, game.exe hooker, extension system and other core features
   - Implement `CurleyShuffle` for AircraftTypes
@@ -124,6 +125,8 @@ This page lists all the individual contributions to the project by their author.
   - Adds keyboard commands to reproduce the last items that were built.
   - Change starting unit placement to be the same as Red Alert 2.
   - Add the framework for new ArmorTypes.
+- **CnCNet Contributors**:
+  - Tiberian Sun TS-patches spawner, Yuri's Revenge CnCNet spawner that served as a base for Vinifera spawner.
 - **Kerbiter (Metadorius)**:
   - Initial documentation setup.
 - **MarkJFox**:
@@ -156,4 +159,5 @@ This page lists all the individual contributions to the project by their author.
   - Add a developer command to dump all heaps to the log.
   - Make harvesters drop the Tiberium type they're carrying on death, instead of Tiberium Riparius.
   - Make it so that it is no longer required to list all Tiberiums in a map to override some Tiberium's properties.
+  - Implement the multiplayer spawner.
 
