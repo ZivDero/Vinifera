@@ -10,6 +10,8 @@ This page describes every change in Vinifera that wasn't categorized into a prop
 - OverlayTypes 27 to 38 (fourth Tiberium images) were hardcoded to be impassable by infantry. This limitation is removed.
 - Harvesters used to drop their cargo as Tiberium Riparius on death. They will now drop the Tiberium types they are carrying, instead.
 - It is no longer required to list all Tiberiums in a map to override some Tiberium's properties.
+- BaseUnit now accepts a list units. Players will be granted the first unit in the list that has their house listed under `Owners=`.
+- The AI now correctly considers all entries of `BuildConst`, `BuildRefinery`, `BuildWeapons` and `HarvesterUnit`.
 
 ## Spawner
 

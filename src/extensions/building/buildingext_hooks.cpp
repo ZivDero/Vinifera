@@ -63,6 +63,7 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "rulesext.h"
 #include "spawner.h"
 
 
@@ -771,6 +772,86 @@ continue_function:
 
 
 /**
+ *  #issue-177
+ *
+ *  Patches the check for if a building is a Construction Yard to check the entire BuildConst list.
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_BuildingClass_Unlimbo_BuildConst_Patch)
+{
+    GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
+
+    if (Rule->BuildConst.Is_Present(this_ptr->Class))
+    {
+        JMP(0x0042AA8B);
+    }
+
+    JMP(0x0042AACF);
+}
+
+
+/**
+ *  #issue-177
+ *
+ *  Patches the check for if a building is a Construction Yard to check the entire BuildConst list.
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_BuildingClass_Captured_BuildConst_Patch1)
+{
+    GET_REGISTER_STATIC(BuildingTypeClass*, buildingtype, ecx);
+
+    if (Rule->BuildConst.Is_Present(buildingtype))
+    {
+        JMP(0x0042F968);
+    }
+
+    JMP(0x0042F9A2);
+}
+
+
+/**
+ *  #issue-177
+ *
+ *  Patches the check for if you have a Construction Yard to check the entire BuildConst list.
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_BuildingClass_Captured_BuildConst_Patch2)
+{
+    GET_REGISTER_STATIC(HouseClass*, house, ebx);
+
+    if (house->Count_Owned(Rule->BuildConst))
+    {
+        JMP(0x0042FAEF);
+    }
+
+    JMP(0x0042FB10);
+}
+
+
+/**
+ *  #issue-177
+ *
+ *  Patches the check for if a building is a Construction Yard to check the entire BuildConst list.
+ *
+ *  @author: ZivDero
+ */
+DECLARE_PATCH(_BuildingClass_Captured_BuildConst_Patch3)
+{
+    GET_REGISTER_STATIC(BuildingClass*, this_ptr, esi);
+
+    if (Rule->BuildConst.Is_Present(this_ptr->Class))
+    {
+        JMP(0x0042FCB6);
+    }
+
+    JMP(0x0042FCF8);
+}
+
+
+/**
  *  Main function for patching the hooks.
  */
 void BuildingClassExtension_Hooks()
@@ -793,4 +874,8 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x00439D10, &BuildingClassExt::_Can_Have_Rally_Point);
     Patch_Jump(0x0042D9A0, &BuildingClassExt::_Update_Buildables);
     Patch_Jump(0x00428810, &BuildingClassExt::_Draw_Overlays);
+    Patch_Jump(0x0042AA76, &_BuildingClass_Unlimbo_BuildConst_Patch);
+    Patch_Jump(0x0042F958, &_BuildingClass_Captured_BuildConst_Patch1);
+    Patch_Jump(0x0042FACC, &_BuildingClass_Captured_BuildConst_Patch2);
+    Patch_Jump(0x0042FCA1, &_BuildingClass_Captured_BuildConst_Patch3);
 }

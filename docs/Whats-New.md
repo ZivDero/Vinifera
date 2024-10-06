@@ -140,6 +140,8 @@ New:
 - Make harvesters drop the Tiberium type they're carrying on death, instead of Tiberium Riparius (by ZivDero)
 - Make it so that it is no longer required to list all Tiberiums in a map to override some Tiberium's properties (by ZivDero)
 - Implemented the multiplayer spawner (by ZivDero)
+- Extend `BaseUnit` to accept a list of vehicles (by ZivDero/CCHyper)
+- Allow `BuildConst`, `BuildRefinery`, `BuildWeapons` and `HarvesterUnit` to properly have multiple entries (by ZivDero)
 
 Vanilla fixes:
 - Fix HouseType `Nod` having the `Prefix=B` and `Side=GDI` in vanilla `rules.ini` by setting them to `N` and `Nod`, respectively (by CCHyper/tomsons26)

@@ -125,6 +125,7 @@ This page lists all the individual contributions to the project by their author.
   - Adds keyboard commands to reproduce the last items that were built.
   - Change starting unit placement to be the same as Red Alert 2.
   - Add the framework for new ArmorTypes.
+  - Extend `BaseUnit` to accept a list of vehicles.
 - **CnCNet Contributors**:
   - Tiberian Sun TS-patches spawner, Yuri's Revenge CnCNet spawner that served as a base for Vinifera spawner.
 - **Kerbiter (Metadorius)**:
@@ -160,4 +161,6 @@ This page lists all the individual contributions to the project by their author.
   - Make harvesters drop the Tiberium type they're carrying on death, instead of Tiberium Riparius.
   - Make it so that it is no longer required to list all Tiberiums in a map to override some Tiberium's properties.
   - Implement the multiplayer spawner.
+  - Extend `BaseUnit` to accept a list of vehicles.
+  - Allow `BuildConst`, `BuildRefinery`, `BuildWeapons` and `HarvesterUnit` to properly have multiple entries.
 
