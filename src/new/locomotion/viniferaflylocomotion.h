@@ -28,26 +28,16 @@
 #pragma once
 
 #include "always.h"
+#include "iflycontrol.h"
 #include "locomotion.h"
 #include "rockettype.h"
+#include "foot.h"
 #include "vinifera_defines.h"
 
 
-enum class RocketMissionState
-{
-    None = 0,
-    Pause = 1,
-    Tilt = 2,
-    GainingAltitude = 3,
-    Flight = 4,
-    ClosingIn = 5,
-    VerticalTakeOff = 6,
-};
 
-#define ROCKET_SPEED 416
-
-class DECLSPEC_UUID(CLSID_ROCKET_LOCOMOTOR)
-RocketLocomotionClass : public LocomotionClass
+class DECLSPEC_UUID(CLSID_FLY_LOCOMOTOR)
+ViniferaFlyLocomotionClass : public LocomotionClass
 {
 public:
     /**
@@ -70,74 +60,73 @@ public:
      */
     IFACEMETHOD_(bool, Is_Moving)() override;
     IFACEMETHOD_(Coordinate, Destination)() override;
-    IFACEMETHOD_(Matrix3D, Draw_Matrix)(int *key) override;
+    IFACEMETHOD_(Matrix3D, Draw_Matrix)(int* key) override;
+    IFACEMETHOD_(Matrix3D, Shadow_Matrix)(int* key) override;
+    IFACEMETHOD_(Point2D, Draw_Point)() override;
     IFACEMETHOD_(Point2D, Shadow_Point)() override;
     IFACEMETHOD_(bool, Process)() override;
     IFACEMETHOD_(void, Move_To)(Coordinate to) override;
     IFACEMETHOD_(void, Stop_Moving)() override;
+    IFACEMETHOD_(void, Do_Turn)(DirStruct coord) override;
+    IFACEMETHOD_(bool, Power_Off)() override;
+    IFACEMETHOD_(bool, Is_Powered)() override;
+    IFACEMETHOD_(bool, Is_Ion_Sensitive)() override;
     IFACEMETHOD_(LayerType, In_Which_Layer)() override;
     IFACEMETHOD_(bool, Is_Moving_Now)() override;
+    IFACEMETHOD_(int, Apparent_Speed)() override;
+    IFACEMETHOD_(int, Get_Status)() override;
+    IFACEMETHOD_(void, Acquire_Hunter_Seeker_Target)() override;
 
-    RocketLocomotionClass();
-    ~RocketLocomotionClass() override = default;
+    ViniferaFlyLocomotionClass();
+    ~ViniferaFlyLocomotionClass() override = default;
 
 private:
     /**
-     *  RocketLocomotionClass
+     *  ViniferaFlyLocomotionClass
      */
-    Coordinate Get_Next_Position(double speed) const;
-    double Get_Next_Pitch() const;
-    void Explode();
-    bool Time_To_Explode(const RocketTypeClass* rocket);
+    bool Landing_Takeoff_AI_499CA0();
+    bool Edge_Of_World_AI_499E40();
+    void Movement_AI_499F20();
+    ImpactType Physics_49AFE0(Coordinate& coord, DirStruct facing);
+    void Rotation_AI_49B0D0();
+    bool Process_Take_Off_49B1A0();
+    bool Process_Landing_49B360();
+    void Nearing_Target_49BBA0(bool a1, Coordinate coord);
+    void Taking_Off_49CB00();
+    void Land_on_Airport_49CBA0();
+    bool Is_In_Flight_49CCE0();
+    int func_49CE70();
+    bool Needs_To_Land_49D210();
+    bool Is_Locked_To_Straight_Flight_49D2D0();
+
+    inline IFlyControl* Get_Fly_Control()
+    {
+        IFlyControl* flycontrol = nullptr;
+        const HRESULT hr = Linked_To()->QueryInterface(__uuidof(IFlyControl), reinterpret_cast<LPVOID*>(&flycontrol));
+
+        if (FAILED(hr) && hr != E_NOINTERFACE)
+            _com_issue_error(hr);
+
+        return flycontrol;
+    }
+
 
 public:
-    RocketLocomotionClass(const RocketLocomotionClass&) = delete;
-    RocketLocomotionClass(const NoInitClass& noinit);
-    RocketLocomotionClass& operator=(const RocketLocomotionClass&) = delete;
+    ViniferaFlyLocomotionClass(const ViniferaFlyLocomotionClass&) = delete;
+    ViniferaFlyLocomotionClass& operator=(const ViniferaFlyLocomotionClass&) = delete;
     
 protected:
-    /**
-     *  This is the desired destination coordinate of the rocket.
-     */
     Coordinate DestinationCoord;
-
-    /**
-     *  This is the timer used by various mission states of the rocket.
-     */
-    CDRateTimerClass<FrameTimerClass> MissionTimer;
-
-    /**
-     *  This is the timer used for timing the trail animation.
-     */
-    CDTimerClass<FrameTimerClass> TrailTimer;
-
-    /**
-     *  The current state of the rocket.
-     */
-    RocketMissionState MissionState;
-
-    /**
-     *  The current speed of the rocket.
-     */
+    Coordinate HeadToCoord;
+    bool IsMoving;
+    int FlightLevel;
+    double TargetSpeed;
     double CurrentSpeed;
-
-    /**
-     *  This boolean gets used to determine if the rocket needs to be submit to DisplayClass.
-     */
-    bool NeedToSubmit;
-
-    /**
-     *  Is this rocket's spawner elite?
-     */
-    bool IsSpawnerElite;
-
-    /**
-     *  The current pitch of the rocket.
-     */
-    double CurrentPitch;
-
-    /**
-     *  The distance to the destination from when the rocket has reached its desired altitude.
-     */
-    int ApogeeDistance;
+    bool IsTakingOff;
+    bool IsLanding;
+    bool WasLanding;
+    bool field_4B;
+    int field_4C_facing;
+    int field_50;
+    bool IsElevating;
 };

@@ -48,7 +48,7 @@
 /**
  *  Retrieves the class identifier (CLSID) of the object.
  * 
- *  @author: CCHyper
+ *  @author: ZivDero
  */
 IFACEMETHODIMP RocketLocomotionClass::GetClassID(CLSID *pClassID)
 {    
@@ -65,7 +65,7 @@ IFACEMETHODIMP RocketLocomotionClass::GetClassID(CLSID *pClassID)
 /**
  *  Initializes an object from the stream where it was saved previously.
  * 
- *  @author: CCHyper
+ *  @author: ZivDero
  */
 IFACEMETHODIMP RocketLocomotionClass::Load(IStream *pStm)
 {
@@ -214,7 +214,7 @@ IFACEMETHODIMP_(bool) RocketLocomotionClass::Process()
             {
                 if (TrailTimer.Expired() && rocket->TakeoffAnim)
                 {
-                    new AnimClass(rocket->TakeoffAnim, Linked_To()->Coord, 2, 1, SHAPE_WIN_REL | SHAPE_CENTER, -10);
+                    new AnimClass(rocket->TakeoffAnim, Linked_To()->Get_Coord(), 2, 1, SHAPE_WIN_REL | SHAPE_CENTER, -10);
                     TrailTimer = 24;
                 }
 
@@ -260,8 +260,8 @@ IFACEMETHODIMP_(bool) RocketLocomotionClass::Process()
                 CurrentPitch = rocket->PitchFinal * DEG_TO_RAD(90);
                 MissionState = RocketMissionState::GainingAltitude;
                 if (rocket->TakeoffAnim)
-                    new AnimClass(rocket->TakeoffAnim, Linked_To()->Coord, 2, 1, SHAPE_WIN_REL | SHAPE_CENTER, -10);
-                Sound_Effect(Linked_To()->Techno_Type_Class()->AuxSound1, Linked_To()->Coord);
+                    new AnimClass(rocket->TakeoffAnim, Linked_To()->Get_Coord(), 2, 1, SHAPE_WIN_REL | SHAPE_CENTER, -10);
+                Sound_Effect(Linked_To()->Techno_Type_Class()->AuxSound1, Linked_To()->Get_Coord());
             }
             /**
              *  Otherwise, keep tilting.
@@ -424,7 +424,7 @@ IFACEMETHODIMP_(bool) RocketLocomotionClass::Process()
             {
                 if (rocket->TakeoffAnim)
                 {
-                    new AnimClass(rocket->TakeoffAnim, Linked_To()->Coord, 2, 1, SHAPE_WIN_REL | SHAPE_CENTER, -10);
+                    new AnimClass(rocket->TakeoffAnim, Linked_To()->Get_Coord(), 2, 1, SHAPE_WIN_REL | SHAPE_CENTER, -10);
                     TrailTimer = 24;
                 }
             }
@@ -435,7 +435,7 @@ IFACEMETHODIMP_(bool) RocketLocomotionClass::Process()
             if (MissionTimer.Expired())
             {
                 CurrentPitch = rocket->PitchFinal * DEG_TO_RAD(90);
-                Sound_Effect(Linked_To()->Techno_Type_Class()->AuxSound1, Linked_To()->Coord);
+                Sound_Effect(Linked_To()->Techno_Type_Class()->AuxSound1, Linked_To()->Get_Coord());
 
                 TrailTimer = 0;
                 MissionState = RocketMissionState::GainingAltitude;
@@ -445,7 +445,7 @@ IFACEMETHODIMP_(bool) RocketLocomotionClass::Process()
              */
             else
             {
-                Coordinate coord = Linked_To()->Coord;
+                Coordinate coord = Linked_To()->Get_Coord();
                 coord.Z += rocket->RaiseRate;
                 if (Map.In_Radar(Coord_Cell(coord)))
                     Linked_To()->Set_Coord(coord);
@@ -573,9 +573,9 @@ Coordinate RocketLocomotionClass::Get_Next_Position(double speed) const
     const double horizontal_speed = FastMath::Cos(CurrentPitch) * speed;
     const double horizontal_angle = Linked_To()->PrimaryFacing.Current().Get_Radian<65536>();
 
-    coord.X = static_cast<int>(Linked_To()->Coord.X + FastMath::Cos(horizontal_angle) * horizontal_speed);
-    coord.Y = static_cast<int>(Linked_To()->Coord.Y - FastMath::Sin(horizontal_angle) * horizontal_speed);
-    coord.Z = static_cast<int>(Linked_To()->Coord.Z + FastMath::Sin(CurrentPitch) * speed);
+    coord.X = static_cast<int>(Linked_To()->Get_Coord().X + FastMath::Cos(horizontal_angle) * horizontal_speed);
+    coord.Y = static_cast<int>(Linked_To()->Get_Coord().Y - FastMath::Sin(horizontal_angle) * horizontal_speed);
+    coord.Z = static_cast<int>(Linked_To()->Get_Coord().Z + FastMath::Sin(CurrentPitch) * speed);
 
     return coord;
 }
@@ -591,7 +591,7 @@ double RocketLocomotionClass::Get_Next_Pitch() const
     /**
      *  Calculate how much is there left to go.
      */
-    const Coordinate left_to_go = DestinationCoord - Linked_To()->Coord;
+    const Coordinate left_to_go = DestinationCoord - Linked_To()->Get_Coord();
     const double length = Vector2(static_cast<float>(left_to_go.X), static_cast<float>(left_to_go.Y)).Length();
 
     /**

@@ -60,6 +60,7 @@
 
 #include "rocketlocomotion.h"
 #include "setup_hooks.h"
+#include "viniferaflylocomotion.h"
 
 
 static DynamicVectorClass<Wstring> ViniferaSearchPaths;
@@ -840,6 +841,7 @@ bool Vinifera_Register_Com_Objects()
      */
     REGISTER_CLASS(TestLocomotionClass);
     REGISTER_CLASS(RocketLocomotionClass);
+    REGISTER_CLASS(ViniferaFlyLocomotionClass);
 
     /**
      *  New types.
