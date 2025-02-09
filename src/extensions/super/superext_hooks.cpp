@@ -174,7 +174,7 @@ void SuperClassExt::_Do_DropPods(Cell* cell)
 	}
 
 	if (ttype != NULL) {
-		Scen->Waypoint[WAYPT_SPECIAL] = Map.Nearby_Location(*cell, SPEED_FOOT);
+		ScenExtension->Waypoint[WAYPT_SPECIAL] = Map.Nearby_Location(*cell, SPEED_FOOT, -1, MZONE_INFANTRY, false, 1, 1, true, false, false, false, Cell());
 		if (Do_Reinforcements(ttype)) {
 
 			// Mark the aircraft as a loaner so it is able to exit the map
