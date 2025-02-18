@@ -1490,8 +1490,9 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
                         navcom_coord = ptr->NavCom->Center_Coord();
                     }
 
-                    std::fprintf(fp, "COORD:%d,%d,%d  Facing:%d  Mission:%s  HeapID:%s(%d)  Speed:%d  TarCom:%s(%d,%d,%d)  NavCom:%s(%d,%d,%d)  Doing:%d  Path: ",
+                    std::fprintf(fp, "COORD:%d,%d,%d  Strength:%d  Facing:%d  Mission:%s  HeapID:%s(%d)  Speed:%d  TarCom:%s(%d,%d,%d)  NavCom:%s(%d,%d,%d)  Doing:%d  Path: ",
                                 ptr->Center_Coord().X, ptr->Center_Coord().Y, ptr->Center_Coord().Z,
+                                ptr->Strength,
                                 (int)ptr->PrimaryFacing.Current().Get_Dir(), MissionClass::Mission_Name(ptr->Get_Mission()),
                                 ptr->Class->Name(), ptr->Class->HeapID,
                                 (int)(ptr->Speed * 256.0),
@@ -1536,8 +1537,9 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
                         navcom_coord = ptr->NavCom->Center_Coord();
                     }
 
-                    std::fprintf(fp, "COORD:%d,%d,%d  Facing:%d  Facing2:%d  Mission:%s  HeapID:%s(%d)  TarCom:%s(%d,%d,%d)  NavCom:%s(%d,%d,%d)  TrkNum:%d  TrkInd:%d  SpdAcc:%d  Path:",
+                    std::fprintf(fp, "COORD:%d,%d,%d  Strength: %d  Facing:%d  Facing2:%d  Mission:%s  HeapID:%s(%d)  TarCom:%s(%d,%d,%d)  NavCom:%s(%d,%d,%d)  TrkNum:%d  TrkInd:%d  SpdAcc:%d  Path:",
                                 ptr->Center_Coord().X, ptr->Center_Coord().Y, ptr->Center_Coord().Z,
+                                ptr->Strength,
                                 (int)ptr->PrimaryFacing.Current().Get_Dir(), (int)ptr->SecondaryFacing.Current().Get_Dir(), MissionClass::Mission_Name(ptr->Get_Mission()),
                                 ptr->Class->Name(), ptr->Class->HeapID,
                                 tarcom_name, tarcom_coord.X, tarcom_coord.Y, tarcom_coord.Z,
@@ -1572,9 +1574,9 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
                         tarcom_name = Name_From_RTTI(ptr->TarCom->RTTI);
                         tarcom_coord = ptr->TarCom->Center_Coord();
                     }
-
-                    std::fprintf(fp, "COORD:%d,%d,%d  Facing:%d  Mission:%s  HeapID:%s(%d)  TarCom:%s(%d,%d,%d)\n",
+                    std::fprintf(fp, "COORD:%d,%d,%d  Strength: %d  Facing:%d  Mission:%s  HeapID:%s(%d)  TarCom:%s(%d,%d,%d)\n",
                                 ptr->Center_Coord().X, ptr->Center_Coord().Y, ptr->Center_Coord().Z,
+                                ptr->Strength,
                                 (int)ptr->PrimaryFacing.Current().Get_Dir(), MissionClass::Mission_Name(ptr->Get_Mission()),
                                 ptr->Class->Name(), ptr->Class->HeapID,
                                 tarcom_name, tarcom_coord.X, tarcom_coord.Y, tarcom_coord.Z);
@@ -1614,8 +1616,9 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
                         navcom_coord = ptr->NavCom->Center_Coord();
                     }
 
-                    std::fprintf(fp, "COORD:%d,%d,%d  Facing:%d  Mission:%s  HeapID:%s(%d) TarCom:%s(%d,%d,%d)  NavCom:%s(%d,%d,%d)  Path:",
+                    std::fprintf(fp, "COORD:%d,%d,%d  Strength:%d  Facing:%d  Mission:%s  HeapID:%s(%d) TarCom:%s(%d,%d,%d)  NavCom:%s(%d,%d,%d)  Path:",
                                 ptr->Center_Coord().X, ptr->Center_Coord().Y, ptr->Center_Coord().Z,
+                                ptr->Strength,
                                 (int)ptr->PrimaryFacing.Current().Get_Dir(), MissionClass::Mission_Name(ptr->Get_Mission()),
                                 ptr->Class->Name(), ptr->Class->HeapID,
                                 tarcom_name, tarcom_coord.X, tarcom_coord.Y, tarcom_coord.Z,
@@ -1723,7 +1726,7 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
                     std::fprintf(fp, "Particle  (Type: %s (%d)) ", objp->Name(), Particles.ID(static_cast<ParticleClass*>(objp)));
                     break;
                 default:
-                    std::fprintf(fp, "Other     (Type: %s (%d)) (RTTI: %d) ", objp->Name(), objp->Fetch_Heap_ID(), objp->RTTI);
+                    std::fprintf(fp, "Other     (Type: (%d)) (RTTI: %d) ", objp->Fetch_Heap_ID(), objp->What_Am_I());
                     break;
             };
             HouseClass *housep = objp->Owner_HouseClass();
