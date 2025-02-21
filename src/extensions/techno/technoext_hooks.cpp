@@ -270,6 +270,8 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
             }
             else if (TClass->PipScale == PIP_AMMO)
             {
+                pips = Ammo;
+
                 if (ttype_ext->PipWrap > 0)
                 {
                     enum { PIP_AMMO_WRAP_FIRST = 7 };
