@@ -50,7 +50,7 @@ bool IgnoreAllAsserts = false;
 /**
  *  Should asserts fire but not report?
  */
-bool SilentAsserts = false;
+bool SilentAsserts = true;
 
 /**
  *  The number of assertions to ignore on a global basis.
