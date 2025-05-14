@@ -119,7 +119,7 @@ void SuperClassExt::_Do_DropPods(Cell* cell)
 {
 	char buffer[24];
 
-	sprintf(buffer, "PARADROPINF_%d", this->House->ID);
+	sprintf(buffer, "PARADROPINF_%d", this->House->HeapID);
 	const TeamTypeClass* ttype = TeamTypeClass::As_Pointer(buffer);
 
 	if (ttype == nullptr) {
