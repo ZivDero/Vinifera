@@ -132,4 +132,9 @@ public:
      *  If this building is a factory, can it only produce those units that list it in BuiltAt=?
      */
     bool IsExclusiveFactory;
+    
+    /**
+     *  Should the Advanced AI ignore prerequisites when considering whether it can build this building?
+     */
+    bool IsAdvancedAIIgnoresPrerequisites;
 };

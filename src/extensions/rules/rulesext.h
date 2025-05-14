@@ -60,6 +60,7 @@ class RulesClassExtension final : public GlobalExtensionClass<RulesClass>
 
         bool Objects(CCINIClass &ini);
 
+        bool AI(CCINIClass &ini);
         bool General(CCINIClass &ini);
         bool MPlayer(CCINIClass &ini);
         bool AudioVisual(CCINIClass &ini);
@@ -190,4 +191,29 @@ class RulesClassExtension final : public GlobalExtensionClass<RulesClass>
          *  Is the strengthening mechanic enabled?
          */
         bool IsStrengtheningEnabled;
+
+        /**
+         *  Is DTA's custom advanced AI logic enabled?
+         */
+        bool IsUseAdvancedAI;
+
+        /**
+         *  Is the advanced AI allowed to own multiple Construction Yards at a time?
+         */
+        bool IsAdvancedAIMultiConYard;
+
+        /**
+         *  Specifies the maximum distance that the advanced AI is allowed to expand at.
+         */
+        int AdvancedAIMaxExpansionDistance;
+
+        /**
+         *  Specifies the minimum number of refineries that the Advanced AI thinks it should build.
+         */
+        int AdvancedAIMinimumRefineryCount;
+
+        /**
+         *  List of naval yards for the AI to build.
+         */
+        TypeList<BuildingTypeClass*> BuildNavalYard;
 };

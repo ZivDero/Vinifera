@@ -118,4 +118,51 @@ public:
     VectorClass<int> WeedStorage;
 
     int StrengthenDestroyedCost;
+
+    /**
+     *  If we are currently expanding our base towards a resourceful location,
+     *  this records the cell that we are expanding towards.
+     */
+    Cell NextExpansionPointLocation;
+
+    /**
+     *  Locations that we should never expand towards.
+     *  Basically, locations that are unreachable.
+     */
+    Cell PermanentlyBlockedExpansionPointLocations[20];
+
+    /**
+     *  Records whether the AI has reached its expansion point.
+     *  If yes, the AI should build a refinery.
+     */
+    bool ShouldBuildRefinery;
+
+    /**
+     *  Set when the AI has built its first barracks during the game.
+     *  Used to figure out whether the AI should reset its TeamDelay
+     *  timer when it has built a barracks.
+     */
+    bool HasBuiltFirstBarracks;
+
+    /**
+     *  Records when the AI last checked for excess refineries.
+     */
+    int LastExcessRefineryCheckFrame;
+
+    /**
+     *  Records when the AI last checked for sleeping harvesters.
+     */
+    int LastSleepingHarvesterCheckFrame;
+
+    /**
+     *  Defines whether the AI has already performed a final "desperate vehicle charge".
+     *  If it has been done, then there is no need to do it again.
+     */
+    bool HasPerformedVehicleCharge;
+
+    /**
+     *  Records a value whether the current structure build choice 
+     *  was made under threat of getting rushed early in the game.
+     */
+    bool IsUnderStartRushThreat;
 };
