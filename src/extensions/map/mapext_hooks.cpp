@@ -70,7 +70,7 @@ void MapClassExt::_Place_Down(Cell& cell, ObjectClass* object)
         Cell xlist[32];
         List_Copy(object->Occupy_List(), ARRAY_SIZE(xlist), xlist);
         Cell const* list = xlist;
-        while (*list != Cell(REFRESH_EOL, REFRESH_EOL)) {
+        while (*list != REFRESH_EOL) {
             Cell newcell = cell + *list++;
             int cellnum = newcell.As_Cell_Number();
 
