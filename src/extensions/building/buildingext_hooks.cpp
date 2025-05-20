@@ -3253,4 +3253,5 @@ void BuildingClassExtension_Hooks()
     Patch_Jump(0x0042B6CC, &_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch);
     Patch_Jump(0x0042D3B8, &_BuildingClass_Exit_Object_Seek_Building_Position);
     Patch_Jump(0x0042CAB9, &_BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic);
+    Patch_Byte(0x00432786 + 1, 0x00); // Change "true" to "false" in Create_Bullet call in Mission_Missile to disable combat light from nukes
 }
