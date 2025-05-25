@@ -2501,7 +2501,7 @@ bool HouseClassExt::_AI_Target_MultiMissile(SuperClass* super)
 DECLARE_PATCH(_HouseClass_AI_Raise_Money_Fix_Memory_Corruption)
 {
     GET_REGISTER_STATIC(HouseClass*, this_ptr, esi);
-    GET_REGISTER_STATIC(BuildingType, buildingtype, eax);
+    GET_REGISTER_STATIC(StructType, buildingtype, eax);
     static int buildable_index;
 
     buildable_index = this_ptr->Base.Next_Buildable_Index(buildingtype);
@@ -2533,10 +2533,10 @@ DECLARE_PATCH(_HouseClass_AI_Raise_Money_Fix_Memory_Corruption)
 void _HouseClass_AI_Building_Check_For_Corrupted_Base_Node(HouseClass* house)
 {
     if (house->Base.Nodes.Count() > 0) {
-        BuildingType type = house->Base.Nodes[0].Type;
+        StructType type = house->Base.Nodes[0].Type;
         if (type < BUILDING_FIRST || type >= BuildingTypes.Count()) {
             DEBUG_ERROR("Corrupted base node detected for house %d, fixing it. Frame: %d\n", house->ID, Frame);
-            house->Base.Nodes[0].Type = BUILDING_NONE;
+            house->Base.Nodes[0].Type = STRUCT_NONE;
             house->Base.Nodes[0].Where = Cell(0, 0);
         }
     }
@@ -2552,7 +2552,7 @@ bool Passes_Additional_Validity_Checks(TechnoTypeClass* technotype, HouseClass* 
         return false;
     }
 
-    if (house->Is_Human_Control() &&
+    if (house->Is_Human_Player() &&
         (technotype->TechLevel < 0 || technotype->TechLevel > house->Control.TechLevel)) {
         // TechnoType cannot be built by this human player.
         return false;
