@@ -246,6 +246,7 @@ void RulesClassExtension::Process(CCINIClass &ini)
      */
 
     This()->Colors(ini);
+    This()->Movies(ArtINI);
     This()->Houses(ini);
     This()->Sides(ini);
     This()->Overlays(ini);
