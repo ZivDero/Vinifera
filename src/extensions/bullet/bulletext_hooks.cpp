@@ -538,7 +538,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
             ObjectClass* cell_occupier = cell_at_new_coord.Cell_Occupier();
             while (!is_forced_to_explode && cell_occupier != nullptr)
             {
-                if (cell_occupier->Owner_HouseClass() != our_house)
+                if (cell_occupier->Owner_HouseClass() != our_house && (our_house == nullptr || !our_house->Is_Ally(cell_occupier)))
                     is_forced_to_explode = true;
                 else
                     cell_occupier = cell_occupier->Next;
