@@ -109,14 +109,7 @@ bool BulletClassExt::_Is_Forced_To_Explode(Coord& coord)
             (Payback == nullptr || !Payback->House->Is_Ally(cellptr->Cell_Techno())))) {
 
             /*
-            **  Force explosion to be at center of techno object if one is present.
-            */
-            if (cellptr->Cell_Techno() != nullptr) {
-                coord = cellptr->Cell_Techno()->Target_Coord();
-            }
-
-            /*
-            **  However, if the torpedo was blocked by a bridge, then force the
+            **  If the torpedo was blocked by a bridge, then force the
             **  torpedo to explode on top of that bridge cell.
             */
             if (cellptr->Is_Bridge_Here()) {
@@ -124,6 +117,32 @@ bool BulletClassExt::_Is_Forced_To_Explode(Coord& coord)
             }
 
             return true;
+        }
+
+        /*
+        **  Torpedoes can be blocked by enemy objects on their path.
+        */
+        TechnoClass* celltechno = cellptr->Cell_Techno();
+
+        if (celltechno != nullptr)
+        {
+            if (celltechno == TarCom || 
+                (Distance(celltechno) < bullettypeext->SnapDistance && (Payback == nullptr || !Payback->House->Is_Ally(celltechno)))) 
+            {
+                /*
+                **  If the techno is not a building, force
+                **  explosion to be at center of techno object.
+                **  Otherwise, explode in the center of the cell.
+                */
+                if (celltechno->Fetch_RTTI() != RTTI_BUILDING) {
+                    coord = cellptr->Cell_Techno()->Target_Coord();
+                }
+                else {
+                    coord = cellptr->Center_Coord();
+                }
+
+                return true;
+            }
         }
     }
 
