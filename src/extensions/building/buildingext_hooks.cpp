@@ -2297,17 +2297,17 @@ int Try_Place(BuildingClass* building, Cell cell)
  *  Fetches a house's base area as a rectangle.
  *  We can use this as a rough zone for placing new buildings.
  */
-Rect Get_Base_Rect(HouseClass* house, int adjacency, int width, int height)
+Rect Get_Base_Rect(int adjacency, int width, int height)
 {
     int x = INT_MAX;
     int y = INT_MAX;
     int right = INT_MIN;
     int bottom = INT_MIN;
 
-    for (int i = 0; i < Buildings.Count(); i++) {
-        BuildingClass* building = Buildings[i];
+    for (int i = 0; i < our_building_count; i++) {
+        BuildingClass* building = our_buildings[i];
 
-        if (!building->IsActive || building->IsInLimbo || building->House != house) {
+        if (!building->IsActive || building->IsInLimbo || !Map.In_Local_Radar(building->Coord)) {
             continue;
         }
 
@@ -2641,7 +2641,7 @@ Point2D Rectangle_Center_Point(Rect rect)
 Cell Get_Best_Refinery_Placement_Position(BuildingClass* building)
 {
     int adjacency = building->Class->Adjacent + 1 + 1;
-    Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
+    Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
     return Find_Best_Building_Placement_Cell(basearea, building, Refinery_Placement_Cell_Value, 1);
 }
 
@@ -2749,7 +2749,7 @@ int Far_From_Enemy_Placement_Position_Value(Cell cell, BuildingClass* building)
 Cell Get_Best_SuperWeapon_Building_Placement_Position(BuildingClass* building)
 {
     int adjacency = building->Class->Adjacent + 1;
-    Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
+    Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
     return Find_Best_Building_Placement_Cell(basearea, building, Far_From_Enemy_Placement_Position_Value);
 }
 
@@ -2784,7 +2784,7 @@ int Towards_Expansion_Placement_Cell_Value(Cell cell, BuildingClass* building)
 Cell Get_Best_Expansion_Placement_Position(BuildingClass* building)
 {
     int adjacency = building->Class->Adjacent + 1 + 1; // allow cheating in adjacency by 1 cell
-    Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
+    Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
 
     HouseClass* owner = building->House;
     HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(owner);
@@ -2914,7 +2914,7 @@ Cell Get_Best_Factory_Placement_Position(BuildingClass* building)
 
     int adjacency = building->Class->Adjacent + 1;
 
-    Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
+    Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
 
     if (building->Class->ToBuild == RTTI_INFANTRYTYPE)
     {
@@ -2954,7 +2954,7 @@ Cell Get_Best_Defense_Placement_Position(BuildingClass* building)
     attackcell = Cell(0, 0);
 
     int adjacency = building->Class->Adjacent + 1;
-    Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
+    Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
 
     // If we were attacked recently, then place the defense near a damaged building of ours if one exists.
     if (owner->LATime + TICKS_PER_MINUTE > Frame) {
@@ -3020,7 +3020,7 @@ Cell Get_Best_Defense_Placement_Position(BuildingClass* building)
 Cell Get_Best_Sensor_Placement_Position(BuildingClass* building)
 {
     int adjacency = building->Class->Adjacent + 1;
-    Rect basearea = Get_Base_Rect(building->House, adjacency, building->Class->Width(), building->Class->Height());
+    Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
     return Find_Best_Building_Placement_Cell(basearea, building, Near_Base_Center_Placement_Position_Value);
 }
 
@@ -3062,7 +3062,8 @@ int BuildingClass_Exit_Object_Custom_Position(BuildingClass* building)
         if (!otherbuilding->IsActive ||
             otherbuilding->IsInLimbo ||
             otherbuilding->Class->IsInvisibleInGame ||
-            otherbuilding->House != owner) {
+            otherbuilding->House != owner ||
+            !Map.In_Local_Radar(otherbuilding->Coord)) {
             continue;
         }
 
