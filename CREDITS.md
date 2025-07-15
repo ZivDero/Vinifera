@@ -181,6 +181,7 @@ This page lists all the individual contributions to the project by their author.
   - Fix a bug where it was impossible to tell infantry to enter cloaked allied transports.
   - Implement `ExplosionDamage` for animations.
   - Implement naval yard rally points.
+  - Original implementations of actions in ts-patches.
 - **secsome**:
   - Add support for up to 32767 waypoints to be used in scenarios.
 - **Starkku**:
@@ -260,3 +261,4 @@ This page lists all the individual contributions to the project by their author.
   - Fix building light sources no longer being attached to the building after loading the game.
   - Fix shroud looking bugged if you attempt to reveal too many cells at once.
   - Implement voxel light customization.
+  - Implement TActionClass extension, port ts-patches actions.
