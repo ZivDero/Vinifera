@@ -26,6 +26,8 @@
  *
  ******************************************************************************/
 #include "tactionext_hooks.h"
+
+#include <algorithm>
 #include "tibsun_globals.h"
 #include "tibsun_inline.h"
 #include "trigger.h"
@@ -50,6 +52,7 @@
 #include "house.h"
 #include "housetype.h"
 #include "session.h"
+#include "voxellib.h"
 
 #include "hooker.h"
 #include "hooker_macros.h"
@@ -99,11 +102,88 @@ bool TActionClassExt::_Operator_Parens_Intercept(HouseClass* house, ObjectClass*
 }
 
 
+struct VoxelShadowRenderStruct {
+    VoxelLibraryClass* VoxLib;
+    int Layer;
+    int Info;
+    Vector3 ShadowCorner[4];
+};
+
+
+VoxelShadowRenderStruct(&VoxelShadowRenderData)[64] = Make_Global<VoxelShadowRenderStruct[64]>(0x00832740);
+int& VoxelShadowRenderDataCount = Make_Global<int>(0x00822338);
+Vector3& MinVoxelBounds = Make_Global<Vector3>(0x0081FDA8);
+Vector3& MaxVoxelBounds = Make_Global<Vector3>(0x00820110);
+
+
+Vector3 Project_Onto_XY(Vector3 point, Vector3 direction)
+{
+    if (fabs(direction.Z) < 1e-6f) {
+        // Parallel to XY plane
+        return Vector3(point.X, point.Y, 0.0f);  // or just return original with Z=0?
+    }
+
+    direction = direction / direction.Length();
+    float t = -point.Z / direction.Z;
+    return point + direction * t;
+}
+
+
+void Prep_For_Shadow(VoxelLibraryClass* voxlib, int layer, int info, Matrix3D const& camera, Matrix3D const& motion, Vector3 const& light)
+{
+    VoxelLibraryClass::LayerInfoStruct const& layer_info = *voxlib->Get_Layer_Info(layer, info);
+
+    VoxelShadowRenderStruct& data = VoxelShadowRenderData[VoxelShadowRenderDataCount];
+
+    data.VoxLib = voxlib;
+    data.Layer = layer;
+    data.Info = info;
+
+    for (int i = 0; i < 4; i++) {
+#if 0 // this is for the vanilla flattened shadow but fixed
+        data.ShadowCorner[i] = motion * (layer_info.Bounds[i] + light);
+        data.ShadowCorner[i].Z = 0;
+        data.ShadowCorner[i] = camera * data.ShadowCorner[i];
+        data.ShadowCorner[i].Y = -data.ShadowCorner[i].Y;
+#endif
+        // First, transform bounding box corner to world space
+        Vector3 world_corner = motion * layer_info.Bounds[i];
+
+        // Project it onto the XY plane along light direction
+        Vector3 projected = Project_Onto_XY(world_corner, light);
+
+        // Apply camera transform and screen-space Y flip
+        projected = camera * projected;
+        projected.Y = -projected.Y;
+
+        data.ShadowCorner[i] = projected;
+
+        MinVoxelBounds.X = std::min(data.ShadowCorner[i].X, MinVoxelBounds.X);
+        MinVoxelBounds.Y = std::min(data.ShadowCorner[i].Y, MinVoxelBounds.Y);
+        MaxVoxelBounds.X = std::max(data.ShadowCorner[i].X, MaxVoxelBounds.X);
+        MaxVoxelBounds.Y = std::max(data.ShadowCorner[i].Y, MaxVoxelBounds.Y);
+    }
+
+    VoxelShadowRenderDataCount++;
+}
+
+
+// disable the main voxel model so that it doesn't obscure our precious shadow
+void Prep_For_Object(VoxelLibraryClass* voxlib, int layer, int info, Matrix3D const& transform)
+{
+    
+}
+
+
+
+
 /**
  *  Main function for patching the hooks.
  */
 void TActionClassExtension_Hooks()
 {
+    Patch_Jump(0x006661C0, &Prep_For_Shadow);
+    Patch_Jump(0x00666300, &Prep_For_Object);
     Patch_Call(0x0064961C, &TActionClassExt::_Operator_Parens_Intercept);
 
     /**

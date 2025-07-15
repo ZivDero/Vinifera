@@ -1175,7 +1175,7 @@ bool RulesClassExtension::Set_Voxel_Light_Angle(float azimuth, float elevation, 
         mtx.Rotate_Z(azimuth);
         mtx.Rotate_Y(elevation);
         VoxelLightSource = mtx * Vector3(-1, 0, 0);
-        VoxelShadowLightSource = Vector3(-offset * VoxelLightSource.X, -offset * VoxelLightSource.Y, 0);
+        VoxelShadowLightSource = -VoxelLightSource;
         ObjectTypeClass::Clear_Voxel_Indexes();
         return true;
     }
