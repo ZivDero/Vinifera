@@ -228,7 +228,7 @@ bool ScenarioClassExtension::Read_INI(CCINIClass &ini)
     IsIceDestruction = ini.Get_Bool(BASIC, "IceDestructionEnabled", IsIceDestruction);
     ScorePlayerColor = ini.Get_RGB(BASIC, "ScorePlayerColor", ScorePlayerColor);
     ScoreEnemyColor = ini.Get_RGB(BASIC, "ScoreEnemyColor", ScoreEnemyColor);
-    ini.Get_String(BASIC, "UIColorName", UIColorOverrideName, ARRAY_SIZE(UIColorOverrideName));
+    ini.Get_String(BASIC, "UIColorName", UIColorOverrideName, std::size(UIColorOverrideName));
     if (UIColorOverrideName[0] != '\0')
         CachedUIColorSchemeIndex = ColorSchemes.ID(ColorScheme::As_Pointer(UIColorOverrideName));
 

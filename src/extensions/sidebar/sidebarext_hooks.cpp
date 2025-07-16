@@ -2016,7 +2016,7 @@ void StripClassExt::_Draw_It(bool complete)
                     }
                     else
                     {
-                        const ColorSchemeType colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->UIColor;
+                        const ColorSchemeType colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->UIColor;
                         colorscheme = ColorSchemes[colorschemetype];
                     }
 

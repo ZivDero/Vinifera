@@ -300,7 +300,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
         this_ptr->Fly.field_98 = scalar * this_ptr->Fly.field_98;
     }*/
 
-    Coordinate target_coord;
+    Coord target_coord;
 
     if (this_ptr->TarCom)
     {
@@ -312,7 +312,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
     {
         // original TS code
         // fetch default invalid coords
-        // target_coord = Coordinate(0, 0, 0);
+        // target_coord = Coord(0, 0, 0);
 
         /**
          *  #issue-19
@@ -320,7 +320,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
          *  Let's just continue flying straight instead of assigning invalid coords.
          */
         target_coord = this_ptr->Center_Coord() +
-            Coordinate(this_ptr->Fly.field_88, this_ptr->Fly.field_90, this_ptr->Fly.field_98);
+            Coord(this_ptr->Fly.field_88, this_ptr->Fly.field_90, this_ptr->Fly.field_98);
     }
 
     ObjectClass* target_as_object = dynamic_cast<ObjectClass*>(this_ptr->TarCom);
@@ -339,7 +339,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
     dirrr = v32;
 
     // Calculate vector from target to us
-    Coordinate distance_coord = this_ptr->Center_Coord() - target_coord;
+    Coord distance_coord = this_ptr->Center_Coord() - target_coord;
 
     /**
      *  #issue-19
@@ -353,7 +353,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
     }
 
     bool is_targeting_aircraft = false;
-    if (this_ptr->TarCom && this_ptr->TarCom->What_Am_I() == RTTI_AIRCRAFT)
+    if (this_ptr->TarCom && this_ptr->TarCom->RTTI == RTTI_AIRCRAFT)
     {
         is_targeting_aircraft = true;
     }
@@ -369,9 +369,9 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
     TVelocity3D v149 = this_ptr->Fly; // should invoke copy constructor
 
     // Back-up our coordinate prior to calling Projectile_Motion
-    Coordinate backup_coord = this_ptr->Coord;
+    Coord backup_coord = this_ptr->Position;
 
-    Coordinate our_coord = this_ptr->Coord;
+    Coord our_coord = this_ptr->Position;
     dirrr = Projectile_Motion(our_coord, v149, target_coord,
         (DirType)dirrr,
         is_targeting_aircraft,
@@ -494,7 +494,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
      */
     if (this_ptr->Class->IsFueled)
     {
-        Coordinate difference = our_coord - this_ptr->Get_Coord();
+        Coord difference = our_coord - this_ptr->Get_Coord();
         this_ptr->Range = this_ptr->Range - (int)difference.Length();
 
         if (this_ptr->Range <= 0)
@@ -526,7 +526,7 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
         */
         if (!is_forced_to_explode)
         {
-            Coordinate newcoord = this_ptr->Get_Coord();
+            Coord newcoord = this_ptr->Get_Coord();
             is_forced_to_explode = this_ptr->Is_Forced_To_Explode(newcoord);
             this_ptr->Set_Coord(newcoord); // why? :/
         }
@@ -592,16 +592,16 @@ void BulletClass_AI_Homing_Reimplementation(BulletClass* this_ptr)
             if (this_ptr->TarCom && (fuse_check == true /*|| v134 */) && !this_ptr->Class->IsAirburst)
             {
                 // v125 = this->TarCom->r.m.o.a.vt->t.r.m.o.a.__some_coords__As_Coord(this->TarCom);
-                Coordinate newtargetcoord = this_ptr->TarCom->Center_Coord();
+                Coord newtargetcoord = this_ptr->TarCom->Center_Coord();
 
-                BulletTypeClassExtension* bullettypeext = Extension::Fetch<BulletTypeClassExtension>(this_ptr->Class);
+                BulletTypeClassExtension* bullettypeext = Extension::Fetch(this_ptr->Class);
 
                 int distance = ::Distance(newtargetcoord, this_ptr->Center_Coord());
                 if (fuse_check && distance < bullettypeext->SnapDistance) {
                     this_ptr->Set_Coord(newtargetcoord);
                 }
 
-                // Coordinate some_coord = Coordinate(our_coord.X - newtargetcoord.X,
+                // Coord some_coord = Coord(our_coord.X - newtargetcoord.X,
                 //     our_coord.Y - newtargetcoord.Y,
                 //     ((newtargetcoord.Z + our_coord.Z) / 2) - newtargetcoord.Z);
                 // int some_coord_length = some_coord.Length();
@@ -690,7 +690,7 @@ void BulletClassExt::_BulletClass_AI_Replacement(void)
         }
     }
 
-    BulletTypeClassExtension *bullettypeext = Extension::Fetch<BulletTypeClassExtension>(Class);
+    BulletTypeClassExtension *bullettypeext = Extension::Fetch(Class);
 
     // Handle trailer anim logic introduced in Tiberian Sun.
     if (Class->Trailer != nullptr) {
@@ -727,8 +727,8 @@ void BulletClassExt::_BulletClass_AI_Replacement(void)
     //     PrimaryFacing.Set_Desired(Direction256(Coord, ::As_Coord(TarCom)));
     // }
 
-    Coordinate our_coord = Center_Coord();
-    Coordinate target_coord;
+    Coord our_coord = Center_Coord();
+    Coord target_coord;
 
     if (TarCom != nullptr)
     {
@@ -738,7 +738,7 @@ void BulletClassExt::_BulletClass_AI_Replacement(void)
     {
         // original TS code
         // fetch default invalid coords
-        // target_coord = Coordinate(0, 0, 0);
+        // target_coord = Coord(0, 0, 0);
 
         /**
          *  #issue-19
@@ -746,11 +746,11 @@ void BulletClassExt::_BulletClass_AI_Replacement(void)
          *  Let's just continue flying straight instead of assigning invalid coords.
          */
         target_coord = Center_Coord() +
-            Coordinate(Fly.field_88, Fly.field_90, Fly.field_98);
+            Coord(Fly.field_88, Fly.field_90, Fly.field_98);
     }
 
     // Calculate vector from target to us
-    Coordinate distancevector = our_coord - target_coord;
+    Coord distancevector = our_coord - target_coord;
 
     // This ROT handling is entirely custom. Let's see how it'll work out.
     // The TS code is hard to make sense of.
@@ -814,7 +814,7 @@ DECLARE_PATCH(_BulletClass_AI_Intercept)
     GET_REGISTER_STATIC(BulletClass*, this_ptr, ebp);
     static BulletTypeClassExtension* bullettypeext;
 
-    bullettypeext = Extension::Fetch<BulletTypeClassExtension>(this_ptr->Class);
+    bullettypeext = Extension::Fetch(this_ptr->Class);
 
     if (false /*bullettypeext->UseCustomProjectileLogic*/) {
 

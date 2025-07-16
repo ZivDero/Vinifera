@@ -528,7 +528,7 @@ DECLARE_PATCH(_AircraftClass_AI_Hook_Patch)
     GET_REGISTER_STATIC(AircraftClass*, this_ptr, ebp);
     static AircraftClassExtension *aircraftext;
 
-    aircraftext = Extension::Fetch<AircraftClassExtension>(this_ptr);
+    aircraftext = Extension::Fetch(this_ptr);
     Check_For_Paradrop_Aircraft(this_ptr, aircraftext);
 
     /**

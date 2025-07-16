@@ -385,7 +385,7 @@ void BuildingClassExt::_Draw_It(Point2D const& xdrawpoint, Rect const& xcliprect
     bool open_roof = false;
     if (Get_Mission() == MISSION_UNLOAD) {
         TechnoClass* radio = Contact_With_Whom();
-        if (radio != nullptr && radio->Techno_Type_Class()->Locomotor == __uuidof(JumpjetLocomotionClass)) {
+        if (radio != nullptr && radio->TClass->Locomotor == __uuidof(JumpjetLocomotionClass)) {
             open_roof = true;
         }
     }
@@ -1917,7 +1917,7 @@ bool Should_Open_Roof(BuildingClass* building)
 {
     if (building->Get_Mission() == MISSION_UNLOAD) {
         TechnoClass* radio = building->Contact_With_Whom();
-        if (radio != nullptr && radio->Techno_Type_Class()->Locomotor == __uuidof(JumpjetLocomotionClass)) {
+        if (radio != nullptr && radio->TClass->Locomotor == __uuidof(JumpjetLocomotionClass)) {
             return true;
         }
     }
@@ -2120,7 +2120,7 @@ DECLARE_PATCH(_BuildingClass_Load_SwizzleLightSource_Patch)
  */
 DECLARE_PATCH(_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch)
 {
-    GET_REGISTER_STATIC(Coordinate *, coord, eax);
+    GET_REGISTER_STATIC(Coord *, coord, eax);
     GET_REGISTER_STATIC(BuildingClass *, this_ptr, esi);
     static BuildingClassExtension *buildingext;
 
@@ -2134,7 +2134,7 @@ DECLARE_PATCH(_BuildingClass_Take_Damage_Prevent_Cumulative_Flame_Spawn_Patch)
      *  Do not spawn flames on the building if flames were spawned
      *  on it too recently.
      */
-    buildingext = Extension::Fetch<BuildingClassExtension>(this_ptr);
+    buildingext = Extension::Fetch(this_ptr);
     if (Frame < buildingext->LastFlameSpawnFrame + RuleExtension->BuildingFlameSpawnBlockFrames) {
         goto past_flame_spawn;
     }
@@ -2222,7 +2222,7 @@ static int our_building_count = 0;
 
 
 void Mark_Expansion_As_Done(HouseClass* house) {
-    HouseClassExtension* ext = Extension::Fetch<HouseClassExtension>(house);
+    HouseClassExtension* ext = Extension::Fetch(house);
 
     if (ext->NextExpansionPointLocation.X == 0 || ext->NextExpansionPointLocation.Y == 0)
         return;
@@ -2233,7 +2233,7 @@ void Mark_Expansion_As_Done(HouseClass* house) {
 int Try_Place(BuildingClass* building, Cell cell) 
 {
     HouseClass* owner = building->House;
-    HouseClassExtension* ext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* ext = Extension::Fetch(owner);
 
     int ret = building->Class->Flush_For_Placement(cell, owner);
     if (ret == 1) {
@@ -2245,7 +2245,7 @@ int Try_Place(BuildingClass* building, Cell cell)
 
     Cell final_placement_cell = cell;
     // final_placement_cell = Map.Nearby_Location(cell, SPEED_TRACK, -1, building->Class->MZone, false, building->Class->Width(), building->Class->Height(), true, false, false, true, closest);
-    Coordinate coord = Cell_Coord(final_placement_cell);
+    Coord coord = final_placement_cell.As_Coord();
 
     if (building->Unlimbo(coord)) {
         owner->BuildStructure = STRUCT_NONE;
@@ -2273,7 +2273,7 @@ int Try_Place(BuildingClass* building, Cell cell)
         // If not, but we're close to an expansion field, then flag us to build a refinery as our next building.
         if (building->Class->IsRefinery) {
             if (ext->NextExpansionPointLocation.X != 0 && ext->NextExpansionPointLocation.Y != 0) {
-                BuildingClassExtension* buildingext = Extension::Fetch<BuildingClassExtension>(building);
+                BuildingClassExtension* buildingext = Extension::Fetch(building);
                 buildingext->AssignedExpansionPoint = ext->NextExpansionPointLocation;
             }
 
@@ -2282,7 +2282,7 @@ int Try_Place(BuildingClass* building, Cell cell)
         } 
         else if (ext->NextExpansionPointLocation.X > 0 &&
             ext->NextExpansionPointLocation.Y > 0 &&
-            ::Distance(Coord_Cell(building->Center_Coord()), ext->NextExpansionPointLocation) < close_enough) 
+            ::Distance(building->Center_Coord().As_Cell(), ext->NextExpansionPointLocation) < close_enough) 
         {
             ext->ShouldBuildRefinery = true;
         }
@@ -2307,7 +2307,7 @@ Rect Get_Base_Rect(int adjacency, int width, int height)
     for (int i = 0; i < our_building_count; i++) {
         BuildingClass* building = our_buildings[i];
 
-        if (!building->IsActive || building->IsInLimbo || !Map.In_Local_Radar(building->Coord)) {
+        if (!building->IsActive || building->IsInLimbo || !Map.In_Local_Radar(building->Position)) {
             continue;
         }
 
@@ -2372,8 +2372,8 @@ bool Should_Evaluate_Cell_For_Placement(Cell cell, BuildingClass* building, int 
 
                 int xdiff = newsum.X - sum.X;
                 int ydiff = newsum.Y - sum.Y;
-                xdiff = ABS(xdiff);
-                ydiff = ABS(ydiff);
+                xdiff = std::abs(xdiff);
+                ydiff = std::abs(ydiff);
 
                 if (xdiff < 2 && ydiff < 2) {
                     // This foundation cell is too close to the compared building
@@ -2427,8 +2427,8 @@ bool Should_Evaluate_Cell_For_Placement(Cell cell, BuildingClass* building, int 
 
                     int xdiff = newsum.X - sum.X;
                     int ydiff = newsum.Y - sum.Y;
-                    xdiff = ABS(xdiff);
-                    ydiff = ABS(ydiff);
+                    xdiff = std::abs(xdiff);
+                    ydiff = std::abs(ydiff);
 
                     if (xdiff <= adjacency && ydiff <= adjacency) {
                         // This foundation cell is close enough to the compared building.
@@ -2586,7 +2586,7 @@ int inline Modify_Rating_By_Allied_Building_Proximity(Cell cell, BuildingClass* 
     for (int i = 0; i < our_building_count; i++) {
         BuildingClass* otherbuilding = our_buildings[i];
 
-        Cell other_center_cell = Coord_Cell(otherbuilding->Center_Coord());
+        Cell other_center_cell = otherbuilding->Center_Coord().As_Cell();
         int dist = ::Distance(center_cell, other_center_cell);
         if (dist < closest_distance) {
             closest_distance = dist;
@@ -2607,7 +2607,7 @@ int inline Modify_Rating_By_Allied_Building_Proximity(Cell cell, BuildingClass* 
 int Refinery_Placement_Cell_Value(Cell cell, BuildingClass* building) 
 {
     HouseClass* owner = building->House;
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* houseext = Extension::Fetch(owner);
 
     int value = 0;
 
@@ -2694,7 +2694,7 @@ int Near_Refinery_Placement_Position_Value(Cell cell, BuildingClass* building)
 
     Cell refinerycell = Cell(0, 0);
     if (refinery != nullptr) {
-        refinerycell = Coord_Cell(refinery->Center_Coord());
+        refinerycell = refinery->Center_Coord().As_Cell();
     } else {
         // Fallback
         Point2D mapcenter = Rectangle_Center_Point(Map.MapLocalSize);
@@ -2713,7 +2713,7 @@ int Near_ConYard_Placement_Position_Value(Cell cell, BuildingClass* building)
 {
     Cell conyardcell = Cell(0, 0);
     if (building->House->ConstructionYards.Count() > 0) {
-        conyardcell = Coord_Cell(building->House->ConstructionYards[0]->Center_Coord());
+        conyardcell = building->House->ConstructionYards[0]->Center_Coord().As_Cell();
     } else {
         // Fallback
         Point2D mapcenter = Rectangle_Center_Point(Map.MapLocalSize);
@@ -2756,7 +2756,7 @@ Cell Get_Best_SuperWeapon_Building_Placement_Position(BuildingClass* building)
 int Towards_Expansion_Placement_Cell_Value(Cell cell, BuildingClass* building)
 {
     HouseClass* owner = building->House;
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* houseext = Extension::Fetch(owner);
 
     // If we have nowhere to expand, then just try placing it somewhere that's far from our base.
     if (houseext->NextExpansionPointLocation.X <= 0 || houseext->NextExpansionPointLocation.Y <= 0) {
@@ -2787,7 +2787,7 @@ Cell Get_Best_Expansion_Placement_Position(BuildingClass* building)
     Rect basearea = Get_Base_Rect(adjacency, building->Class->Width(), building->Class->Height());
 
     HouseClass* owner = building->House;
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* houseext = Extension::Fetch(owner);
 
     Cell bestcell = Find_Best_Building_Placement_Cell(basearea, building, Towards_Expansion_Placement_Cell_Value, 0);
 
@@ -2839,7 +2839,7 @@ int Barracks_Placement_Cell_Value(Cell cell, BuildingClass* building)
 {
     // A barracks is best built close to the opponent.
     HouseClass* owner = building->House;
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* houseext = Extension::Fetch(owner);
 
     int expand_distance = 0;
     // If we are expanding, consider distance to expansion location as barracks are great for expanding.
@@ -2949,7 +2949,7 @@ int Near_AttackCell_Cell_Value(Cell cell, BuildingClass* building)
 Cell Get_Best_Defense_Placement_Position(BuildingClass* building)
 {
     HouseClass* owner = building->House;
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* houseext = Extension::Fetch(owner);
 
     attackcell = Cell(0, 0);
 
@@ -3052,7 +3052,7 @@ Cell Get_Best_Placement_Position(BuildingClass* building)
 int BuildingClass_Exit_Object_Custom_Position(BuildingClass* building)
 {
     HouseClass* owner = building->House;
-    HouseClassExtension* ext = Extension::Fetch<HouseClassExtension>(owner);
+    HouseClassExtension* ext = Extension::Fetch(owner);
 
     our_building_count = 0;
 
@@ -3063,14 +3063,14 @@ int BuildingClass_Exit_Object_Custom_Position(BuildingClass* building)
             otherbuilding->IsInLimbo ||
             otherbuilding->Class->IsInvisibleInGame ||
             otherbuilding->House != owner ||
-            !Map.In_Local_Radar(otherbuilding->Coord)) {
+            !Map.In_Local_Radar(otherbuilding->Position)) {
             continue;
         }
 
         our_buildings[our_building_count] = otherbuilding;
         our_building_count++;
 
-        if (our_building_count >= ARRAY_SIZE(our_buildings)) {
+        if (our_building_count >= std::size(our_buildings)) {
             break;
         }
     }
@@ -3128,7 +3128,7 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
             // if (bldg->Class != this_ptr->Class)
             //     continue;
 
-            const TechnoTypeClass* technotype = exiting_object->Techno_Type_Class();
+            const TechnoTypeClass* technotype = exiting_object->TClass;
 
             // Check ownable, so only factories of a faction that owns the object can
             // build the object
@@ -3138,12 +3138,12 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
 
             // Check ownable, so only factories of a faction that owns the object can
             // build the object
-            if ((bldg->Class->Get_Ownable() & exiting_object->Techno_Type_Class()->Get_Ownable()) == 0) {
+            if ((bldg->Class->Get_Ownable() & exiting_object->TClass->Get_Ownable()) == 0) {
                 continue;
             }
 
             // All checks have passed. Check the distance to find the closest factory to exit from.
-            int distance = ::Distance(this_ptr->Coord, bldg->Coord);
+            int distance = ::Distance(this_ptr->Position, bldg->Position);
             if (distance < closest_distance) {
                 closest_distance = distance;
                 closest_match = bldg;

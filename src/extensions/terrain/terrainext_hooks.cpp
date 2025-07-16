@@ -184,7 +184,7 @@ DECLARE_PATCH(_TerrainClass_Take_Damage_LightSource_Patch)
 /**
  *  Workaround for getting the cell of a terrain object without smashing the stack.
  */
-CellClass* Get_Terrain_Cell(TerrainClass* terrain) { return &Map[terrain->Coord]; }
+CellClass* Get_Terrain_Cell(TerrainClass* terrain) { return &Map[terrain->Position]; }
 
 /**
  *  By default, the game removes all overlay from under Tiberium trees.
@@ -198,7 +198,7 @@ DECLARE_PATCH(_TerrainClass_Unlimbo_No_Overlay_Erase_Patch)
     GET_REGISTER_STATIC(TerrainClass *, this_ptr, edi);
     GET_REGISTER_STATIC(TerrainTypeClass *, terraintype, eax);
     // didn't work for some reason, maybe I don't know enough about C++ syntax
-    // GET_STACK_STATIC(Coordinate*, coord, esp, 0x1C);
+    // GET_STACK_STATIC(Coord*, coord, esp, 0x1C);
     static CellClass* cellptr;
     static OverlayTypeClass* overlaytype;
 
@@ -206,7 +206,7 @@ DECLARE_PATCH(_TerrainClass_Unlimbo_No_Overlay_Erase_Patch)
      *  Stolen bytes/code.
      *  Skip erasing overlay if the terrain type does not spawn Tiberium.
      */
-    if (!terraintype->IsSpawnsTiberium) {
+    if (!terraintype->IsTiberiumSpawn) {
         goto continue_function;
     }
 

@@ -364,7 +364,7 @@ void _DTA_Compute_Game_CRC(void)
 
     for (int i = 0; i < Infantry.Count(); i++) {
         InfantryClass* infp = Infantry[i];
-        Coordinate coord = infp->Get_Coord();
+        Coord coord = infp->Get_Coord();
 
         Add_CRC(&GameCRC, coord.X);
         Add_CRC(&GameCRC, coord.Y);
@@ -374,7 +374,7 @@ void _DTA_Compute_Game_CRC(void)
 
     for (int i = 0; i < Units.Count(); i++) {
         UnitClass* unit = Units[i];
-        Coordinate coord = unit->Get_Coord();
+        Coord coord = unit->Get_Coord();
 
         Add_CRC(&GameCRC, coord.X);
         Add_CRC(&GameCRC, coord.Y);
@@ -386,7 +386,7 @@ void _DTA_Compute_Game_CRC(void)
     for (int i = 0; i < Buildings.Count(); i++) {
         BuildingClass* building = Buildings[i];
 
-        Coordinate coord = building->Get_Coord();
+        Coord coord = building->Get_Coord();
 
         Add_CRC(&GameCRC, coord.X);
         Add_CRC(&GameCRC, coord.Y);
@@ -397,7 +397,7 @@ void _DTA_Compute_Game_CRC(void)
     for (int i = 0; i < Aircrafts.Count(); i++) {
         AircraftClass* aircraft = Aircrafts[i];
 
-        Coordinate coord = aircraft->Get_Coord();
+        Coord coord = aircraft->Get_Coord();
 
         Add_CRC(&GameCRC, coord.X);
         Add_CRC(&GameCRC, coord.Y);
@@ -416,7 +416,7 @@ void _DTA_Compute_Game_CRC(void)
         for (int j = 0; j < Map.Layer[i].Count(); j++) {
             ObjectClass* objp = Map.Layer[i][j];
 
-            if (objp->What_Am_I() == RTTI_ANIM) {
+            if (objp->RTTI == RTTI_ANIM) {
                 AnimClass* anim = reinterpret_cast<AnimClass*>(objp);
 
                 // If ID = -2, it's a player-specific animation (such as a mouse click effect)
@@ -424,14 +424,14 @@ void _DTA_Compute_Game_CRC(void)
                     continue;
             }
 
-            Add_CRC(&GameCRC, (int)objp->What_Am_I());
+            Add_CRC(&GameCRC, (int)objp->RTTI);
 
-            if (objp->What_Am_I() == RTTI_ANIM || objp->What_Am_I() == RTTI_PARTICLE) {
+            if (objp->RTTI == RTTI_ANIM || objp->RTTI == RTTI_PARTICLE) {
                 // Work-around: don't desync due to different anim or particle coords
                 continue;
             }
 
-            Coordinate coord = objp->Get_Coord();
+            Coord coord = objp->Get_Coord();
             Add_CRC(&GameCRC, coord.X);
             Add_CRC(&GameCRC, coord.Y);
         }
@@ -443,7 +443,7 @@ void _DTA_Compute_Game_CRC(void)
     for (int i = 0; i < Logic.Count(); i++) {
         ObjectClass* objp = Logic[i];
 
-        if (objp->What_Am_I() == RTTI_ANIM) {
+        if (objp->RTTI == RTTI_ANIM) {
             AnimClass* anim = reinterpret_cast<AnimClass*>(objp);
 
             // If ID = -2, it's a player-specific animation (such as a mouse click effect)
@@ -451,14 +451,14 @@ void _DTA_Compute_Game_CRC(void)
                 continue;
         }
 
-        Add_CRC(&GameCRC, (int)objp->What_Am_I());
+        Add_CRC(&GameCRC, (int)objp->RTTI);
 
-        if (objp->What_Am_I() == RTTI_ANIM || objp->What_Am_I() == RTTI_PARTICLE) {
+        if (objp->RTTI == RTTI_ANIM || objp->RTTI == RTTI_PARTICLE) {
             // Work-around: don't desync due to different anim or particle coords
             continue;
         }
 
-        Coordinate coord = objp->Get_Coord();
+        Coord coord = objp->Get_Coord();
         Add_CRC(&GameCRC, coord.X);
         Add_CRC(&GameCRC, coord.Y);
     }

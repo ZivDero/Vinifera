@@ -84,7 +84,7 @@
 
 bool AdvAI_House_Search_For_Next_Expansion_Point(HouseClass* house)
 {
-    HouseClassExtension* ext = Extension::Fetch<HouseClassExtension>(house);
+    HouseClassExtension* ext = Extension::Fetch(house);
 
     if (ext->NextExpansionPointLocation.X != 0 && ext->NextExpansionPointLocation.Y != 0) {
         return false;
@@ -110,7 +110,7 @@ bool AdvAI_House_Search_For_Next_Expansion_Point(HouseClass* house)
 
     for (int i = 0; i < Terrains.Count(); i++) {
         TerrainClass* terrain = Terrains[i];
-        if (terrain->IsActive && !terrain->IsInLimbo && terrain->Class->IsSpawnsTiberium) {
+        if (terrain->IsActive && !terrain->IsInLimbo && terrain->Class->IsTiberiumSpawn) {
 
             Cell terraincell = terrain->Get_Cell();
 
@@ -132,7 +132,7 @@ bool AdvAI_House_Search_For_Next_Expansion_Point(HouseClass* house)
 
                 // Check if any existing AI refinery has been assigned for this expansion point yet.
                 // If yes, consider it occupied, but only if it is ours.
-                BuildingClassExtension* buildingext = Extension::Fetch<BuildingClassExtension>(building);
+                BuildingClassExtension* buildingext = Extension::Fetch(building);
                 if (building->House == house && buildingext->AssignedExpansionPoint == terraincell) {
                     found = true;
                     break;
@@ -176,7 +176,7 @@ bool AdvAI_House_Search_For_Next_Expansion_Point(HouseClass* house)
 bool AdvAI_Can_Build_Building(HouseClass* house, BuildingTypeClass* buildingtype, bool check_prereqs)
 {
     ASSERT_FATAL(BuildingTypes.ID(buildingtype) == buildingtype->Fetch_Heap_ID());
-    if (buildingtype->What_Am_I() != RTTI_BUILDINGTYPE) {
+    if (buildingtype->RTTI != RTTI_BUILDINGTYPE) {
         DEBUG_ERROR("Invalid BuildingTypeClass pointer in AdvAI_Can_Build_Building!!!");
         Emergency_Exit(0);
     }
@@ -198,7 +198,7 @@ bool AdvAI_Can_Build_Building(HouseClass* house, BuildingTypeClass* buildingtype
         return false;
     }
 
-    BuildingTypeClassExtension* buildingtypeext = Extension::Fetch<BuildingTypeClassExtension>(buildingtype);
+    BuildingTypeClassExtension* buildingtypeext = Extension::Fetch(buildingtype);
 
     if (check_prereqs && !buildingtypeext->IsAdvancedAIIgnoresPrerequisites) {
         for (int i = 0; i < buildingtype->Prerequisite.Count(); i++) {
@@ -280,7 +280,7 @@ bool AdvAI_Is_Under_Start_Rush_Threat(HouseClass* house, int enemy_aircraft_coun
     // Counter infantry rushing. If a human enemy has more infantry than we do, we are at risk.
 
     static int house_infantry_strength[10];
-    memset(house_infantry_strength, 0, sizeof(int) * ARRAY_SIZE(house_infantry_strength));
+    memset(house_infantry_strength, 0, sizeof(int) * std::size(house_infantry_strength));
 
     // Go through all infantry on the map and gather infantry strength of all enemy human houses.
     for (int i = 0; i < Infantry.Count(); i++) {
@@ -308,7 +308,7 @@ bool AdvAI_Is_Under_Start_Rush_Threat(HouseClass* house, int enemy_aircraft_coun
             continue;
         }
 
-        if (inf->House->Fetch_Heap_ID() >= ARRAY_SIZE(house_infantry_strength)) {
+        if (inf->House->Fetch_Heap_ID() >= std::size(house_infantry_strength)) {
             continue;
         }
 
@@ -317,7 +317,7 @@ bool AdvAI_Is_Under_Start_Rush_Threat(HouseClass* house, int enemy_aircraft_coun
     }
 
     int our_infantry_strength = house_infantry_strength[house->Fetch_Heap_ID()];
-    for (int i = 0; i < ARRAY_SIZE(house_infantry_strength); i++) {
+    for (int i = 0; i < std::size(house_infantry_strength); i++) {
 
         if (house_infantry_strength[i] > our_infantry_strength) {
             return true;
@@ -356,7 +356,7 @@ int AdvAI_Calculate_Enemy_Aircraft_Count(HouseClass* house)
  */
 const BuildingTypeClass* AdvAI_Evaluate_Get_Best_Building(HouseClass* house)
 {
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(house);
+    HouseClassExtension* houseext = Extension::Fetch(house);
 
     StructType our_refinery = STRUCT_NONE;
     StructType our_basic_power = STRUCT_NONE;
@@ -923,7 +923,7 @@ void AdvAI_Economy_Upkeep(HouseClass* house)
             return;
         }
 
-        int distance = ::Distance(centerpoint, Coord_Cell(building->Center_Coord()));
+        int distance = ::Distance(centerpoint, building->Center_Coord().As_Cell());
         if (distance < closest_distance) {
             closest_distance = distance;
             farthest_refinery = building;
@@ -1019,7 +1019,7 @@ int Vinifera_HouseClass_AI_Building(HouseClass* this_ptr)
 
     if (this_ptr->ConstructionYards.Count() <= 0) return TICKS_PER_SECOND;
 
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(this_ptr);
+    HouseClassExtension* houseext = Extension::Fetch(this_ptr);
 
     if (RuleExtension->IsUseAdvancedAI) {
 
@@ -1082,7 +1082,7 @@ void AdvAI_HouseClass_Expert_AI(HouseClass* house)
         house->ExpertAITimer = 0;
     }
 
-    HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(house);
+    HouseClassExtension* houseext = Extension::Fetch(house);
 
     // Do some economy upkeep to keep the AI running.
 
@@ -2406,15 +2406,15 @@ int SuperTargeting_Evaluate_Object(HouseClass* house, HouseClass* enemy, TechnoC
 
     if (techno->Owner_HouseClass() == enemy) {
 
-        if (!techno->Techno_Type_Class()->IsLegalTarget) {
+        if (!techno->TClass->IsLegalTarget) {
             return -1;
         }
 
-        if (techno->Cloak == CLOAKED || (techno->What_Am_I() == RTTI_BUILDING && reinterpret_cast<BuildingClass*>(techno)->TranslucencyLevel == 0xF)) {
+        if (techno->Cloak == CLOAKED || (techno->RTTI == RTTI_BUILDING && reinterpret_cast<BuildingClass*>(techno)->TranslucencyLevel == 0xF)) {
             threat = Scen->RandomNumber(0, 100);
         }
         else {
-            Cell targetcell = Coord_Cell(techno->Center_Coord());
+            Cell targetcell = techno->Center_Coord().As_Cell();
             threat = Map.Cell_Threat(targetcell, house);
         }
     }
@@ -2475,8 +2475,8 @@ bool Vinifera_HouseClass_AI_Target_MultiMissile(HouseClass* this_ptr, SuperClass
     }
 
     if (besttarget) {
-        Coordinate center = besttarget->Center_Coord();
-        Cell targetcell = Coord_Cell(center);
+        Coord center = besttarget->Center_Coord();
+        Cell targetcell = center.As_Cell();
         int superid = this_ptr->SuperWeapon.ID(super);
         bool result = this_ptr->SuperWeapon[superid]->Discharged(this_ptr == PlayerPtr, targetcell);
         return result;

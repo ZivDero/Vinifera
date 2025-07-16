@@ -68,7 +68,7 @@ void MapClassExt::_Place_Down(Cell& cell, ObjectClass* object)
 
     if (object->Class_Of()->IsFootprint && object->In_Which_Layer() == LAYER_GROUND) {
         Cell xlist[32];
-        List_Copy(object->Occupy_List(), ARRAY_SIZE(xlist), xlist);
+        List_Copy(object->Occupy_List(), std::size(xlist), xlist);
         Cell const* list = xlist;
         while (*list != REFRESH_EOL) {
             Cell newcell = cell + *list++;

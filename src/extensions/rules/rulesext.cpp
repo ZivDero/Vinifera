@@ -94,7 +94,6 @@ RulesClassExtension::RulesClassExtension(const RulesClass *this_ptr) :
     VoxelLightElevation(DEG_TO_RAD(45)),
     VoxelShadowOffset(6),
     IsTiberiumStorage(true),
-    IsMultiMCV(false),
     BuildingFlameSpawnBlockFrames(0),
     StrengthenDestroyedValueThreshold(0),
     StrengthenBuildingValueMultiplier(3),
@@ -651,29 +650,6 @@ bool RulesClassExtension::Objects(CCINIClass &ini)
 
 
 /**
- *  Process AI-related game rules.
- *
- *  @author: Rampastring
- */
-bool RulesClassExtension::AI(CCINIClass &ini)
-{
-    static char const* const AI = "AI";
-
-    if (!ini.Is_Present(AI)) {
-        return false;
-    }
-
-    IsUseAdvancedAI = ini.Get_Bool(AI, "UseAdvancedAI", IsUseAdvancedAI);
-    IsAdvancedAIMultiConYard = ini.Get_Bool(AI, "AdvancedAIMultiConYard", IsAdvancedAIMultiConYard);
-    AdvancedAIMaxExpansionDistance = ini.Get_Int(AI, "AdvancedAIMaxExpansionDistance", AdvancedAIMaxExpansionDistance);
-    AdvancedAIMinimumRefineryCount = ini.Get_Int(AI, "AdvancedAIMinimumRefineryCount", AdvancedAIMinimumRefineryCount);
-    BuildNavalYard = ini.Get_Buildings(AI, "BuildNavalYard", BuildNavalYard);
-
-    return true;
-}
-
-
-/**
  *  Process the general main game rules.
  *  
  *  @author: CCHyper
@@ -779,6 +755,11 @@ bool RulesClassExtension::AI(CCINIClass& ini)
     }
 
     AINavalYardAdjacency = ini.Get_Int(AI, "AINavalYardAdjacency", AINavalYardAdjacency);
+    IsUseAdvancedAI = ini.Get_Bool(AI, "UseAdvancedAI", IsUseAdvancedAI);
+    IsAdvancedAIMultiConYard = ini.Get_Bool(AI, "AdvancedAIMultiConYard", IsAdvancedAIMultiConYard);
+    AdvancedAIMaxExpansionDistance = ini.Get_Int(AI, "AdvancedAIMaxExpansionDistance", AdvancedAIMaxExpansionDistance);
+    AdvancedAIMinimumRefineryCount = ini.Get_Int(AI, "AdvancedAIMinimumRefineryCount", AdvancedAIMinimumRefineryCount);
+    BuildNavalYard = ini.Get_Buildings(AI, "BuildNavalYard", BuildNavalYard);
 
     return true;
 }

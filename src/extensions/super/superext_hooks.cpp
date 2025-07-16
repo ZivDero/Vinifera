@@ -180,7 +180,7 @@ void SuperClassExt::_Do_DropPods(Cell* cell)
 			// Mark the aircraft as a loaner so it is able to exit the map
 			AircraftClass* spawnedAircraft = Aircrafts[Aircrafts.Count() - 1];
 			spawnedAircraft->IsALoaner = true;
-			AircraftClassExtension* aircraftext = Extension::Fetch<AircraftClassExtension>(spawnedAircraft);
+			AircraftClassExtension* aircraftext = Extension::Fetch(spawnedAircraft);
 			aircraftext->IsParadropReinforcement = true;
 		}
 	}

@@ -1281,11 +1281,11 @@ void TechnoClassExt::_Record_The_Kill(TechnoClass* source)
         House->WhoLastHurtMe = source->Owner();
 
         if (RuleExtension->IsStrengtheningEnabled) {
-            HouseClassExtension* houseext = Extension::Fetch<HouseClassExtension>(source->House);
+            HouseClassExtension* houseext = Extension::Fetch(source->House);
             int value = technotypecost;
 
             // Buildings have a multiplier to their value.
-            if (What_Am_I() == RTTI_BUILDING) {
+            if (RTTI == RTTI_BUILDING) {
                 value = value * RuleExtension->StrengthenBuildingValueMultiplier;
             }
 

@@ -1726,7 +1726,7 @@ void Extension::Print_CRCs(FILE *fp, EventClass *ev)
                     std::fprintf(fp, "Particle  (Type: %s (%d)) ", objp->Name(), Particles.ID(static_cast<ParticleClass*>(objp)));
                     break;
                 default:
-                    std::fprintf(fp, "Other     (Type: (%d)) (RTTI: %d) ", objp->Fetch_Heap_ID(), objp->What_Am_I());
+                    std::fprintf(fp, "Other     (Type: (%d)) (RTTI: %d) ", objp->Fetch_Heap_ID(), objp->RTTI);
                     break;
             };
             HouseClass *housep = objp->Owner_HouseClass();

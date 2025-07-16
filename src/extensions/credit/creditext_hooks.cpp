@@ -46,11 +46,11 @@
 #include "hooker_macros.h"
 
 
- /**
-  *  Modifies the color of the "Options" text based on the player's side.
-  *
-  *  @author: Rampastring, ZivDero
-  */
+/**
+ *  Modifies the color of the "Options" text based on the player's side.
+ *
+ *  @author: Rampastring, ZivDero
+ */
 DECLARE_PATCH(_TabClass_Draw_It_Faction_Specific_Options_Button_Color_Scheme_Patch)
 {
     static ColorSchemeType colorschemetype;
@@ -62,14 +62,14 @@ DECLARE_PATCH(_TabClass_Draw_It_Faction_Specific_Options_Button_Color_Scheme_Pat
     }
     else
     {
-        colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->UIColor;
+        colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->UIColor;
         colorscheme = ColorSchemes[colorschemetype];
     }
 
     _asm mov edx, colorscheme
     _asm mov ecx, LogicSurface
     _asm mov ecx, [ecx]
-        JMP(0x0060E5B4);
+    JMP(0x0060E5B4);
 }
 
 
@@ -93,7 +93,7 @@ DECLARE_PATCH(_CreditClass_Graphic_Logic_Faction_Specific_Color_Scheme_Patch)
     }
     else
     {
-        colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->UIColor;
+        colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->UIColor;
         colorscheme = ColorSchemes[colorschemetype];
     }
 
@@ -119,7 +119,7 @@ void Draw_Tooltip_Rectangle(DSurface* surface, Rect& drawrect)
     }
     else
     {
-        ColorSchemeType colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->ToolTipColor;
+        ColorSchemeType colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->ToolTipColor;
         colorscheme = ColorSchemes[colorschemetype];
     }
 
@@ -160,7 +160,7 @@ DECLARE_PATCH(_CCToolTip_Draw_Faction_Specific_Color_Scheme_Text_Patch)
     }
     else
     {
-        colorschemetype = Extension::Fetch<SideClassExtension>(Sides[PlayerPtr->Class->Side])->ToolTipColor;
+        colorschemetype = Extension::Fetch(Sides[PlayerPtr->Class->Side])->ToolTipColor;
         colorscheme = ColorSchemes[colorschemetype];
     }
 
