@@ -34,9 +34,10 @@
 #include "tibsun_defines.h"
 #include "vector.h"
 #include "vinifera_defines.h"
+#include "EASTL/unordered_map.h"
+#include "EASTL/vector.h"
 #include <cstdio>
 #include <string>
-#include <unordered_map>
 
 
 /**
@@ -125,12 +126,12 @@ private:
     /**
      *  List of all the pointers that need remapping.
      */
-    std::vector<SwizzlePointerStruct> RequestTable;
+    eastl::vector<SwizzlePointerStruct> RequestTable;
 
     /**
      *  List of all the new pointers.
      */
-    std::unordered_map<LONG, SwizzlePointerStruct> PointerTable;
+    eastl::unordered_map<LONG, SwizzlePointerStruct> PointerTable;
 };
 
 extern ViniferaSwizzleManagerClass ViniferaSwizzleManager;

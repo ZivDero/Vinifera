@@ -293,6 +293,7 @@ GlobSources(GLOB HOOKER_SOURCES ${HOOKER_INCLUDE_DIR})
 # Include the TS++ submodule in the solution.
 ################################################################################
 add_subdirectory(${CMAKE_SOURCE_DIR}/TSpp)
+add_subdirectory(${CMAKE_SOURCE_DIR}/EASTL)
 
 
 ################################################################################
@@ -577,6 +578,8 @@ target_compile_options(${PROJECT_NAME} PUBLIC /MP2)
 # Link to the TS++ static library.
 target_link_libraries(${PROJECT_NAME} TSpp)
 add_dependencies(${PROJECT_NAME} TSpp)
+target_link_libraries(${PROJECT_NAME} EASTL)
+add_dependencies(${PROJECT_NAME} EASTL)
 
 # Ensure the launcher is built with the main project.
 add_dependencies(${PROJECT_NAME} Launch${PROJECT_NAME})
