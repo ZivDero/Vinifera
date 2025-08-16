@@ -28,10 +28,9 @@
 #pragma once
 
 #include "always.h"
-
+#include "rect.h"
 
 struct SDL_Rect;
-class Rect;
 class DSurface;
 
 

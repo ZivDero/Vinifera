@@ -296,6 +296,23 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/TSpp)
 
 
 ################################################################################
+# Include the SDL2 submodule in the solution.
+################################################################################
+# Configure SDL2 build options
+set(SDL_TEST OFF CACHE BOOL "Disable SDL test library" FORCE)
+set(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "Disable SDL uninstall target" FORCE)
+
+# Choose static/shared as needed:
+set(SDL_SHARED OFF CACHE BOOL "Build SDL as a shared library" FORCE)
+set(SDL_STATIC ON CACHE BOOL "Build SDL as a static library" FORCE)
+
+# On Windows, SDL2main is usually required.
+set(SDL_MAIN_HANDLED OFF CACHE BOOL "Let SDL2 provide SDL2main entrypoint" FORCE)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/SDL)
+
+
+################################################################################
 # Embed some git version information in the binary.
 ################################################################################
 message(STATUS "Fetching git repository information.")
@@ -597,6 +614,8 @@ target_compile_options(${PROJECT_NAME} PUBLIC /MP2)
 target_link_libraries(${PROJECT_NAME} TSpp)
 add_dependencies(${PROJECT_NAME} TSpp)
 
+target_link_libraries(${PROJECT_NAME} SDL2::SDL2)
+
 # Ensure the launcher is built with the main project.
 add_dependencies(${PROJECT_NAME} Launch${PROJECT_NAME})
 
@@ -607,16 +626,6 @@ target_link_libraries(${PROJECT_NAME} ${REQUIRED_LIBRARIES})
 
 # Make build check state of git to check for uncommitted changes.
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_check_git)
-
-# Look for SDL2 if it is installed (define the SDL2WIN environment var).
-if(DEFINED ENV{SDL2WIN})
-	set(SDL2_FOUND ON)
-	message(STATUS "Found SDL2: $ENV{SDL2WIN}")
-	add_compile_definitions(SDL2_FOUND)
-	target_include_directories(${PROJECT_NAME} BEFORE PUBLIC $ENV{SDL2WIN}/include)
-	target_link_libraries(${PROJECT_NAME} $ENV{SDL2WIN}/lib/x86/SDL2.lib)
-endif()
-
 
 ################################################################################
 # Setup project IDE filters.

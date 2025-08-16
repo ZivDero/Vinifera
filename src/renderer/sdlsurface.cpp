@@ -31,6 +31,7 @@
 #include "dsurface.h"
 #include "options.h"
 #include "rgb.h"
+#include "rect.h"
 #include "sdl_functions.h"
 #include "debughandler.h"
 #include "asserthandler.h"
@@ -184,9 +185,9 @@ SDLSurface *SDLSurface::Create_Primary(SDLSurface **backbuffer_surface)
     DEBUG_INFO("SDLSurface::Create_Primary() - GreenLeft: %d, GreenRight: %d.\n", DSurface::GreenLeft, DSurface::GreenRight);
     DEBUG_INFO("SDLSurface::Create_Primary() - BlueLeft: %d, BlueRight: %d.\n", DSurface::BlueLeft, DSurface::BlueRight);
 
-    DSurface::ColorGrey = DSurface::RGBA_To_Pixel(127, 127, 127);
-    DSurface::ColorMidGrey = DSurface::RGBA_To_Pixel(63, 63, 63);
-    DSurface::ColorDarkGrey = DSurface::RGBA_To_Pixel(31, 31, 31);
+    DSurface::ColorGrey = DSurface::RGB_To_Pixel(127, 127, 127);
+    DSurface::ColorMidGrey = DSurface::RGB_To_Pixel(63, 63, 63);
+    DSurface::ColorDarkGrey = DSurface::RGB_To_Pixel(31, 31, 31);
 
     /**
      *  Detect and set the 16bit pixel format used by the primary surface.
@@ -560,7 +561,7 @@ bool SDLSurface::entry_80() const
 
 bool SDLSurface::Draw_Line_entry_90(Rect &area, Point2D &start, Point2D &end, RGBClass &a4, RGBClass &a5, float &a6, float &a7)
 {
-    unsigned color = DSurface::RGBA_To_Pixel(a4.Red, a4.Green, a4.Blue);
+    unsigned color = DSurface::RGB_To_Pixel(a4.Red, a4.Green, a4.Blue);
     return XSurface::Draw_Line(area, start, end, color);
 }
 

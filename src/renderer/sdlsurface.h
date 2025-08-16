@@ -28,6 +28,7 @@
 #pragma once
 
 #include "always.h"
+#include "rect.h"
 #include "xsurface.h"
 #include "sdl_globals.h"
 
