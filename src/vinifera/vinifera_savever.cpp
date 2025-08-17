@@ -33,6 +33,8 @@
 #include "savever.h"
 #include "debughandler.h"
 
+#include <iterator>
+
 
 /**
  *  Basic constructor for ViniferaSaveVersionInfo.

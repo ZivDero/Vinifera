@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 /**
  *  The process we initialised the symbols of.

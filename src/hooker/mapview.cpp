@@ -31,6 +31,8 @@
  ******************************************************************************/
 #include "mapview.h"
 
+#include <iterator>
+
 
 MapViewOfFileClass::MapViewOfFileClass(const wchar_t *fileName) :
     File(INVALID_HANDLE_VALUE),

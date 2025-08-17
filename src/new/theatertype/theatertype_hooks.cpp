@@ -46,6 +46,26 @@
 #include "hooker_macros.h"
 
 
+char const* Test(char* root_name, char* iso_root, char* suffix_name, TheaterType theater)
+{
+    std::snprintf(root_name, 16, "%s.MIX", TheaterTypeClass::Root_From(theater));
+    std::snprintf(iso_root, 16, "%s.MIX", TheaterTypeClass::IsoRoot_From(theater));
+    std::snprintf(suffix_name, 16, "%s.MIX", TheaterTypeClass::Suffix_From(theater));
+
+    DEBUG_INFO("Init theater \"%s\"\n"
+               "  %s\n"
+               "  %s\n"
+               "  %s\n",
+               TheaterTypeClass::Name_From(theater), root_name, iso_root, suffix_name);
+
+    /**
+     *  Code further down in the function expects to have theater root without
+     *  the extension, so we restore this here, along with the EDI function pointer.
+     */
+    return TheaterTypeClass::Root_From(theater);
+}
+
+
 /**
  *  Patch to add support for new theaters when initialising the theater data.
  * 
@@ -60,21 +80,7 @@ DECLARE_PATCH(_Init_Theater_Patch)
     LEA_STACK_STATIC(char *, suffix_name, esp, 0x24); // char [16]
     static const char* root;
 
-    std::snprintf(root_name, 16, "%s.MIX", TheaterTypeClass::Root_From(theater));
-    std::snprintf(iso_root, 16, "%s.MIX", TheaterTypeClass::IsoRoot_From(theater));
-    std::snprintf(suffix_name, 16, "%s.MIX", TheaterTypeClass::Suffix_From(theater));
-
-    DEBUG_INFO("Init theater \"%s\"\n"
-        "  %s\n"
-        "  %s\n"
-        "  %s\n",
-        TheaterTypeClass::Name_From(theater), root_name, iso_root, suffix_name);
-
-    /**
-     *  Code further down in the function expects to have theater root without
-     *  the extension, so we restore this here, along with the EDI function pointer.
-     */
-    root = TheaterTypeClass::Root_From(theater);
+    root = Test(root_name, iso_root, suffix_name, theater);
     _asm { mov ebx, root }
 
     _asm { mov edi, _imp_wsprintfA } // Restore EDI.
