@@ -43,6 +43,8 @@
 
 #include "hooker.h"
 #include "hooker_macros.h"
+#include "imgui.h"
+#include <windowsx.h>
 
 
 bool Passes_Cloak_Check(TechnoClass* techno)
@@ -128,6 +130,78 @@ DECLARE_PATCH(_Tactical_Get_Object_At_Cell_Allied_Cloaked_Object_Patch)
 }
 
 
+bool Handle_ImGui_Message(UINT message, LPARAM lparam, WPARAM wparam)
+{
+    // Early-out if ImGui wants this input
+    ImGuiIO& io = ImGui::GetIO();
+    bool imgui_consumed = false;
+
+    switch (message) {
+    case WM_LBUTTONDOWN:
+        io.AddMouseButtonEvent(0, true);
+        imgui_consumed = io.WantCaptureMouse;
+        break;
+    case WM_LBUTTONUP:
+        io.AddMouseButtonEvent(0, false);
+        imgui_consumed = io.WantCaptureMouse;
+        break;
+    case WM_RBUTTONDOWN:
+        io.AddMouseButtonEvent(1, true);
+        imgui_consumed = io.WantCaptureMouse;
+        break;
+    case WM_RBUTTONUP:
+        io.AddMouseButtonEvent(1, false);
+        imgui_consumed = io.WantCaptureMouse;
+        break;
+    case WM_MOUSEMOVE:
+        io.AddMousePosEvent((float)GET_X_LPARAM(lparam), (float)GET_Y_LPARAM(lparam));
+        imgui_consumed = io.WantCaptureMouse;
+        break;
+    case WM_MOUSEWHEEL:
+        io.AddMouseWheelEvent(0.0f, GET_WHEEL_DELTA_WPARAM(wparam) / (float)WHEEL_DELTA);
+        imgui_consumed = io.WantCaptureMouse;
+        break;
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+        io.AddKeyEvent(ImGuiKey_None, true);
+        imgui_consumed = io.WantCaptureKeyboard;
+        break;
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        io.AddKeyEvent(ImGuiKey_None, false);
+        imgui_consumed = io.WantCaptureKeyboard;
+        break;
+    case WM_CHAR:
+        io.AddInputCharacter((unsigned int)wparam);
+        imgui_consumed = io.WantTextInput;
+        break;
+    }
+
+    return imgui_consumed; // stop here, ImGui will handle it
+}
+
+bool& IgnoreInput = Make_Global<bool>(0x007E493C);
+
+//
+DECLARE_PATCH(_ScrollClass_Message_Handle_ImGui_Intercept)
+{
+    GET_STACK_STATIC(UINT*, message, esp, 0x2C);
+    GET_STACK_STATIC(WPARAM*, wparam, esp, 0x30);
+    GET_STACK_STATIC(LPARAM*, lparam, esp, 0x34);
+
+    //_asm pushad
+
+    if (!IgnoreInput || *message == WM_CAPTURECHANGED) {
+        if (Handle_ImGui_Message(*message, *lparam, *wparam)) {
+            JMP_REG(ecx, 0x005E961E);
+        }
+        _asm mov eax, message
+        JMP_REG(ecx, 0x005E9373);
+    }
+    JMP_REG(ecx, 0x005E961E);
+}
+
+
 /**
  *  Main function for patching the hooks.
  */
@@ -135,5 +209,6 @@ void ScrollClassExtension_Hooks()
 {
 	Patch_Jump(0x005E8840, &_ScrollClass_Input_Allied_Cloaked_Object_Patch1);
 	Patch_Jump(0x005E88AA, &_ScrollClass_Input_Allied_Cloaked_Object_Patch2);
-	Patch_Jump(0x006167E3, &_Tactical_Get_Object_At_Cell_Allied_Cloaked_Object_Patch);
+    Patch_Jump(0x006167E3, &_Tactical_Get_Object_At_Cell_Allied_Cloaked_Object_Patch);
+    Patch_Jump(0x005E935A, &_ScrollClass_Message_Handle_ImGui_Intercept);
 }

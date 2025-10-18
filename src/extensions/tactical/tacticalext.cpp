@@ -574,6 +574,9 @@ void TacticalExtension::Render_Post()
     static BasicTimerClass<SystemTimerClass> timer;
     static int last_time;
 
+    DDSURFACEDESC desc;
+    DirectDrawObject->GetDisplayMode(&desc);
+
     int delta = timer - last_time;
     if (delta > 0) {
         last_time += delta;

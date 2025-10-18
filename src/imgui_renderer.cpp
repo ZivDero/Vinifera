@@ -56,25 +56,20 @@ static inline void Unpack16(uint16_t c, uint8_t& r, uint8_t& g, uint8_t& b)
     b = (uint8_t)(((c >> DSurface::BlueRight)  & ((1 << (8 - DSurface::BlueLeft))  - 1)) << DSurface::BlueLeft);
 }
 
-static inline uint16_t Pack16(uint8_t r, uint8_t g, uint8_t b)
-{
-    return (uint16_t)(((r >> DSurface::RedLeft)   << DSurface::RedRight)   |
-                      ((g >> DSurface::GreenLeft) << DSurface::GreenRight) |
-                      ((b >> DSurface::BlueLeft)  << DSurface::BlueRight));
-}
-
 static inline uint16_t Blend16(uint16_t dst16, uint8_t sr, uint8_t sg, uint8_t sb, uint8_t sa)
 {
     if (sa == 0)   return dst16;
-    if (sa == 255) return Pack16(sr, sg, sb);
+    if (sa == 255) return (uint16_t)DSurface::Build_Hicolor_Pixel(sr, sg, sb);
 
     uint8_t dr, dg, db;
+    // use your Unpack16 that reads using DSurface’s shift fields
     Unpack16(dst16, dr, dg, db);
 
-    uint8_t r = (uint8_t)((sr * sa + dr * (255 - sa)) / 255);
-    uint8_t g = (uint8_t)((sg * sa + dg * (255 - sa)) / 255);
-    uint8_t b = (uint8_t)((sb * sa + db * (255 - sa)) / 255);
-    return Pack16(r, g, b);
+    dr = (uint8_t)((sr * sa + dr * (255 - sa)) / 255);
+    dg = (uint8_t)((sg * sa + dg * (255 - sa)) / 255);
+    db = (uint8_t)((sb * sa + db * (255 - sa)) / 255);
+
+    return (uint16_t)DSurface::Build_Hicolor_Pixel(dr, dg, db);
 }
 
 // ---------------------------------------------
@@ -139,9 +134,9 @@ static void RasterizeTri(const ImDrawVert& a, const ImDrawVert& b, const ImDrawV
             float a_ = ca[3]*w0 + cb[3]*w1 + cc_[3]*w2;
 
             uint32_t texel = SampleTexNearest(tex, u, v);
-            uint8_t tr = (texel >> 16) & 0xFF;
-            uint8_t tg = (texel >>  8) & 0xFF;
-            uint8_t tb = (texel >>  0) & 0xFF;
+            uint8_t tr = (texel >> 0) & 0xFF;
+            uint8_t tg = (texel >> 8) & 0xFF;
+            uint8_t tb = (texel >> 16) & 0xFF;
             uint8_t ta = (texel >> 24) & 0xFF;
 
             float sr = (tr * (1.0f/255.0f)) * r;
@@ -188,15 +183,7 @@ void ImGuiDSurface_CreateFontsTexture()
     tex->px.resize(size_t(w) * size_t(h));
 
     // RGBA (ImGui) -> ARGB (renderer)
-    uint32_t* src = (uint32_t*)pixels;
-    for (int i = 0; i < w*h; ++i) {
-        uint32_t RGBA = src[i];
-        uint8_t r = (RGBA >> 0)  & 0xFF;
-        uint8_t g = (RGBA >> 8)  & 0xFF;
-        uint8_t b = (RGBA >> 16) & 0xFF;
-        uint8_t a = (RGBA >> 24) & 0xFF;
-        tex->px[i] = (uint32_t(a) << 24) | (uint32_t(r) << 16) | (uint32_t(g) << 8) | b;
-    }
+    memcpy(tex->px.data(), pixels, size_t(w) * size_t(h) * 4);
 
 #if defined(IMGUI_VERSION_NUM) && IMGUI_VERSION_NUM >= 19100
     atlas->SetTexID((ImTextureID)(uintptr_t)tex);
