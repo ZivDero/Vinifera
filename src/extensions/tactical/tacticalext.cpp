@@ -54,6 +54,8 @@
 #include "extension.h"
 #include "asserthandler.h"
 #include "debughandler.h"
+#include "imgui.h"
+#include "imgui_renderer.h"
 
 
 /**
@@ -82,6 +84,11 @@ TacticalExtension::TacticalExtension(const Tactical* this_ptr) :
     //if (this_ptr) EXT_DEBUG_TRACE("TacticalExtension::TacticalExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
     std::memset(CellRedraw, 0, sizeof(CellRedraw));
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGuiDSurface_CreateFontsTexture();
 }
 
 
@@ -106,6 +113,9 @@ TacticalExtension::TacticalExtension(const NoInitClass& noinit) :
 TacticalExtension::~TacticalExtension()
 {
     //EXT_DEBUG_TRACE("TacticalExtension::~TacticalExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
+
+    ImGuiDSurface_DestroyFontsTexture();
+    ImGui::DestroyContext();
 }
 
 
@@ -560,6 +570,23 @@ void TacticalExtension::Render_Post()
      *  Draw any overlay text.
      */
     Draw_Super_Timers();
+
+    static BasicTimerClass<SystemTimerClass> timer;
+    static int last_time;
+
+    int delta = timer - last_time;
+    if (delta > 0) {
+        last_time += delta;
+        ImGuiIO& io = ImGui::GetIO();
+        io.DeltaTime = static_cast<float>(delta * 16) / 1000.0f;
+        io.DisplaySize = {static_cast<float>(CompositeSurface->Get_Width()), static_cast<float>(CompositeSurface->Get_Height())};
+
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
+        ImGui::Render();
+
+        ImGuiDSurface_Render(ImGui::GetDrawData(), CompositeSurface);
+    }
 }
 
 
