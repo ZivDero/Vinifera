@@ -279,7 +279,18 @@ AllowedSmudges=   ; list of SmudgeTypes, which Smudges can appear on this tile. 
 In `TEMPERAT.INI` (or other theater file):
 ```ini
 [SOMEISOTILESET]  ; IsometricTileType
-AllowVeins=yes    ; boolean, can Veins can grow on this tile.
+AllowVeins=yes    ; boolean, can Veins can grow on this tile?
+```
+
+
+### WaterTunnel
+
+- The `WaterTunnel` key turns this tile's `Tunnel` LandType tiles water-passable.
+
+In `TEMPERAT.INI` (or other theater file):
+```ini
+[SOMEISOTILESET]  ; IsometricTileType
+WaterTunnel=no    ; boolean, is this tile's tunnel on water?
 ```
 
 ## Infantry
@@ -301,6 +312,18 @@ OmniHealer=no   ; boolean, should this infantry consider other infantry, unit, a
 
 ```{note}
 When an infantry with `Mechanic=yes` and `OmniHealer=yes` is selected and the mouse is over a transport unit or aircraft, holding down the `ALT` key (Force Move) will allow you to enter the transport instead of healing it.
+```
+
+## Overlays
+
+### WaterTunnel
+
+- If the cell the overlay is on has the `Tunnel` LandType, the `WaterTunnel` key turns this tile water-passable.
+
+In `RULES.INI`:
+```ini
+[SOMEOVERLAY]   ; OverlayType
+WaterTunnel=no  ; boolean, is this tile's tunnel on water?
 ```
 
 ## Projectiles
@@ -621,6 +644,15 @@ Vanilla actions are always present implicitly, but their properties **can** be o
     DropPod=AirStrike,AirStrike
     RallyToPoint=CanMove,Normal
     AttackSupport=Normal,Normal
+    PlaceBeacon=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon1=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon2=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon3=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon4=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon5=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon6=PlaceWaypoint,PlaceWaypoint
+    PlaceBeacon7=PlaceWaypoint,PlaceWaypoint
+    SelectBeacon=SelectWaypoint,SelectWaypoint
 
     ```
    :::
@@ -1207,7 +1239,7 @@ LightBlueTint=1       ; float, the blue tint of this terrain objects light.
 - Vinifera adds additional customization for Tiberium spreaders (`SpawnsTiberium=yes`).
 
 ```{note}
-Spreaders don't spawn Tiberium out of thin air. A spreader first spreads Tiberium from itself, then from the radius-1 ring of Tiberium around it, then from the radius-2 ring, and so on. You can think of it as accelerating the natural spread process. If a cell doesn't border the spreader of a piece of Tiberium, it won't be spread to.
+With `SpawnsTiberiumScattered=no`, Spreaders don't spawn Tiberium out of thin air. A spreader first spreads Tiberium from itself, then from the radius-1 ring of Tiberium around it, then from the radius-2 ring, and so on. You can think of it as accelerating the natural spread process. If a cell doesn't border the spreader of a piece of Tiberium, it won't be spread to.
 ```
 
 In `RULES.INI`:
@@ -1217,6 +1249,7 @@ SpawnsTiberiumRange=1         ; integer, the maximum range in which Tiberium wil
 SpawnsTiberiumStage=5,5       ; two integers, the minimum and maximum growth stage at which Tiberium will be spawned (maximum can be omitted).
 SpawnsTiberiumStageFalloff=0  ; float, the amount by which the growth stage will decrease for every ring after the first one.
 SpawnsTiberiumCount=1,1       ; two integers, the minimum and maximum number of spreads that will occur (maximum can be omitted).
+SpawnsTiberiumScattered=no    ; boolean, whether Tiberium should spawn scattered in the spawn range, as opposed to spreading from the center (imitates the old Tiberium spreaders using animations).
 ```
 
 ## Theaters
@@ -1392,6 +1425,16 @@ In `RULES.INI`:
 ```ini
 [AudioVisual]
 WeedPipIndex=1  ; integer, the pip index used for Weeds.
+```
+
+### Spread Customization
+
+- Vinifera allows mods to customize some aspects about how Tiberiums spread.
+In `RULES.INI`:
+```ini
+[SOMETIBERIUM]      ; Tiberium
+MinSpreadStage=0    ; integer, the minimum growth stage at which this Tiberium can spread to a nearby cell. Defaults to ((Tiberium Index in list) / 2 + 1).
+SpreadSpawnStage=5  ; integer, newly spread Tiberium spawns grown to this stage.
 ```
 
 ## Vehicles

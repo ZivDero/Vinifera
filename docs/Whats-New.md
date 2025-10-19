@@ -69,6 +69,9 @@ New:
 - Add Tiberium spreader customization (by ZivDero)
 - Implement `BarGate` for buildings (by ZivDero)
 - Parachute animations with `AltPalette=yes` now remap to the parachuted unit owner's color (by ZivDero)
+- Add Water movement zone override (by ZivDero)
+- Implement multiplayer beacons (by ZivDero)
+- Chat improvements (by ZivDero)
 
 
 Vinifera fixes:
@@ -105,6 +108,9 @@ Vanilla fixes:
 - Fix a bug where vehicles paradropped from a carryall would be drawn with an offset (by ZivDero)
 - Fix a bug where paradrops didn't take cell passability and bridges into account (by ZivDero)
 - Fix a bug where units in guard mode would not abandon targets out of their range (by ZivDero)
+- Fix a bug where under some circumstances Tiberium would halt spreading and/or growing temporarily (by ZivDero)
+- Fix a bug where Tiberium spawned by animations wouldn't grow or spread (by ZivDero)
+- Fix a bug where carryalls assign their ROT to the unit they're carrying (by ZivDero)
 
 :::
 

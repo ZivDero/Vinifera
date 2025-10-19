@@ -120,7 +120,7 @@ static void Do_Anim_Damage(AnimClass* anim, int damage)
     /*
      *  INVISO is hardcoded to use C4Warhead, let's leave that just in case.
      */
-    if (std::strcmp(anim->Class->IniName, "INVISO") == 0) {
+    if (anim->Class->IniName == "INVISO") {
         Explosion_Damage(anim->Center_Coord(), damage, nullptr, Rule->C4Warhead);
     }
     /*
@@ -230,6 +230,10 @@ void AnimClassExt::_AI()
                                     Rect overlayrect = tibcell->Overlay_Render_Rect();
                                     overlayrect.Y -= TacticalRect.Y;
                                     updaterect = Union(updaterect, overlayrect);
+                                    TiberiumType tiberium = tibcell->Tiberium_Type_Here();
+                                    if (tiberium != TIBERIUM_NONE) {
+                                        Tiberiums[tiberium]->Queue_Growth(tibcell->CellID);
+                                    }
                                 }
                             }
                         }
