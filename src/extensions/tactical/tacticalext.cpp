@@ -54,6 +54,7 @@
 #include "extension.h"
 #include "asserthandler.h"
 #include "beacon.h"
+#include "cd3d.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "tibsun_functions.h"
@@ -92,10 +93,11 @@ TacticalExtension::TacticalExtension(const Tactical* this_ptr) :
 
     std::memset(CellRedraw, 0, sizeof(CellRedraw));
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    ImGuiDSurface_CreateFontsTexture();
+    Direct3D_Prep();
+    Direct3D_Init();
+
+    ImGui_ImplD3D2_Init();
+    ImGui::GetIO().DisplaySize = ImVec2((float)CompositeSurface->Get_Width(), (float)CompositeSurface->Get_Height());
 }
 
 
@@ -121,8 +123,8 @@ TacticalExtension::~TacticalExtension()
 {
     //EXT_DEBUG_TRACE("TacticalExtension::~TacticalExtension - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 
-    ImGuiDSurface_DestroyFontsTexture();
-    ImGui::DestroyContext();
+    ImGui_ImplD3D2_Shutdown();
+    Direct3D_Release();
 }
 
 
@@ -591,9 +593,6 @@ void TacticalExtension::Render_Post()
     static BasicTimerClass<SystemTimerClass> timer;
     static int last_time;
 
-    DDSURFACEDESC desc;
-    DirectDrawObject->GetDisplayMode(&desc);
-
     int delta = timer - last_time;
     if (delta > 0) {
         last_time += delta;
@@ -601,11 +600,14 @@ void TacticalExtension::Render_Post()
         io.DeltaTime = static_cast<float>(delta * 16) / 1000.0f;
         io.DisplaySize = {static_cast<float>(CompositeSurface->Get_Width()), static_cast<float>(CompositeSurface->Get_Height())};
 
+        ImGui_ImplD3D2_NewFrame();
         ImGui::NewFrame();
+
         ImGui::ShowDemoWindow();
+
         ImGui::Render();
 
-        ImGuiDSurface_Render(ImGui::GetDrawData(), CompositeSurface);
+        ImGui_ImplD3D2_RenderDrawData(ImGui::GetDrawData());
     }
 }
 

@@ -1,297 +1,202 @@
-// imgui_dsurface_renderer.cpp
-#include <vector>
-#include <algorithm>
-#include <cstdint>
-#include <cmath>
+#include "imgui_renderer.h"
 
-#include "imgui.h"
+#include "cd3d.h"
+#include "debughandler.h"
 #include "dsurface.h"
+#include "tibsun_globals.h"
 
-// ---------------------------------------------
-// Simple ARGB32 texture for ImGui::TexID
-struct DSurfImTexture {
-    int w = 0, h = 0;
-    std::vector<uint32_t> px; // ARGB32 (straight alpha)
+#include <algorithm>
+#include <cstring>
+#include <vector>
+
+static ImGui_ImplD3D2_Data* g = nullptr;
+
+LPDIRECTDRAWSURFACE g_imguiZ = nullptr;
+
+// D3D2 TL vertex
+struct TLV {
+    float sx, sy, sz, rhw;
+    DWORD diffuse;
+    float tu, tv;
 };
 
-static inline uint32_t SampleTexNearest(DSurfImTexture* t, float u, float v)
+static inline DWORD RGBA8_to_ARGB8(ImU32 c)
 {
-    if (!t || t->w <= 0 || t->h <= 0) return 0xFFFFFFFFu;
-    // Clamp + nearest
-    int x = (int)std::floor(u * t->w + 0.5f);
-    int y = (int)std::floor(v * t->h + 0.5f);
-    x = std::max(0, std::min(t->w - 1, x));
-    y = std::max(0, std::min(t->h - 1, y));
-    return t->px[y * t->w + x];
+    // ImGui packs as 0xAABBGGRR (on little-endian), use shifts:
+    unsigned int r = (c >> IM_COL32_R_SHIFT) & 0xFF;
+    unsigned int g = (c >> IM_COL32_G_SHIFT) & 0xFF;
+    unsigned int b = (c >> IM_COL32_B_SHIFT) & 0xFF;
+    unsigned int a = (c >> IM_COL32_A_SHIFT) & 0xFF;
+    return (a << 24) | (r << 16) | (g << 8) | (b);
 }
 
-// ---------------------------------------------
-// 32-bit alpha blend (src over dst) on ARGB
-static inline uint32_t Blend32(uint32_t dst, uint32_t src)
+// --- Init / Shutdown -------------------------------------------------------
+
+bool ImGui_ImplD3D2_Init()
 {
-    uint32_t sa = (src >> 24) & 0xFF;
-    if (sa == 0)   return dst;
-    if (sa == 255) return (src & 0x00FFFFFF) | 0xFF000000;
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
 
-    uint32_t sr = (src >> 16) & 0xFF;
-    uint32_t sg = (src >>  8) & 0xFF;
-    uint32_t sb = (src >>  0) & 0xFF;
+    if (!Direct3DDevice) {
+        DEBUG_INFO("ImGui_ImplD3D2_Init_FromExisting: No Direct3DDevice available\n");
+        return false;
+    }
 
-    uint32_t dr = (dst >> 16) & 0xFF;
-    uint32_t dg = (dst >>  8) & 0xFF;
-    uint32_t db = (dst >>  0) & 0xFF;
+    g = new ImGui_ImplD3D2_Data();
+    g->dev = Direct3DDevice; // use existing
+    g->dev->AddRef();        // keep ref
 
-    uint32_t r = (sr * sa + dr * (255 - sa)) / 255;
-    uint32_t g = (sg * sa + dg * (255 - sa)) / 255;
-    uint32_t b = (sb * sa + db * (255 - sa)) / 255;
-    return 0xFF000000 | (r << 16) | (g << 8) | b;
+    g->viewport = Direct3DViewport;
+    if (g->viewport) g->viewport->AddRef();
+
+    return ImGui_ImplD3D2_CreateFontsTexture();
 }
 
-// ---------------------------------------------
-// 16-bit helpers using DSurface's bit layout
-static inline void Unpack16(uint16_t c, uint8_t& r, uint8_t& g, uint8_t& b)
+void ImGui_ImplD3D2_Shutdown()
 {
-    r = (uint8_t)(((c >> DSurface::RedRight)   & ((1 << (8 - DSurface::RedLeft))   - 1)) << DSurface::RedLeft);
-    g = (uint8_t)(((c >> DSurface::GreenRight) & ((1 << (8 - DSurface::GreenLeft)) - 1)) << DSurface::GreenLeft);
-    b = (uint8_t)(((c >> DSurface::BlueRight)  & ((1 << (8 - DSurface::BlueLeft))  - 1)) << DSurface::BlueLeft);
+    ImGui_ImplD3D2_DestroyFontsTexture();
+    //if (g) {
+    //    if (g->viewport) {
+    //        g->dev->DeleteViewport(g->viewport); // optional, safe on D3D2
+    //        g->viewport->Release();
+    //        g->viewport = nullptr;
+    //    }
+    //    if (g->dev) g->dev->Release();
+    //    if (g->d3d) g->d3d->Release();
+    //    delete g;
+    //    g = nullptr;
+    //}
+    //if (g_imguiZ) {
+    //    g_imguiZ->Release();
+    //    g_imguiZ = nullptr;
+    //}
+    ImGui::DestroyContext();
 }
 
-static inline uint16_t Blend16(uint16_t dst16, uint8_t sr, uint8_t sg, uint8_t sb, uint8_t sa)
+void ImGui_ImplD3D2_NewFrame()
 {
-    if (sa == 0)   return dst16;
-    if (sa == 255) return (uint16_t)DSurface::Build_Hicolor_Pixel(sr, sg, sb);
-
-    uint8_t dr, dg, db;
-    // use your Unpack16 that reads using DSurface’s shift fields
-    Unpack16(dst16, dr, dg, db);
-
-    dr = (uint8_t)((sr * sa + dr * (255 - sa)) / 255);
-    dg = (uint8_t)((sg * sa + dg * (255 - sa)) / 255);
-    db = (uint8_t)((sb * sa + db * (255 - sa)) / 255);
-
-    return (uint16_t)DSurface::Build_Hicolor_Pixel(dr, dg, db);
+    // nothing special, states are set in init and per-draw
 }
 
-// ---------------------------------------------
-// Barycentric triangle rasterizer with scissor
-static inline float edge(float x0, float y0, float x1, float y1, float x, float y)
+// --- Font texture ----------------------------------------------------------
+// Create ARGB4444 texture surface and upload ImGui font atlas (convert RGBA8->ARGB4444)
+static inline WORD RGBA8_to_ARGB4444(ImU32 c)
 {
-    return (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0);
+    unsigned r = (c >> IM_COL32_R_SHIFT) & 0xFF;
+    unsigned g8 = (c >> IM_COL32_G_SHIFT) & 0xFF;
+    unsigned b = (c >> IM_COL32_B_SHIFT) & 0xFF;
+    unsigned a = (c >> IM_COL32_A_SHIFT) & 0xFF;
+    unsigned ra = (a >> 4) & 0x0F;
+    unsigned rr = (r >> 4) & 0x0F;
+    unsigned rg = (g8 >> 4) & 0x0F;
+    unsigned rb = (b >> 4) & 0x0F;
+    return (WORD)((ra << 12) | (rr << 8) | (rg << 4) | (rb));
 }
 
-// NOTE: positions must be in framebuffer space (after DisplayPos/FramebufferScale applied)
-static void RasterizeTri(const ImDrawVert& a, const ImDrawVert& b, const ImDrawVert& c,
-                         uint8_t* base, int pitch, int bpp,
-                         const RECT& sc, DSurfImTexture* tex)
+bool ImGui_ImplD3D2_CreateFontsTexture()
 {
-    float x0=a.pos.x, y0=a.pos.y;
-    float x1=b.pos.x, y1=b.pos.y;
-    float x2=c.pos.x, y2=c.pos.y;
+    ImGuiIO& io = ImGui::GetIO();
+    unsigned char* pixels;
+    int w, h;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
 
-    float A = edge(x0,y0,x1,y1,x2,y2);
-    if (A == 0.f) return;
-    float invA = 1.0f / A;
+    // Use CD3DTexture to allocate in system/video memory
+    CD3DTexture* tex = new CD3DTexture(w, h, 0);
+    if (!tex->Texture_Allocated()) {
+        DEBUG_ERROR("ImGui font CD3DTexture failed\n");
+        delete tex;
+        return false;
+    }
 
-    int minx = std::max((int)sc.left,   (int)std::floor(std::min({x0,x1,x2})));
-    int maxx = std::min((int)sc.right,  (int)std::ceil (std::max({x0,x1,x2})));
-    int miny = std::max((int)sc.top,    (int)std::floor(std::min({y0,y1,y2})));
-    int maxy = std::min((int)sc.bottom, (int)std::ceil (std::max({y0,y1,y2})));
-    if (minx >= maxx || miny >= maxy) return;
+    // Lock and upload ImGui font pixels
+    DDSURFACEDESC desc = {sizeof(desc)};
+    if (SUCCEEDED(tex->Get_Texture_Surface_Ptr()->Lock(nullptr, &desc, DDLOCK_WAIT, nullptr))) {
+        auto* dst = reinterpret_cast<uint16_t*>(desc.lpSurface);
+        int pitch = desc.lPitch / 2;
+        const ImU32* src = (const ImU32*)pixels;
 
-    auto unpack = [](ImU32 c, float out[4]){
-        out[0] = ((c >> IM_COL32_R_SHIFT) & 0xFF) * (1.0f/255.0f);
-        out[1] = ((c >> IM_COL32_G_SHIFT) & 0xFF) * (1.0f/255.0f);
-        out[2] = ((c >> IM_COL32_B_SHIFT) & 0xFF) * (1.0f/255.0f);
-        out[3] = ((c >> IM_COL32_A_SHIFT) & 0xFF) * (1.0f/255.0f);
-    };
-    float ca[4], cb[4], cc_[4];
-    unpack(a.col, ca);
-    unpack(b.col, cb);
-    unpack(c.col, cc_);
-
-    constexpr float eps = -0.0001f; // tolerate tiny negative due to FP error
-
-    for (int y = miny; y < maxy; ++y) {
-        float py = y + 0.5f;
-        uint8_t* row = base + y * pitch;
-        for (int x = minx; x < maxx; ++x) {
-            float px = x + 0.5f;
-
-            float w0 = edge(x1,y1,x2,y2,px,py) * invA;
-            float w1 = edge(x2,y2,x0,y0,px,py) * invA;
-            float w2 = edge(x0,y0,x1,y1,px,py) * invA;
-
-            // accept both windings (normalized weights >= 0)
-            if (w0 < eps || w1 < eps || w2 < eps)
-                continue;
-
-            float u = a.uv.x*w0 + b.uv.x*w1 + c.uv.x*w2;
-            float v = a.uv.y*w0 + b.uv.y*w1 + c.uv.y*w2;
-
-            float r = ca[0]*w0 + cb[0]*w1 + cc_[0]*w2;
-            float g = ca[1]*w0 + cb[1]*w1 + cc_[1]*w2;
-            float b = ca[2]*w0 + cb[2]*w1 + cc_[2]*w2;
-            float a_ = ca[3]*w0 + cb[3]*w1 + cc_[3]*w2;
-
-            uint32_t texel = SampleTexNearest(tex, u, v);
-            uint8_t tr = (texel >> 0) & 0xFF;
-            uint8_t tg = (texel >> 8) & 0xFF;
-            uint8_t tb = (texel >> 16) & 0xFF;
-            uint8_t ta = (texel >> 24) & 0xFF;
-
-            float sr = (tr * (1.0f/255.0f)) * r;
-            float sg = (tg * (1.0f/255.0f)) * g;
-            float sb = (tb * (1.0f/255.0f)) * b;
-            float sa = (ta * (1.0f/255.0f)) * a_;
-
-            uint8_t SR = (uint8_t)(sr * 255.0f + 0.5f);
-            uint8_t SG = (uint8_t)(sg * 255.0f + 0.5f);
-            uint8_t SB = (uint8_t)(sb * 255.0f + 0.5f);
-            uint8_t SA = (uint8_t)(sa * 255.0f + 0.5f);
-
-            if (bpp == 4) {
-                uint32_t* p = (uint32_t*)(row + x * 4);
-                uint32_t dst = *p;
-                uint32_t src = (SA << 24) | (SR << 16) | (SG << 8) | (SB);
-                *p = Blend32(dst, src);
-            } else if (bpp == 2) {
-                uint16_t* p = (uint16_t*)(row + x * 2);
-                *p = Blend16(*p, SR, SG, SB, SA);
-            } else if (bpp == 1) {
-                // Paletted/8bpp: simple luminance (no alpha)
-                uint8_t Y = (uint8_t)((77*SR + 150*SG + 29*SB) / 256);
-                row[x] = Y;
+        for (int y = 0; y < h; ++y) {
+            for (int x = 0; x < w; ++x) {
+                ImU32 c = src[y * w + x];
+                unsigned a = (c >> 24) & 0xFF;
+                dst[y * pitch + x] = DSurface::Build_Hicolor_Pixel(a, a, a); // grayscale alpha
             }
         }
+        tex->Get_Texture_Surface_Ptr()->Unlock(nullptr);
     }
+
+    io.Fonts->SetTexID((ImTextureID)(intptr_t)tex->Get_Texture_Ptr());
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    io.Fonts->TexIsBuilt = true;
+    return true;
 }
 
-// ---------------------------------------------
-// Public API
-
-void ImGuiDSurface_CreateFontsTexture()
+void ImGui_ImplD3D2_DestroyFontsTexture()
 {
     ImGuiIO& io = ImGui::GetIO();
-    ImFontAtlas* atlas = io.Fonts;
-
-    unsigned char* pixels = nullptr;
-    int w=0, h=0;
-    atlas->GetTexDataAsRGBA32(&pixels, &w, &h);
-
-    auto* tex = new DSurfImTexture();
-    tex->w = w; tex->h = h;
-    tex->px.resize(size_t(w) * size_t(h));
-
-    // RGBA (ImGui) -> ARGB (renderer)
-    memcpy(tex->px.data(), pixels, size_t(w) * size_t(h) * 4);
-
-#if defined(IMGUI_VERSION_NUM) && IMGUI_VERSION_NUM >= 19100
-    atlas->SetTexID((ImTextureID)(uintptr_t)tex);
-    if (atlas->TexRef._TexData)
-        atlas->TexRef._TexData->BackendUserData = tex;
-#else
-    atlas->TexID = (ImTextureID)(uintptr_t)tex;
-#endif
+    if (io.Fonts->TexData) {
+        CD3DTexture* tex = (CD3DTexture*)(intptr_t)io.Fonts->TexData->TexID;
+        delete tex;
+        io.Fonts->SetTexID(0);
+        io.Fonts->TexIsBuilt = false; // add this
+    }
 }
 
-void ImGuiDSurface_DestroyFontsTexture()
+// --- Rendering -------------------------------------------------------------
+static void SetViewportClipRect(const ImVec4& cr, int fb_w, int fb_h)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    ImFontAtlas* atlas = io.Fonts;
-    if (!atlas) return;
+    if (!g || !g->viewport) return;
 
-#if defined(IMGUI_VERSION_NUM) && IMGUI_VERSION_NUM >= 19100
-    ImTextureRef texref = atlas->TexRef;
-    if (texref._TexData && texref._TexData->BackendUserData) {
-        delete (DSurfImTexture*)texref._TexData->BackendUserData;
-        texref._TexData->BackendUserData = nullptr;
-    } else if (texref._TexID != ImTextureID_Invalid) {
-        delete (DSurfImTexture*)(uintptr_t)texref._TexID;
-    }
-    atlas->SetTexID(ImTextureID_Invalid);
-    atlas->TexRef = ImTextureRef();
-#else
-    if (atlas->TexID) {
-        delete (DSurfImTexture*)(uintptr_t)atlas->TexID;
-        atlas->TexID = nullptr;
-    }
-#endif
+    D3DVIEWPORT2 vp = {};
+    vp.dwSize = sizeof(vp);
+    vp.dwX = (DWORD)std::max(0, (int)cr.x);
+    vp.dwY = (DWORD)std::max(0, (int)cr.y);
+    vp.dwWidth = (DWORD)std::max(0, (int)(cr.z - cr.x));
+    vp.dwHeight = (DWORD)std::max(0, (int)(cr.w - cr.y));
+    vp.dvClipX = 0.0f;
+    vp.dvClipY = 0.0f;
+    vp.dvClipWidth = (float)fb_w;
+    vp.dvClipHeight = (float)fb_h;
+    vp.dvMinZ = 0.0f;
+    vp.dvMaxZ = 1.0f;
+
+    g->viewport->SetViewport2(&vp);
 }
 
-// Render ImGui into a locked DSurface. Assumes surface size == io.DisplaySize.
-void ImGuiDSurface_Render(ImDrawData* draw_data, Surface* surface)
+
+void ImGui_ImplD3D2_RenderDrawData(ImDrawData* draw_data)
 {
-    if (!draw_data || !surface) return;
+    if (!draw_data || !Direct3DDevice) return;
 
-    uint8_t* base = (uint8_t*)surface->Lock();
-    if (!base) return;
+    Direct3DDevice->BeginScene();
 
-    const int bpp   = surface->Get_Bytes_Per_Pixel();
-    const int pitch = surface->Get_Pitch();
+    CD3DTriangle tri;
+    CD3DTriangleBuffer batch;
 
-    const int fb_w  = (int)draw_data->DisplaySize.x;
-    const int fb_h  = (int)draw_data->DisplaySize.y;
-    if (fb_w <= 0 || fb_h <= 0) { surface->Unlock(); return; }
-
-    const ImVec2 clip_off   = draw_data->DisplayPos;
+    const ImVec2 clip_off = draw_data->DisplayPos;
     const ImVec2 clip_scale = draw_data->FramebufferScale;
 
-    for (int n = 0; n < draw_data->CmdListsCount; ++n) {
+    for (int n = 0; n < draw_data->CmdListsCount; n++) {
         const ImDrawList* cl = draw_data->CmdLists[n];
         const ImDrawVert* vtx = cl->VtxBuffer.Data;
-        const ImDrawIdx*  idx = cl->IdxBuffer.Data;
+        const ImDrawIdx* idx = cl->IdxBuffer.Data;
 
-        int idx_off = 0;
-        for (int ci = 0; ci < cl->CmdBuffer.Size; ++ci) {
+        int idx_offset = 0;
+        for (int ci = 0; ci < cl->CmdBuffer.Size; ci++) {
             const ImDrawCmd& cmd = cl->CmdBuffer[ci];
-
-            // Scissor (framebuffer space)
-            ImVec4 cr;
-            cr.x = (cmd.ClipRect.x - clip_off.x) * clip_scale.x;
-            cr.y = (cmd.ClipRect.y - clip_off.y) * clip_scale.y;
-            cr.z = (cmd.ClipRect.z - clip_off.x) * clip_scale.x;
-            cr.w = (cmd.ClipRect.w - clip_off.y) * clip_scale.y;
-
-            RECT sc;
-            sc.left   = (LONG)std::max(0,    (int)std::floor(cr.x));
-            sc.top    = (LONG)std::max(0,    (int)std::floor(cr.y));
-            sc.right  = (LONG)std::min(fb_w, (int)std::ceil (cr.z));
-            sc.bottom = (LONG)std::min(fb_h, (int)std::ceil (cr.w));
-            if (sc.right <= sc.left || sc.bottom <= sc.top) {
-                idx_off += (int)cmd.ElemCount;
-                continue;
-            }
-
-            // Resolve texture (modern ImGui)
-            DSurfImTexture* tex = nullptr;
-#if defined(IMGUI_VERSION_NUM) && IMGUI_VERSION_NUM >= 19100
-            const ImTextureRef& texref = cmd.TexRef; // ImTextureRef
-            if (texref._TexData && texref._TexData->BackendUserData)
-                tex = (DSurfImTexture*)texref._TexData->BackendUserData;
-            else if (texref._TexID != ImTextureID_Invalid)
-                tex = (DSurfImTexture*)(uintptr_t)texref._TexID;
-#else
-            tex = (DSurfImTexture*)(uintptr_t)cmd.TextureId;
-#endif
-
-            // Draw triangles: transform positions to framebuffer space first
             for (unsigned int i = 0; i < cmd.ElemCount; i += 3) {
-                ImDrawVert a = vtx[idx[idx_off + i + 0]];
-                ImDrawVert b = vtx[idx[idx_off + i + 1]];
-                ImDrawVert c = vtx[idx[idx_off + i + 2]];
+                for (int j = 0; j < 3; j++) {
+                    const ImDrawVert& v = vtx[idx[idx_offset + i + j]];
+                    tri.Set_Coords(j, (v.pos.x - clip_off.x) * clip_scale.x, (v.pos.y - clip_off.y) * clip_scale.y, 0.0f, v.uv.x, v.uv.y);
 
-                a.pos.x = (a.pos.x - clip_off.x) * clip_scale.x;
-                a.pos.y = (a.pos.y - clip_off.y) * clip_scale.y;
-                b.pos.x = (b.pos.x - clip_off.x) * clip_scale.x;
-                b.pos.y = (b.pos.y - clip_off.y) * clip_scale.y;
-                c.pos.x = (c.pos.x - clip_off.x) * clip_scale.x;
-                c.pos.y = (c.pos.y - clip_off.y) * clip_scale.y;
-
-                RasterizeTri(a, b, c, base, pitch, bpp, sc, tex);
+                    tri.Vertexes[j].color = RGBA_MAKE((v.col >> 0) & 0xFF, (v.col >> 8) & 0xFF, (v.col >> 16) & 0xFF, (v.col >> 24) & 0xFF);
+                }
+                batch.Add(&tri);
             }
-            idx_off += (int)cmd.ElemCount;
+            idx_offset += (int)cmd.ElemCount;
         }
     }
 
-    surface->Unlock();
+    batch.Blit(CompositeSurface->Get_DD_Surface());
+    Direct3DDevice->EndScene();
 }
