@@ -836,34 +836,34 @@ void AircraftClassExtension_Hooks()
      */
     AircraftClassExtension_Init();
 
-    Patch_Jump(0x00408898, &_AircraftClass_Init_IsCloakable_BugFix_Patch);
-    Patch_Jump(0x0040A413, &_AircraftClass_Mission_Move_LAND_Is_Moving_Check_Patch);
-    Patch_Jump(0x0040988C, &_AircraftClass_Mission_Unload_Transport_Detach_Sound_Patch);
-    Patch_Jump(0x0040BDCF, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET0_Can_Fire_FIRE_FACING_Patch);
-    Patch_Jump(0x0040C054, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_OK_Patch);
-    Patch_Jump(0x0040BF9D, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_FACING_Patch);
-    Patch_Jump(0x0040C0AC, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_DEFAULT_Patch);
+    //Patch_Jump(0x00408898, &_AircraftClass_Init_IsCloakable_BugFix_Patch);
+    //Patch_Jump(0x0040A413, &_AircraftClass_Mission_Move_LAND_Is_Moving_Check_Patch);
+    //Patch_Jump(0x0040988C, &_AircraftClass_Mission_Unload_Transport_Detach_Sound_Patch);
+    //Patch_Jump(0x0040BDCF, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET0_Can_Fire_FIRE_FACING_Patch);
+    //Patch_Jump(0x0040C054, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_OK_Patch);
+    //Patch_Jump(0x0040BF9D, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_FIRE_FACING_Patch);
+    //Patch_Jump(0x0040C0AC, &_AircraftClass_Mission_Attack_IsCurleyShuffle_FIRE_AT_TARGET2_Can_Fire_DEFAULT_Patch);
 
-    /**
-     *  #issue-1091
-     *
-     *  Fix bug where aircraft are unable to attack shrouded targets in campaign games and instead get stuck in mid-air.
-     *
-     *  Author: Rampastring
-     */
-    Patch_Jump(0x0040D0C5, (uintptr_t)0x0040D0EA);
+    ///**
+    // *  #issue-1091
+    // *
+    // *  Fix bug where aircraft are unable to attack shrouded targets in campaign games and instead get stuck in mid-air.
+    // *
+    // *  Author: Rampastring
+    // */
+    //Patch_Jump(0x0040D0C5, (uintptr_t)0x0040D0EA);
 
-    Patch_Jump(0x00408940, &AircraftClassExt::_Unlimbo);
-    Patch_Jump(0x0040D260, &AircraftClassExt::_Cell_Seems_Ok);
-    Patch_Jump(0x0040B3A6, &_AircraftClass_Enter_Idle_Mode_Spawner_Patch);
-    Patch_Jump(0x0040B7E0, &AircraftClassExt::_What_Action);
+    //Patch_Jump(0x00408940, &AircraftClassExt::_Unlimbo);
+    //Patch_Jump(0x0040D260, &AircraftClassExt::_Cell_Seems_Ok);
+    //Patch_Jump(0x0040B3A6, &_AircraftClass_Enter_Idle_Mode_Spawner_Patch);
+    //Patch_Jump(0x0040B7E0, &AircraftClassExt::_What_Action);
 
-    Patch_Jump(0x004097FF, &_AircraftClass_Do_MISSION_UNLOAD_Carryall_Drop_Off_Patch);
-    Patch_Jump(0x0040AD7B, &_AircraftClass_Do_MISSION_MOVE_CARRYALL_Drop_Off_Patch);
-    Patch_Jump(0x0040D60D, &_AircraftClass_Do_MISSION_ENTER_Drop_Off_Patch);
-    Patch_Jump(0x00408BF3, &_AircraftClass_Draw_It_Carry_All_Patch);
-    Patch_Jump(0x0040EDD0, &AircraftClassExt::_Landing_Altitude_Thunk);
-    Patch_Jump(0x0040C8A0, &AircraftClassExt::_Receive_Message);
+    //Patch_Jump(0x004097FF, &_AircraftClass_Do_MISSION_UNLOAD_Carryall_Drop_Off_Patch);
+    //Patch_Jump(0x0040AD7B, &_AircraftClass_Do_MISSION_MOVE_CARRYALL_Drop_Off_Patch);
+    //Patch_Jump(0x0040D60D, &_AircraftClass_Do_MISSION_ENTER_Drop_Off_Patch);
+    //Patch_Jump(0x00408BF3, &_AircraftClass_Draw_It_Carry_All_Patch);
+    //Patch_Jump(0x0040EDD0, &AircraftClassExt::_Landing_Altitude_Thunk);
+    //Patch_Jump(0x0040C8A0, &AircraftClassExt::_Receive_Message);
 
-    Patch_Jump(0x00409366, &_AircraftClass_AI_Carryall_Facing_Patch);
+    //Patch_Jump(0x00409366, &_AircraftClass_AI_Carryall_Facing_Patch);
 }

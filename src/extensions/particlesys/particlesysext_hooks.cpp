@@ -62,5 +62,5 @@ DECLARE_PATCH(_ParticleSystemClass_Spawn_Particle_Particle_System_Patch)
  */
 void ParticleSystemClassExtension_Hooks()
 {
-	Patch_Jump(0x005A5A65, &_ParticleSystemClass_Spawn_Particle_Particle_System_Patch);
+	//Patch_Jump(0x005A5A65, &_ParticleSystemClass_Spawn_Particle_Particle_System_Patch);
 }

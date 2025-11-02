@@ -100,5 +100,5 @@ DECLARE_PATCH(_ParticleClass_Smoke_And_WeakGas_Behaviour_AI_Tiberium_Death_Patch
  */
 void ParticleClassExtension_Hooks()
 {
-    Patch_Jump(0x005A389C, &_ParticleClass_Smoke_And_WeakGas_Behaviour_AI_Tiberium_Death_Patch);
+    //Patch_Jump(0x005A389C, &_ParticleClass_Smoke_And_WeakGas_Behaviour_AI_Tiberium_Death_Patch);
 }

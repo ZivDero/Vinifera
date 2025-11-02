@@ -266,56 +266,56 @@ void Extension_Hooks()
     SessionClassExtension_Hooks();
     OptionsClassExtension_Hooks();
 
-    ThemeClassExtension_Hooks();
+    //ThemeClassExtension_Hooks();
 
-    DisplayClassExtension_Hooks();
-    ScrollClassExtension_Hooks();
+    //DisplayClassExtension_Hooks();
+    //ScrollClassExtension_Hooks();
     SidebarClassExtension_Hooks();
-    MouseClassExtension_Hooks();
+    //MouseClassExtension_Hooks();
 
     /**
      *  Various modules and functions.
      */
     GameInit_Hooks();
-    MainLoop_Hooks();
-    NewMenuExtension_Hooks();
-    CommandExtension_Hooks();
+    //MainLoop_Hooks();
+    //NewMenuExtension_Hooks();
+    //CommandExtension_Hooks();
     CDExtension_Hooks();
-    PlayMovieExtension_Hooks();
-    VQAExtension_Hooks();
-    CCINIClassExtension_Hooks();
-    RawFileClassExtension_Hooks();
+    //PlayMovieExtension_Hooks();
+    //VQAExtension_Hooks();
+    //CCINIClassExtension_Hooks();
+    //RawFileClassExtension_Hooks();
     CCFileClassExtension_Hooks();
 
-    MessageListClassExtension_Hooks();
-    TextLabelClassExtension_Hooks();
-    ToolTipManagerExtension_Hooks();
-    TextPrintExtension_Hooks();
+    //MessageListClassExtension_Hooks();
+    //TextLabelClassExtension_Hooks();
+    //ToolTipManagerExtension_Hooks();
+    //TextPrintExtension_Hooks();
 
-    CombatExtension_Hooks();
-    DropshipExtension_Hooks();
-    EnvironmentExtension_Hooks();
-    MapSeedClassExtension_Hooks();
-    MultiScoreExtension_Hooks();
-    ScoreClassExtension_Hooks();
-    MultiMissionExtension_Hooks();
-    ConquerExtension_Hooks();
+    //CombatExtension_Hooks();
+    //DropshipExtension_Hooks();
+    //EnvironmentExtension_Hooks();
+    //MapSeedClassExtension_Hooks();
+    //MultiScoreExtension_Hooks();
+    //ScoreClassExtension_Hooks();
+    //MultiMissionExtension_Hooks();
+    //ConquerExtension_Hooks();
 
     SDLSurface_Hooks();
     SDLMouse_Hooks();
     SDL_Hooks();
 
-    /**
-     *  Dialogs and associated code.
-     */
-    SkirmishDialog_Hooks();
+    ///**
+    // *  Dialogs and associated code.
+    // */
+    //SkirmishDialog_Hooks();
 
-    /**
-     *  Miscellaneous hooks
-     */
-    FilePCXExtension_Hooks();
-    FetchRes_Hooks();
-    XSurfaceExtension_Hooks();
+    ///**
+    // *  Miscellaneous hooks
+    // */
+    //FilePCXExtension_Hooks();
+    //FetchRes_Hooks();
+    //XSurfaceExtension_Hooks();
 
     /**
      *  New classes and interfaces.

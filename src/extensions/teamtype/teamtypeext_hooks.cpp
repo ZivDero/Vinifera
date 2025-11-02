@@ -73,5 +73,5 @@ void TeamTypeClassExtension_Hooks()
      */
     TeamTypeClassExtension_Init();
 
-	Patch_Jump(0x00628CD0, &_TeamTypeClass_Read_All);
+	//Patch_Jump(0x00628CD0, &_TeamTypeClass_Read_All);
 }

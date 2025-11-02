@@ -85,5 +85,5 @@ void IsometricTileTypeClassExtension_Hooks()
      */
     IsometricTileTypeClassExtension_Init();
 
-    Patch_Jump(0x004F3570, &IsometricTileTypeClassExt::_Get_Image_Data);
+    //Patch_Jump(0x004F3570, &IsometricTileTypeClassExt::_Get_Image_Data);
 }

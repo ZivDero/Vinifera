@@ -117,6 +117,6 @@ void TeamClassExtension_Hooks()
 {
     TeamClassExtension_Init();
 
-    Patch_Jump(0x00622B2C, &_TeamClass_AI_MoveCell_FixCellCalc_Patch);
-    Patch_Jump(0x00625886, &_TeamClass_TMission_PATROL_WaypointMax);
+    //Patch_Jump(0x00622B2C, &_TeamClass_AI_MoveCell_FixCellCalc_Patch);
+    //Patch_Jump(0x00625886, &_TeamClass_TMission_PATROL_WaypointMax);
 }

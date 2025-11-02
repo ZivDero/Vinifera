@@ -356,9 +356,9 @@ void FactoryClassExtension_Hooks()
      */
     FactoryClassExtension_Init();
 
-    Patch_Jump(0x00496EA0, &FactoryClassExt::_AI);
-    Patch_Jump(0x004971E0, &FactoryClassExt::_Start);
-    Patch_Jump(0x004978D0, &FactoryClassExt::_Resume_Queue);
-    Patch_Jump(0x00497330, &FactoryClassExt::_Abandon);
-    Patch_Jump(0x00497760, &FactoryClassExt::_Object_CRC);
+    //Patch_Jump(0x00496EA0, &FactoryClassExt::_AI);
+    //Patch_Jump(0x004971E0, &FactoryClassExt::_Start);
+    //Patch_Jump(0x004978D0, &FactoryClassExt::_Resume_Queue);
+    //Patch_Jump(0x00497330, &FactoryClassExt::_Abandon);
+    //Patch_Jump(0x00497760, &FactoryClassExt::_Object_CRC);
 }

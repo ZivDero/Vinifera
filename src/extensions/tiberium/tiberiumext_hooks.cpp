@@ -145,33 +145,33 @@ void TiberiumClassExtension_Hooks()
      */
     TiberiumClassExtension_Init();
 
-    /**
-     *  De-hardcode Power for Tiberium Vinifera.
-     */
-    Patch_Jump(0x00644DB8, 0x00644DD4); // 
+    ///**
+    // *  De-hardcode Power for Tiberium Vinifera.
+    // */
+    //Patch_Jump(0x00644DB8, 0x00644DD4); // 
 
-    /**
-     *  OverlayTypes indexes 27 to 38 (fourth Tiberium images) are hardcoded to be
-     *  impassable by infantry. This hack removes this.
-     */
-    Patch_Jump(0x004D54E7, 0x004D5507);
+    ///**
+    // *  OverlayTypes indexes 27 to 38 (fourth Tiberium images) are hardcoded to be
+    // *  impassable by infantry. This hack removes this.
+    // */
+    //Patch_Jump(0x004D54E7, 0x004D5507);
 
-    Patch_Jump(0x0058C934, _Get_Tiberium_Type_Debug_Info_Patch);
-    Patch_Jump(0x0045CEB9, _CellClass_Place_Tiberium_Variety_Patch);
+    //Patch_Jump(0x0058C934, _Get_Tiberium_Type_Debug_Info_Patch);
+    //Patch_Jump(0x0045CEB9, _CellClass_Place_Tiberium_Variety_Patch);
 
-    Patch_Jump(0x006455C0, &TiberiumClassExt::_Spread_AI);
-    Patch_Jump(0x006458F0, &TiberiumClassExt::_Init_Spread);
-    Patch_Jump(0x00645A30, &TiberiumClassExt::_Recalc_Spread);
-    Patch_Jump(0x00645BA0, &TiberiumClassExt::_Clear_Spread);
-    Patch_Jump(0x00645C70, &TiberiumClassExt::_Queue_Spread);
-    Patch_Jump(0x00646080, &TiberiumClassExt::_Growth_AI);
-    Patch_Jump(0x006463D0, &TiberiumClassExt::_Init_Growth);
-    Patch_Jump(0x00646510, &TiberiumClassExt::_Recalc_Growth);
-    Patch_Jump(0x00646680, &TiberiumClassExt::_Clear_Growth);
-    Patch_Jump(0x00646710, &TiberiumClassExt::_Queue_Growth);
-    Patch_Jump(0x006453C0, &TiberiumClassExt::_Initialize_Tiberium_Spread_System);
-    Patch_Jump(0x00645510, &TiberiumClassExt::_Deinitialize_Tiberium_Spread_System);
-    Patch_Jump(0x00645E80, &TiberiumClassExt::_Initialize_Tiberium_Growth_System);
-    Patch_Jump(0x00645FD0, &TiberiumClassExt::_Deinitialize_Tiberium_Growth_System);
-    Patch_Jump(0x00645C30, &TiberiumClassExt::_Clear_Spread_State);
+    //Patch_Jump(0x006455C0, &TiberiumClassExt::_Spread_AI);
+    //Patch_Jump(0x006458F0, &TiberiumClassExt::_Init_Spread);
+    //Patch_Jump(0x00645A30, &TiberiumClassExt::_Recalc_Spread);
+    //Patch_Jump(0x00645BA0, &TiberiumClassExt::_Clear_Spread);
+    //Patch_Jump(0x00645C70, &TiberiumClassExt::_Queue_Spread);
+    //Patch_Jump(0x00646080, &TiberiumClassExt::_Growth_AI);
+    //Patch_Jump(0x006463D0, &TiberiumClassExt::_Init_Growth);
+    //Patch_Jump(0x00646510, &TiberiumClassExt::_Recalc_Growth);
+    //Patch_Jump(0x00646680, &TiberiumClassExt::_Clear_Growth);
+    //Patch_Jump(0x00646710, &TiberiumClassExt::_Queue_Growth);
+    //Patch_Jump(0x006453C0, &TiberiumClassExt::_Initialize_Tiberium_Spread_System);
+    //Patch_Jump(0x00645510, &TiberiumClassExt::_Deinitialize_Tiberium_Spread_System);
+    //Patch_Jump(0x00645E80, &TiberiumClassExt::_Initialize_Tiberium_Growth_System);
+    //Patch_Jump(0x00645FD0, &TiberiumClassExt::_Deinitialize_Tiberium_Growth_System);
+    //Patch_Jump(0x00645C30, &TiberiumClassExt::_Clear_Spread_State);
 }

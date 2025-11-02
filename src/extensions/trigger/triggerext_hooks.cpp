@@ -88,5 +88,5 @@ DECLARE_PATCH(_TriggerClass_Constructor_Enabled_For_Difficulty_Patch)
  */
 void TriggerClassExtension_Hooks()
 {
-    Patch_Jump(0x00649171, &_TriggerClass_Constructor_Enabled_For_Difficulty_Patch);
+    //Patch_Jump(0x00649171, &_TriggerClass_Constructor_Enabled_For_Difficulty_Patch);
 }

@@ -959,43 +959,43 @@ void TacticalExtension_Hooks()
      */
     TacticalExtension_Init();
 
-    Patch_Jump(0x00611AF9, &_Tactical_Render_Post_Effects_Patch);
-    Patch_Jump(0x00611BCB, &_Tactical_Render_Overlay_Patch);
+    //Patch_Jump(0x00611AF9, &_Tactical_Render_Post_Effects_Patch);
+    //Patch_Jump(0x00611BCB, &_Tactical_Render_Overlay_Patch);
 
-    Patch_Jump(0x00616C90, &TacticalExt::_Draw_Rally_Points);
+    //Patch_Jump(0x00616C90, &TacticalExt::_Draw_Rally_Points);
 
-    Patch_Jump(0x006172DB, &_Tactical_Draw_Waypoint_Paths_NormaliseLineAnimation_Patch);
-    Patch_Jump(0x00617327, &_Tactical_Draw_Waypoint_Paths_DrawNormalLine_Patch);
+    //Patch_Jump(0x006172DB, &_Tactical_Draw_Waypoint_Paths_NormaliseLineAnimation_Patch);
+    //Patch_Jump(0x00617327, &_Tactical_Draw_Waypoint_Paths_DrawNormalLine_Patch);
 
-    Patch_Jump(0x0060F953, &_Tactical_Center_On_Location_Unfollow_Object_Patch);
+    //Patch_Jump(0x0060F953, &_Tactical_Center_On_Location_Unfollow_Object_Patch);
 
-    /**
-     *  #issue-351
-     * 
-     *  Changes the waypoint number text to have a stroke/outline.
-     * 
-     *  @authors: CCHyper
-     */
-    Patch_Dword(0x006171C8+1, (TPF_CENTER|TPF_EFNT|TPF_FULLSHADOW));
+    ///**
+    // *  #issue-351
+    // * 
+    // *  Changes the waypoint number text to have a stroke/outline.
+    // * 
+    // *  @authors: CCHyper
+    // */
+    //Patch_Dword(0x006171C8+1, (TPF_CENTER|TPF_EFNT|TPF_FULLSHADOW));
 
-    Patch_Jump(0x00616FDA, &_Tactical_Draw_Waypoint_Paths_Text_Color_Patch);
-    Patch_Jump(0x00616560, &TacticalExt::_Draw_Band_Box);
+    //Patch_Jump(0x00616FDA, &_Tactical_Draw_Waypoint_Paths_Text_Color_Patch);
+    //Patch_Jump(0x00616560, &TacticalExt::_Draw_Band_Box);
 
-    Patch_Jump(0x00616940, &TacticalExt::_Select_These);
-    Patch_Jump(0x00479150, &Vinifera_Bandbox_Select);
+    //Patch_Jump(0x00616940, &TacticalExt::_Select_These);
+    //Patch_Jump(0x00479150, &Vinifera_Bandbox_Select);
 
-    Patch_Jump(0x00614EC0, &TacticalExt::_Clamp_To_Tactical_Rect);
-    Patch_Jump(0x00611BBB, &_Tactical_Render_Fill_With_Black_Patch);
+    //Patch_Jump(0x00614EC0, &TacticalExt::_Clamp_To_Tactical_Rect);
+    //Patch_Jump(0x00611BBB, &_Tactical_Render_Fill_With_Black_Patch);
 
-    Patch_Jump(0x00617F54, 0x00617F79); // Skip swizzling cell redraw pointers in TacticalClass as we have our own array
-    Patch_Jump(0x00617F80, &TacticalExt::_Save);
-    Patch_Jump(0x00616C07, _TacticalClass_Flag_Cell_New_Array_Patch);
-    Patch_Jump(0x00610154, _TacticalClass_SubRender1_Patch);
-    Patch_Jump(0x006102B9, _TacticalClass_SubRender2_Patch);
-    Patch_Jump(0x00610519, _TacticalClass_SubRender3_Patch);
-    Patch_Jump(0x00610762, _TacticalClass_SubRender4_Patch);
-    Patch_Jump(0x00610946, _TacticalClass_SubRender5_Patch);
-    Patch_Jump(0x00610B03, _TacticalClass_SubRender6_Patch);
-    Patch_Jump(0x00610D61, _TacticalClass_SubRender7_Patch);
-    Patch_Jump(0x00610FB1, _TacticalClass_SubRender8_Patch);
+    //Patch_Jump(0x00617F54, 0x00617F79); // Skip swizzling cell redraw pointers in TacticalClass as we have our own array
+    //Patch_Jump(0x00617F80, &TacticalExt::_Save);
+    //Patch_Jump(0x00616C07, _TacticalClass_Flag_Cell_New_Array_Patch);
+    //Patch_Jump(0x00610154, _TacticalClass_SubRender1_Patch);
+    //Patch_Jump(0x006102B9, _TacticalClass_SubRender2_Patch);
+    //Patch_Jump(0x00610519, _TacticalClass_SubRender3_Patch);
+    //Patch_Jump(0x00610762, _TacticalClass_SubRender4_Patch);
+    //Patch_Jump(0x00610946, _TacticalClass_SubRender5_Patch);
+    //Patch_Jump(0x00610B03, _TacticalClass_SubRender6_Patch);
+    //Patch_Jump(0x00610D61, _TacticalClass_SubRender7_Patch);
+    //Patch_Jump(0x00610FB1, _TacticalClass_SubRender8_Patch);
 }

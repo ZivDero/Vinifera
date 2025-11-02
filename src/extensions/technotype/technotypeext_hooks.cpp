@@ -94,5 +94,5 @@ int TechnoTypeClassExt::_Max_Pips() const
  */
 void TechnoTypeClassExtension_Hooks()
 {
-    Patch_Jump(0x0063D460, &TechnoTypeClassExt::_Max_Pips);
+    //Patch_Jump(0x0063D460, &TechnoTypeClassExt::_Max_Pips);
 }

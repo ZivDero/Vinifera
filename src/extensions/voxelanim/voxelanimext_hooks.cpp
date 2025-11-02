@@ -85,5 +85,5 @@ void VoxelAnimClassExt::_Delete_Me()
  */
 void VoxelAnimClassExtension_Hooks()
 {
-    Change_Virtual_Address(0x006D9134, Get_Func_Address(&VoxelAnimClassExt::_Delete_Me));
+    //Change_Virtual_Address(0x006D9134, Get_Func_Address(&VoxelAnimClassExt::_Delete_Me));
 }

@@ -65,5 +65,5 @@ void OptionsClassExtension_Hooks()
      */
     OptionsClassExtension_Init();
 
-    Patch_Jump(0x0058AA18, &_Hotkey_Dialog_Proc_Keyboard_INI_RawFileClass_Patch);
+    //Patch_Jump(0x0058AA18, &_Hotkey_Dialog_Proc_Keyboard_INI_RawFileClass_Patch);
 }

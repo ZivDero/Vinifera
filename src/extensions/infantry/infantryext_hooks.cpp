@@ -643,17 +643,17 @@ void InfantryClassExtension_Hooks()
      */
     InfantryClassExtension_Init();
 
-    Patch_Jump(0x004D88FA, &_InfantryClass_Firing_AI_JumpJet_In_Air_Patch);
-    Patch_Jump(0x004D8C83, &_InfantryClass_Doing_AI_JumpJet_Idle_Patch);
-    Patch_Jump(0x004D50C9, &_InfantryClass_AI_JumpJet_Idle_Between_Firing_Patch);
-    Patch_Jump(0x004D9076, &_InfantryClass_Movement_AI_JumpJet_Not_Moving_Patch);
-    Patch_Jump(0x004D5AB4, &_InfantryClass_Can_Fire_Target_Check_Patch);
-    Patch_Jump(0x004D7168, &_InfantryClass_What_Action_Mechanic_Patch);
-    Patch_Jump(0x004D87E9, &_InfantryClass_Firing_AI_Mechanic_Patch);
-    Patch_Jump(0x004D3A7B, &_InfantryClass_Per_Cell_Process_Transport_Attach_Sound_Patch);
-    Patch_Jump(0x004D35F9, &_InfantryClass_Per_Cell_Process_Engineer_Capture_Damage_Patch);
-    Patch_Jump(0x004D3F5D, &_InfantryClass_Per_Cell_Process_Tiberium_Damage_Patch);
-    Patch_Jump(0x004D8BE4, &_InfantryClass_Doing_AI_Fix_Invalid_Facing_Set);
+    //Patch_Jump(0x004D88FA, &_InfantryClass_Firing_AI_JumpJet_In_Air_Patch);
+    //Patch_Jump(0x004D8C83, &_InfantryClass_Doing_AI_JumpJet_Idle_Patch);
+    //Patch_Jump(0x004D50C9, &_InfantryClass_AI_JumpJet_Idle_Between_Firing_Patch);
+    //Patch_Jump(0x004D9076, &_InfantryClass_Movement_AI_JumpJet_Not_Moving_Patch);
+    //Patch_Jump(0x004D5AB4, &_InfantryClass_Can_Fire_Target_Check_Patch);
+    //Patch_Jump(0x004D7168, &_InfantryClass_What_Action_Mechanic_Patch);
+    //Patch_Jump(0x004D87E9, &_InfantryClass_Firing_AI_Mechanic_Patch);
+    //Patch_Jump(0x004D3A7B, &_InfantryClass_Per_Cell_Process_Transport_Attach_Sound_Patch);
+    //Patch_Jump(0x004D35F9, &_InfantryClass_Per_Cell_Process_Engineer_Capture_Damage_Patch);
+    //Patch_Jump(0x004D3F5D, &_InfantryClass_Per_Cell_Process_Tiberium_Damage_Patch);
+    //Patch_Jump(0x004D8BE4, &_InfantryClass_Doing_AI_Fix_Invalid_Facing_Set);
 
-    Patch_Jump(0x004D90B0, &InfantryClassExt::_Get_Image_Data);
+    //Patch_Jump(0x004D90B0, &InfantryClassExt::_Get_Image_Data);
 }

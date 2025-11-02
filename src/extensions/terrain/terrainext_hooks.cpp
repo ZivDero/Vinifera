@@ -255,7 +255,7 @@ void TerrainClassExtension_Hooks()
      */
     TerrainClassExtension_Init();
 
-    Patch_Jump(0x006409C3, &_TerrainClass_Unlimbo_LightSource_Patch);
-    Patch_Jump(0x0063F4D9, &_TerrainClass_Take_Damage_LightSource_Patch);
-    Patch_Jump(0x0063FFB0, &TerrainClassExt::_AI);
+    //Patch_Jump(0x006409C3, &_TerrainClass_Unlimbo_LightSource_Patch);
+    //Patch_Jump(0x0063F4D9, &_TerrainClass_Take_Damage_LightSource_Patch);
+    //Patch_Jump(0x0063FFB0, &TerrainClassExt::_AI);
 }

@@ -120,5 +120,5 @@ void SuperWeaponTypeClassExtension_Hooks()
      */
     SuperWeaponTypeClassExtension_Init();
 
-    Patch_Jump(0x0060D6C0, &SuperWeaponTypeClassExt::_What_Action);
+    //Patch_Jump(0x0060D6C0, &SuperWeaponTypeClassExt::_What_Action);
 }

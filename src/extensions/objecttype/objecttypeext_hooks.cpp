@@ -244,9 +244,9 @@ BuildingClass* ObjectTypeClassExt::_Who_Can_Build_Me(bool intheory, bool needsno
 void ObjectTypeClassExtension_Hooks()
 {
     //Patch_Jump(0x004101A0, &ObjectTypeClassExt::_Get_Image_Data);
-    Patch_Jump(0x00588D00, &ObjectTypeClassExt::_Assign_Theater_Name);
-    Patch_Jump(0x0058891D, &_ObjectTypeClass_Load_Theater_Art_Assign_Theater_Name_Theater_Patch);
-    Patch_Jump(0x00587C80, &ObjectTypeClassExt::_Fetch_Voxel_Image);
-    Patch_Jump(0x00589030, &ObjectTypeClassExt::_Clear_Voxel_Indexes);
-    Patch_Jump(0x00587B20, &ObjectTypeClassExt::_Who_Can_Build_Me);
+    //Patch_Jump(0x00588D00, &ObjectTypeClassExt::_Assign_Theater_Name);
+    //Patch_Jump(0x0058891D, &_ObjectTypeClass_Load_Theater_Art_Assign_Theater_Name_Theater_Patch);
+    //Patch_Jump(0x00587C80, &ObjectTypeClassExt::_Fetch_Voxel_Image);
+    //Patch_Jump(0x00589030, &ObjectTypeClassExt::_Clear_Voxel_Indexes);
+    //Patch_Jump(0x00587B20, &ObjectTypeClassExt::_Who_Can_Build_Me);
 }

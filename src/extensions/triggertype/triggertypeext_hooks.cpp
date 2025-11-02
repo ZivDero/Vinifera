@@ -79,21 +79,21 @@ void TriggerTypeClassExtension_Hooks()
      *  to issues with jumping out of the game binary into the DLL, resulting
      *  in memory heap issues with strtok.
      */
-    Patch_Byte_Range(0x0064A2DC, 0x90, 4); // 4 nops
-    Patch_Byte_Range(0x0064A2E9, 0x90, 4); // 4 nops
-    Patch_Dword(0x0064A2ED, 0x90654588); // mov [ebp+65h], al; nop;
+    //Patch_Byte_Range(0x0064A2DC, 0x90, 4); // 4 nops
+    //Patch_Byte_Range(0x0064A2E9, 0x90, 4); // 4 nops
+    //Patch_Dword(0x0064A2ED, 0x90654588); // mov [ebp+65h], al; nop;
 
-    Patch_Byte_Range(0x0064A2FF, 0x90, 4); // 4 nops
-    Patch_Byte_Range(0x0064A30C, 0x90, 4); // 4 nops
-    Patch_Dword(0x0064A310, 0x90664588); // mov [ebp+66h], al; nop;
+    //Patch_Byte_Range(0x0064A2FF, 0x90, 4); // 4 nops
+    //Patch_Byte_Range(0x0064A30C, 0x90, 4); // 4 nops
+    //Patch_Dword(0x0064A310, 0x90664588); // mov [ebp+66h], al; nop;
 
-    Patch_Byte_Range(0x0064A322, 0x90, 4); // 4 nops
-    Patch_Byte_Range(0x0064A32F, 0x90, 4); // 4 nops
-    Patch_Dword(0x0064A333, 0x90674588); // mov [ebp+67h], al; nop;
+    //Patch_Byte_Range(0x0064A322, 0x90, 4); // 4 nops
+    //Patch_Byte_Range(0x0064A32F, 0x90, 4); // 4 nops
+    //Patch_Dword(0x0064A333, 0x90674588); // mov [ebp+67h], al; nop;
 
-    /**
-     *  This patch skips the code for setting the enabled state of the
-     *  trigger, we have moved this to the TriggerClass constructor now.
-     */
-    Patch_Jump(0x0064A35A, 0x0064A3A7);
+    ///**
+    // *  This patch skips the code for setting the enabled state of the
+    // *  trigger, we have moved this to the TriggerClass constructor now.
+    // */
+    //Patch_Jump(0x0064A35A, 0x0064A3A7);
 }

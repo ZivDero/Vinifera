@@ -218,6 +218,6 @@ void OverlayClassExtension_Hooks()
      */
     OverlayClassExtension_Init();
 
-    Patch_Jump(0x0058BE30, &Read_INI);
-    Patch_Jump(0x0058C280, &Write_INI);
+    //Patch_Jump(0x0058BE30, &Read_INI);
+    //Patch_Jump(0x0058C280, &Write_INI);
 }

@@ -280,16 +280,16 @@ void BuildingTypeClassExtension_Hooks()
 
     //Patch_Jump(0x00440365, &_BuildingTypeClass_Get_Image_Data_Assertion_Patch);
 
-    Patch_Jump(0x00443CF0, &BuildingTypeClassExt::_Free_Buildup_Image);
-    Patch_Jump(0x00443D20, &BuildingTypeClassExt::_Set_Base_Defense_Values);
+    //Patch_Jump(0x00443CF0, &BuildingTypeClassExt::_Free_Buildup_Image);
+    //Patch_Jump(0x00443D20, &BuildingTypeClassExt::_Set_Base_Defense_Values);
 
-    Patch_Jump(0x0044403B, &_BuildingTypeClass_SDDTOR_Free_Image_Patch);
-    Patch_Jump(0x0043FD83, &_BuildingTypeClass_Init_Free_Image_Patch);
-    Patch_Jump(0x0043F90B, &_BuildingTypeClass_DTOR_Free_Image_Patch);
-    Patch_Jump(0x00444052, &_BuildingTypeClass_SDDTOR_Free_Buildup_Image_Patch);
-    Patch_Jump(0x0043FDB0, &_BuildingTypeClass_Init_Free_Buildup_Image_Patch);
-    Patch_Jump(0x0043F936, &_BuildingTypeClass_DTOR_Free_Buildup_Image_Patch);
-    Patch_Jump(0x00440000, &BuildingTypeClassExt::_Raw_Cost);
-    Patch_Jump(0x00440080, &BuildingTypeClassExt::_Cost_Of);
-    Patch_Jump(0x0043FDBF, &_BuildingTypeClass_Init_Fetch_Image_Patch);
+    //Patch_Jump(0x0044403B, &_BuildingTypeClass_SDDTOR_Free_Image_Patch);
+    //Patch_Jump(0x0043FD83, &_BuildingTypeClass_Init_Free_Image_Patch);
+    //Patch_Jump(0x0043F90B, &_BuildingTypeClass_DTOR_Free_Image_Patch);
+    //Patch_Jump(0x00444052, &_BuildingTypeClass_SDDTOR_Free_Buildup_Image_Patch);
+    //Patch_Jump(0x0043FDB0, &_BuildingTypeClass_Init_Free_Buildup_Image_Patch);
+    //Patch_Jump(0x0043F936, &_BuildingTypeClass_DTOR_Free_Buildup_Image_Patch);
+    //Patch_Jump(0x00440000, &BuildingTypeClassExt::_Raw_Cost);
+    //Patch_Jump(0x00440080, &BuildingTypeClassExt::_Cost_Of);
+    //Patch_Jump(0x0043FDBF, &_BuildingTypeClass_Init_Fetch_Image_Patch);
 }

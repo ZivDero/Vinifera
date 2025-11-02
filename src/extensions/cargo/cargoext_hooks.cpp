@@ -108,10 +108,10 @@ FootClass* CargoClassExt::_Detach_Unit()
  *  Main function for patching the hooks.
  */
 void CargoClassExtension_Hooks()
-{
+{/*
     Patch_Call(0x00651617, &CargoClassExt::_Attach_One);
     Patch_Call(0x004D39FB, &CargoClassExt::_Attach_One);
     Patch_Call(0x004D3A82, &CargoClassExt::_Attach_One);
     Patch_Call(0x0065431A, &CargoClassExt::_Attach_One);
-    Patch_Call(0x0040A76F, &CargoClassExt::_Detach_Unit);
+    Patch_Call(0x0040A76F, &CargoClassExt::_Detach_Unit);*/
 }

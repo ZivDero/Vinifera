@@ -117,6 +117,6 @@ void SuperClassExtension_Hooks()
      */
     SuperClassExtension_Init();
 
-    Patch_Jump(0x0060C5DE, &_SuperClass_Place_HunterSeeker_Type_Patch);
-    Patch_Jump(0x0060C49E, &_SuperClass_Place_NukeType);
+    //Patch_Jump(0x0060C5DE, &_SuperClass_Place_HunterSeeker_Type_Patch);
+    //Patch_Jump(0x0060C49E, &_SuperClass_Place_NukeType);
 }

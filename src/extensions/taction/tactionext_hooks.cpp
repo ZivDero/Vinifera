@@ -131,19 +131,19 @@ AttachType _Attaches_To(TActionType event)
  */
 void TActionClassExtension_Hooks()
 {
-    Patch_Call(0x0064961C, &TActionClassExt::_Operator_Parens_Intercept);
-    Patch_Jump(0x0061D9C0, &_Attaches_To);
+    //Patch_Call(0x0064961C, &TActionClassExt::_Operator_Parens_Intercept);
+    //Patch_Jump(0x0061D9C0, &_Attaches_To);
 
-    /**
-     *  #issue-674
-     * 
-     *  Fixes a bug where the game would crash when TACTION_WAKEUP_GROUP was
-     *  executed but the game was not able to match the Group to the triggers
-     *  group. This was because the game was searching the Foots vector with
-     *  the count of the Technos vector, and in cases where the Group did
-     *  not match, the game would crash trying to search out of bounds.
-     * 
-     *  @author: CCHyper
-     */
-    Patch_Dword(0x00619552+2, (0x007E4820+4)); // Foot vector to Technos vector.
+    ///**
+    // *  #issue-674
+    // * 
+    // *  Fixes a bug where the game would crash when TACTION_WAKEUP_GROUP was
+    // *  executed but the game was not able to match the Group to the triggers
+    // *  group. This was because the game was searching the Foots vector with
+    // *  the count of the Technos vector, and in cases where the Group did
+    // *  not match, the game would crash trying to search out of bounds.
+    // * 
+    // *  @author: CCHyper
+    // */
+    //Patch_Dword(0x00619552+2, (0x007E4820+4)); // Foot vector to Technos vector.
 }

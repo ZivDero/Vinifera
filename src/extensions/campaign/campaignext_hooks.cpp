@@ -113,6 +113,6 @@ void CampaignClassExtension_Hooks()
      */
     CampaignClassExtension_Init();
 
-    Patch_Jump(0x004E337D, &_Choose_Campaign_Debug_Only_Patch);
-    Patch_Byte_Range(0x004E3377, 0x90, 3); // Removes "or ecx, 0x0FFFFFFFF"
+    //Patch_Jump(0x004E337D, &_Choose_Campaign_Debug_Only_Patch);
+    //Patch_Byte_Range(0x004E3377, 0x90, 3); // Removes "or ecx, 0x0FFFFFFFF"
 }

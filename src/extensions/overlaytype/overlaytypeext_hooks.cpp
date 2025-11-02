@@ -113,6 +113,6 @@ void OverlayTypeClassExtension_Hooks()
 
     //Patch_Jump(0x0058DC18, &_OverlayTypeClass_Get_Image_Data_Assertion_Patch);
 
-    Patch_Jump(0x0058D17B, &_OverlayTypeClass_DTOR_Free_Image_Patch);
-    Patch_Jump(0x0058DC6B, &_OverlayTypeClass_SDDTOR_Free_Image_Patch);
+    //Patch_Jump(0x0058D17B, &_OverlayTypeClass_DTOR_Free_Image_Patch);
+    //Patch_Jump(0x0058DC6B, &_OverlayTypeClass_SDDTOR_Free_Image_Patch);
 }

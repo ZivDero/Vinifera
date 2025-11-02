@@ -980,10 +980,10 @@ void TEventClassExtension_Hooks()
      */
     TEventClassExtension_Init();
 
-    Patch_Jump(0x00642310, &TEventClassExt::_Operator_Parens_Intercept);
-    Patch_Jump(0x00642E20, &TEventClassExt::_Is_Temporal);
-    Patch_Jump(0x00642E80, &TEventClassExt::_Has_Memory);
-    Patch_Jump(0x00642A60, &TEventClassExt::_Read_INI);
-    Patch_Jump(0x00642A10, &TEventClassExt::_Build_INI_Entry);
-    Patch_Jump(0x00642B90, &_Attaches_To);
+    //Patch_Jump(0x00642310, &TEventClassExt::_Operator_Parens_Intercept);
+    //Patch_Jump(0x00642E20, &TEventClassExt::_Is_Temporal);
+    //Patch_Jump(0x00642E80, &TEventClassExt::_Has_Memory);
+    //Patch_Jump(0x00642A60, &TEventClassExt::_Read_INI);
+    //Patch_Jump(0x00642A10, &TEventClassExt::_Build_INI_Entry);
+    //Patch_Jump(0x00642B90, &_Attaches_To);
 }

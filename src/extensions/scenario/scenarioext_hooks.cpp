@@ -470,83 +470,83 @@ void ScenarioClassExtension_Hooks()
      *  Initialises the extended class.
      */
     ScenarioClassExtension_Init();
-
-    /**
-     *  For compatibility with the TS Client we need to remove
-     *  these two reimplementations as they conflict with the spawner.
-     */
-#if !defined(TS_CLIENT)
-    /**
-     *  Hooks in the new Assign_Houses() function.
-     * 
-     *  @author: CCHyper
-     */
-    Patch_Call(0x005E08E3, &ScenarioClassExtension::Assign_Houses);
-
-    /**
-     *  #issue-338
-     * 
-     *  Hooks in the new Create_Units() function.
-     * 
-     *  @author: CCHyper
-     */
-    Patch_Call(0x005DD320, &ScenarioClassExtension::Create_Units);
-#endif
-
-    Patch_Jump(0x005DC9D4, &_Do_Win_Skip_MPlayer_Score_Screen_Patch);
-    Patch_Jump(0x005DCD92, &_Do_Lose_Skip_MPlayer_Score_Screen_Patch);
-    Patch_Jump(0x005DD8D5, &_Read_Scenario_INI_MPlayer_INI_Patch);
-
-    /**
-     *  #issue-71
-     *
-     *  Increases the amount of available waypoints (see ScenarioClassExtension for implementation).
-     *
-     *  @author: CCHyper, ZivDero
-     */
-    Patch_Jump(0x005E1460, &ScenarioClassExt::_Waypoint_Cell);
-    Patch_Jump(0x005E1480, &ScenarioClassExt::_Waypoint_CellClass);
-    Patch_Jump(0x005E14A0, &ScenarioClassExt::_Waypoint_Coord);
-    Patch_Jump(0x005E1500, &ScenarioClassExt::_Clear_All_Waypoints);
-    Patch_Jump(0x005E1520, &ScenarioClassExt::_Is_Waypoint_Valid);
-    Patch_Jump(0x005E1560, &ScenarioClassExt::_Read_Waypoint_INI);
-    Patch_Jump(0x005E1630, &ScenarioClassExt::_Write_Waypoint_INI);
-    Patch_Jump(0x005E16C0, &ScenarioClassExt::_Clear_Waypoint);
-    Patch_Jump(0x005E16E0, &ScenarioClassExt::_Set_Waypoint_Cell);
-    Patch_Jump(0x005E1700, &ScenarioClassExt::_Waypoint_CellClass);
-    Patch_Jump(0x005E1720, &ScenarioClassExt::_Waypoint_As_String);
-    Patch_Jump(0x005DC852, &_Clear_Scenario_Patch);
-    Patch_Jump(0x005DC0A0, &_Fill_In_Data_Home_Cell_Patch);
-    Patch_Jump(0x00673330, &_Waypoint_From_Name);
-    Patch_Jump(0x006732B0, &_Waypoint_To_Name);
-
-    /**
-     *  Patch vanilla Create_Units so that TS CLient builds get new unit placement.
-     *
-     *  @author: ZivDero
-     */
-    Patch_Call(0x005DED81, &Scan_Place_Object_Proxy);
-    Patch_Jump(0x005DEE64, 0x005DEE91); // Skip calling Scatter on placed units, let them stay in their spots.
-
-    Patch_Jump(0x005DEBFA, &_Create_Units_Save_Spawn_Waypoint_Patch);
-
-    Patch_Jump(0x005DF930, &ScenarioClassExt::_Read_Global_INI);
-    Patch_Jump(0x005DFBD0, &ScenarioClassExt::_Read_Local_INI);
-    Patch_Jump(0x005DFD10, &ScenarioClassExt::_Write_Local_INI);
-    Patch_Jump(0x005DF720, static_cast<bool (ScenarioClassExt::*)(int, bool)>(&ScenarioClassExt::_Set_Global_To));
-    Patch_Jump(0x005DF770, static_cast<bool (ScenarioClassExt::*)(const char*, bool)>(&ScenarioClassExt::_Set_Global_To));
-    Patch_Jump(0x005DF810, static_cast<bool (ScenarioClassExt::*)(int, bool&)>(&ScenarioClassExt::_Get_Global_Value));
-    Patch_Jump(0x005DF840, static_cast<bool (ScenarioClassExt::*)(const char*, bool&)>(&ScenarioClassExt::_Get_Global_Value));
-    Patch_Jump(0x005DF9C0, static_cast<bool (ScenarioClassExt::*)(int, bool)>(&ScenarioClassExt::_Set_Local_To));
-    Patch_Jump(0x005DFA10, static_cast<bool (ScenarioClassExt::*)(const char*, bool)>(&ScenarioClassExt::_Set_Local_To));
-    Patch_Jump(0x005DFAB0, static_cast<bool (ScenarioClassExt::*)(int, bool&)>(&ScenarioClassExt::_Get_Local_Value));
-    Patch_Jump(0x005DFAE0, static_cast<bool (ScenarioClassExt::*)(const char*, bool&)>(&ScenarioClassExt::_Get_Local_Value));
-    Patch_Jump(0x005DF8D0, &ScenarioClassExt::_Find_Global_Variable_Index);
-    Patch_Jump(0x005DFB70, &ScenarioClassExt::_Find_Local_Variable_Index);
-    Patch_Jump(0x005DFDC0, &ScenarioClassExt::_Find_Free_Local);
-    Patch_Jump(0x005DFDA0, &ScenarioClassExt::_Num_Locals);
-
-    Patch_Jump(0x005DCB59, &_ScenarioClass_Do_Win_GlobalFlags_Patch);
-    Patch_Jump(0x005DC64D, &_Clear_Scenario_Clear_Globals_Patch);
-    Patch_Jump(0x005DD85D, &_Read_Scenario_INI_Read_Global_INI_Patch);
+//
+//    /**
+//     *  For compatibility with the TS Client we need to remove
+//     *  these two reimplementations as they conflict with the spawner.
+//     */
+//#if !defined(TS_CLIENT)
+//    /**
+//     *  Hooks in the new Assign_Houses() function.
+//     * 
+//     *  @author: CCHyper
+//     */
+//    Patch_Call(0x005E08E3, &ScenarioClassExtension::Assign_Houses);
+//
+//    /**
+//     *  #issue-338
+//     * 
+//     *  Hooks in the new Create_Units() function.
+//     * 
+//     *  @author: CCHyper
+//     */
+//    Patch_Call(0x005DD320, &ScenarioClassExtension::Create_Units);
+//#endif
+//
+//    Patch_Jump(0x005DC9D4, &_Do_Win_Skip_MPlayer_Score_Screen_Patch);
+//    Patch_Jump(0x005DCD92, &_Do_Lose_Skip_MPlayer_Score_Screen_Patch);
+//    Patch_Jump(0x005DD8D5, &_Read_Scenario_INI_MPlayer_INI_Patch);
+//
+//    /**
+//     *  #issue-71
+//     *
+//     *  Increases the amount of available waypoints (see ScenarioClassExtension for implementation).
+//     *
+//     *  @author: CCHyper, ZivDero
+//     */
+//    Patch_Jump(0x005E1460, &ScenarioClassExt::_Waypoint_Cell);
+//    Patch_Jump(0x005E1480, &ScenarioClassExt::_Waypoint_CellClass);
+//    Patch_Jump(0x005E14A0, &ScenarioClassExt::_Waypoint_Coord);
+//    Patch_Jump(0x005E1500, &ScenarioClassExt::_Clear_All_Waypoints);
+//    Patch_Jump(0x005E1520, &ScenarioClassExt::_Is_Waypoint_Valid);
+//    Patch_Jump(0x005E1560, &ScenarioClassExt::_Read_Waypoint_INI);
+//    Patch_Jump(0x005E1630, &ScenarioClassExt::_Write_Waypoint_INI);
+//    Patch_Jump(0x005E16C0, &ScenarioClassExt::_Clear_Waypoint);
+//    Patch_Jump(0x005E16E0, &ScenarioClassExt::_Set_Waypoint_Cell);
+//    Patch_Jump(0x005E1700, &ScenarioClassExt::_Waypoint_CellClass);
+//    Patch_Jump(0x005E1720, &ScenarioClassExt::_Waypoint_As_String);
+//    Patch_Jump(0x005DC852, &_Clear_Scenario_Patch);
+//    Patch_Jump(0x005DC0A0, &_Fill_In_Data_Home_Cell_Patch);
+//    Patch_Jump(0x00673330, &_Waypoint_From_Name);
+//    Patch_Jump(0x006732B0, &_Waypoint_To_Name);
+//
+//    /**
+//     *  Patch vanilla Create_Units so that TS CLient builds get new unit placement.
+//     *
+//     *  @author: ZivDero
+//     */
+//    Patch_Call(0x005DED81, &Scan_Place_Object_Proxy);
+//    Patch_Jump(0x005DEE64, 0x005DEE91); // Skip calling Scatter on placed units, let them stay in their spots.
+//
+//    Patch_Jump(0x005DEBFA, &_Create_Units_Save_Spawn_Waypoint_Patch);
+//
+//    Patch_Jump(0x005DF930, &ScenarioClassExt::_Read_Global_INI);
+//    Patch_Jump(0x005DFBD0, &ScenarioClassExt::_Read_Local_INI);
+//    Patch_Jump(0x005DFD10, &ScenarioClassExt::_Write_Local_INI);
+//    Patch_Jump(0x005DF720, static_cast<bool (ScenarioClassExt::*)(int, bool)>(&ScenarioClassExt::_Set_Global_To));
+//    Patch_Jump(0x005DF770, static_cast<bool (ScenarioClassExt::*)(const char*, bool)>(&ScenarioClassExt::_Set_Global_To));
+//    Patch_Jump(0x005DF810, static_cast<bool (ScenarioClassExt::*)(int, bool&)>(&ScenarioClassExt::_Get_Global_Value));
+//    Patch_Jump(0x005DF840, static_cast<bool (ScenarioClassExt::*)(const char*, bool&)>(&ScenarioClassExt::_Get_Global_Value));
+//    Patch_Jump(0x005DF9C0, static_cast<bool (ScenarioClassExt::*)(int, bool)>(&ScenarioClassExt::_Set_Local_To));
+//    Patch_Jump(0x005DFA10, static_cast<bool (ScenarioClassExt::*)(const char*, bool)>(&ScenarioClassExt::_Set_Local_To));
+//    Patch_Jump(0x005DFAB0, static_cast<bool (ScenarioClassExt::*)(int, bool&)>(&ScenarioClassExt::_Get_Local_Value));
+//    Patch_Jump(0x005DFAE0, static_cast<bool (ScenarioClassExt::*)(const char*, bool&)>(&ScenarioClassExt::_Get_Local_Value));
+//    Patch_Jump(0x005DF8D0, &ScenarioClassExt::_Find_Global_Variable_Index);
+//    Patch_Jump(0x005DFB70, &ScenarioClassExt::_Find_Local_Variable_Index);
+//    Patch_Jump(0x005DFDC0, &ScenarioClassExt::_Find_Free_Local);
+//    Patch_Jump(0x005DFDA0, &ScenarioClassExt::_Num_Locals);
+//
+//    Patch_Jump(0x005DCB59, &_ScenarioClass_Do_Win_GlobalFlags_Patch);
+//    Patch_Jump(0x005DC64D, &_Clear_Scenario_Clear_Globals_Patch);
+//    Patch_Jump(0x005DD85D, &_Read_Scenario_INI_Read_Global_INI_Patch);
 }

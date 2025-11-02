@@ -233,7 +233,7 @@ DECLARE_PATCH(_BulletClass_Logic_ShakeScreen_Patch)
  */
 void BulletClassExtension_Hooks()
 {
-    Patch_Jump(0x004462C0, &BulletClassExt::_Is_Forced_To_Explode);
-    Patch_Jump(0x00446652, &_BulletClass_Logic_ShakeScreen_Patch);
-    Patch_Jump(0x004447BF, &_BulletClass_AI_SpawnDelay_Patch);
+    //Patch_Jump(0x004462C0, &BulletClassExt::_Is_Forced_To_Explode);
+    //Patch_Jump(0x00446652, &_BulletClass_Logic_ShakeScreen_Patch);
+    //Patch_Jump(0x004447BF, &_BulletClass_AI_SpawnDelay_Patch);
 }

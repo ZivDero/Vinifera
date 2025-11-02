@@ -162,8 +162,8 @@ void AnimTypeClassExtension_Hooks()
 
     //Patch_Jump(0x00419B37, &_AnimTypeClass_Get_Image_Data_Assertion_Patch);
 
-    Patch_Jump(0x00419B40, &AnimTypeClassExt::_Free_Image);
-    Patch_Jump(0x00418A70, &AnimTypeClassExt::_Load_Image);
-    Patch_Jump(0x004187DB, &_AnimTypeClass_DTOR_Free_Image_Patch);
-    Patch_Jump(0x00419C0B, &_AnimTypeClass_SDDTOR_Free_Image_Patch);
+    //Patch_Jump(0x00419B40, &AnimTypeClassExt::_Free_Image);
+    //Patch_Jump(0x00418A70, &AnimTypeClassExt::_Load_Image);
+    //Patch_Jump(0x004187DB, &_AnimTypeClass_DTOR_Free_Image_Patch);
+    //Patch_Jump(0x00419C0B, &_AnimTypeClass_SDDTOR_Free_Image_Patch);
 }

@@ -142,8 +142,8 @@ void MapClassExt::_Detach(AbstractClass* target, bool all)
  */
 void MapClassExtension_Hooks()
 {
-    Patch_Jump(0x00511070, &MapClassExt::_Place_Down);
+    //Patch_Jump(0x00511070, &MapClassExt::_Place_Down);
     Patch_Jump(0x005111B0, &MapClassExt::_Pick_Up);
-    Patch_Call(0x00648BCF, &MapClassExt::_Detach);
-    Patch_Call(0x00648B67, &MapClassExt::_Detach);
+    //Patch_Call(0x00648BCF, &MapClassExt::_Detach);
+    //Patch_Call(0x00648B67, &MapClassExt::_Detach);
 }

@@ -2871,52 +2871,52 @@ DECLARE_PATCH(_TechnoClass_Evaluate_Object_Zone_Evaluation_TargetZoneScanType_Pa
  */
 void TechnoClassExtension_Hooks()
 {
-    Patch_Jump(0x00633C78, &_TechnoClass_Do_Cloak_Cloak_Sound_Patch);
-    Patch_Jump(0x00633BD4, &_TechnoClass_Do_Uncloak_Uncloak_Sound_Patch);
-    Patch_Jump(0x0063105C, &_TechnoClass_Fire_At_Weapon_Anim_Patch);
-    Patch_Jump(0x0062F6B7, &_TechnoClass_Is_Ready_To_Uncloak_Cloak_Stop_BugFix_Patch);
-    Patch_Jump(0x0062E6F0, &_TechnoClass_Null_House_Warning_Patch);
-    Patch_Jump(0x006328DE, &_TechnoClass_Take_Damage_IsAffectsAllies_Patch);
-    Patch_Jump(0x0062C5D5, &_TechnoClass_Draw_Health_Bars_Unit_Draw_Pos_Patch);
-    Patch_Jump(0x0062C55B, &_TechnoClass_Draw_Health_Bars_Infantry_Draw_Pos_Patch);
-    Patch_Jump(0x0062DD70, &_TechnoClass_Greatest_Threat_Infantry_Mechanic_Patch);
-    Patch_Jump(0x00638095, &_TechnoClass_Refund_Amount_Soylent_Patch);
-    Patch_Jump(0x00631661, &_TechnoClass_Player_Assign_Mission_Response_Patch);
-    Patch_Jump(0x00630390, &_TechnoClass_Fire_At_Suicide_Patch);
-    Patch_Jump(0x00631223, &_TechnoClass_Fire_At_Electric_Bolt_Patch);
-    Patch_Jump(0x0062D4CA, &_TechnoClass_Evaluate_Object_Is_Legal_Target_Patch);
-    Patch_Jump(0x00637540, &TechnoClassExt::_Draw_Pips);
-    Patch_Jump(0x0062A0D0, &TechnoClassExt::_What_Weapon_Should_I_Use);
-    Patch_Jump(0x00636F00, &TechnoClassExt::_Is_Allowed_To_Retaliate);
-    Patch_Jump(0x00639810, &TechnoClassExt::_Target_Threat);
-    Patch_Jump(0x00638240, &TechnoClassExt::_Anti_Infantry);
-    Patch_Jump(0x00636BFE, &_TechnoClass_Base_Is_Attacked_Armor1_Patch);
-    Patch_Jump(0x006369B0, &_TechnoClass_Base_Is_Attacked_Armor2_Patch);
-    Patch_Jump(0x0062D11E, &_TechnoClass_Evaluate_Object_PassiveAcquire_Armor_Patch);
-    Patch_Call(0x0042EC25, &TechnoClassExt::_What_Action);
-    Patch_Call(0x004A8532, &TechnoClassExt::_What_Action);
-    Patch_Jump(0x0062EB27, &_TechnoClass_AI_Abandon_Invalid_Target_Patch);
-    Patch_Jump(0x00632F4C, &_TechnoClass_Take_Damage_Drop_Tiberium_Type_Patch);
-    Patch_Jump(0x00632070, &TechnoClassExt::_Can_Deploy_Now);
-    Patch_Call(0x00637FF5, &TechnoClassExt::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
-    Patch_Jump(0x006396D1, &_TechnoClass_Railgun_Damage_Apply_Damage_Modifier_Patch);
-    Patch_Jump(0x006313D0, &TechnoClassExt::_Draw_Target_Laser);
-    Patch_Jump(0x00631207, &_TechnoClass_Fire_At_TargetLaserTimer_Patch);
-    Patch_Jump(0x00637D60, &TechnoClassExt::_Draw_Text_Overlay);
-    Patch_Jump(0x006364A0, &TechnoClassExt::_Crew_Type);
-    Patch_Jump(0x0062A300, &TechnoClassExt::_How_Many_Survivors);
-    Patch_Jump(0x006324FF, &_TechnoClass_Captured_Spawn_Manager_Patch);
-    Patch_Jump(0x0062FDE2, &_TechnoClass_Assign_Target_Spawn_Manager_Patch);
-    Patch_Jump(0x006304DD, &_TechnoClass_Fire_At_Spawn_Manager_Patch);
-    Patch_Jump(0x00637450, &TechnoClassExt::_Target_Something_Nearby);
-    Patch_Jump(0x0062FD20, &TechnoClassExt::_Stun);
-    Patch_Call(0x0062E9D1, &TechnoClassExt::_Mission_AI);
-    Patch_Jump(0x0062F980, &TechnoClassExt::_Can_Fire);
-    Patch_Jump(0x00631FF0, &TechnoClassExt::_Can_Player_Move);
-    Patch_Jump(0x006336F0, &TechnoClassExt::_Record_The_Kill);
-    //Patch_Jump(0x0062A3D0, &TechnoClassExt::_Fire_Coord); // Disabled because it's functionally identical to the vanilla function when there's no secondary coordinate
-    Patch_Jump(0x00633745, (uintptr_t)0x00633762); // Do not trigger "Discovered by Player" when an object is destroyed
-    Patch_Jump(0x0062D218, &_TechnoClass_Evaluate_Object_Zone_Evaluation_TargetZoneScanType_Patch);
-    Patch_Jump(0x0062A970, &TechnoClassExt::_Time_To_Build);
-    Patch_Jump(0x0062FD70, &TechnoClassExt::_Assign_Target);
+    //Patch_Jump(0x00633C78, &_TechnoClass_Do_Cloak_Cloak_Sound_Patch);
+    //Patch_Jump(0x00633BD4, &_TechnoClass_Do_Uncloak_Uncloak_Sound_Patch);
+    //Patch_Jump(0x0063105C, &_TechnoClass_Fire_At_Weapon_Anim_Patch);
+    //Patch_Jump(0x0062F6B7, &_TechnoClass_Is_Ready_To_Uncloak_Cloak_Stop_BugFix_Patch);
+    //Patch_Jump(0x0062E6F0, &_TechnoClass_Null_House_Warning_Patch);
+    //Patch_Jump(0x006328DE, &_TechnoClass_Take_Damage_IsAffectsAllies_Patch);
+    //Patch_Jump(0x0062C5D5, &_TechnoClass_Draw_Health_Bars_Unit_Draw_Pos_Patch);
+    //Patch_Jump(0x0062C55B, &_TechnoClass_Draw_Health_Bars_Infantry_Draw_Pos_Patch);
+    //Patch_Jump(0x0062DD70, &_TechnoClass_Greatest_Threat_Infantry_Mechanic_Patch);
+    //Patch_Jump(0x00638095, &_TechnoClass_Refund_Amount_Soylent_Patch);
+    //Patch_Jump(0x00631661, &_TechnoClass_Player_Assign_Mission_Response_Patch);
+    //Patch_Jump(0x00630390, &_TechnoClass_Fire_At_Suicide_Patch);
+    //Patch_Jump(0x00631223, &_TechnoClass_Fire_At_Electric_Bolt_Patch);
+    //Patch_Jump(0x0062D4CA, &_TechnoClass_Evaluate_Object_Is_Legal_Target_Patch);
+    //Patch_Jump(0x00637540, &TechnoClassExt::_Draw_Pips);
+    //Patch_Jump(0x0062A0D0, &TechnoClassExt::_What_Weapon_Should_I_Use);
+    //Patch_Jump(0x00636F00, &TechnoClassExt::_Is_Allowed_To_Retaliate);
+    //Patch_Jump(0x00639810, &TechnoClassExt::_Target_Threat);
+    //Patch_Jump(0x00638240, &TechnoClassExt::_Anti_Infantry);
+    //Patch_Jump(0x00636BFE, &_TechnoClass_Base_Is_Attacked_Armor1_Patch);
+    //Patch_Jump(0x006369B0, &_TechnoClass_Base_Is_Attacked_Armor2_Patch);
+    //Patch_Jump(0x0062D11E, &_TechnoClass_Evaluate_Object_PassiveAcquire_Armor_Patch);
+    //Patch_Call(0x0042EC25, &TechnoClassExt::_What_Action);
+    //Patch_Call(0x004A8532, &TechnoClassExt::_What_Action);
+    //Patch_Jump(0x0062EB27, &_TechnoClass_AI_Abandon_Invalid_Target_Patch);
+    //Patch_Jump(0x00632F4C, &_TechnoClass_Take_Damage_Drop_Tiberium_Type_Patch);
+    //Patch_Jump(0x00632070, &TechnoClassExt::_Can_Deploy_Now);
+    //Patch_Call(0x00637FF5, &TechnoClassExt::_Cell_Distance_Squared); // Patch Find_Docking_Bay to call our own distance function that avoids overflows
+    //Patch_Jump(0x006396D1, &_TechnoClass_Railgun_Damage_Apply_Damage_Modifier_Patch);
+    //Patch_Jump(0x006313D0, &TechnoClassExt::_Draw_Target_Laser);
+    //Patch_Jump(0x00631207, &_TechnoClass_Fire_At_TargetLaserTimer_Patch);
+    //Patch_Jump(0x00637D60, &TechnoClassExt::_Draw_Text_Overlay);
+    //Patch_Jump(0x006364A0, &TechnoClassExt::_Crew_Type);
+    //Patch_Jump(0x0062A300, &TechnoClassExt::_How_Many_Survivors);
+    //Patch_Jump(0x006324FF, &_TechnoClass_Captured_Spawn_Manager_Patch);
+    //Patch_Jump(0x0062FDE2, &_TechnoClass_Assign_Target_Spawn_Manager_Patch);
+    //Patch_Jump(0x006304DD, &_TechnoClass_Fire_At_Spawn_Manager_Patch);
+    //Patch_Jump(0x00637450, &TechnoClassExt::_Target_Something_Nearby);
+    //Patch_Jump(0x0062FD20, &TechnoClassExt::_Stun);
+    //Patch_Call(0x0062E9D1, &TechnoClassExt::_Mission_AI);
+    //Patch_Jump(0x0062F980, &TechnoClassExt::_Can_Fire);
+    //Patch_Jump(0x00631FF0, &TechnoClassExt::_Can_Player_Move);
+    //Patch_Jump(0x006336F0, &TechnoClassExt::_Record_The_Kill);
+    ////Patch_Jump(0x0062A3D0, &TechnoClassExt::_Fire_Coord); // Disabled because it's functionally identical to the vanilla function when there's no secondary coordinate
+    //Patch_Jump(0x00633745, (uintptr_t)0x00633762); // Do not trigger "Discovered by Player" when an object is destroyed
+    //Patch_Jump(0x0062D218, &_TechnoClass_Evaluate_Object_Zone_Evaluation_TargetZoneScanType_Patch);
+    //Patch_Jump(0x0062A970, &TechnoClassExt::_Time_To_Build);
+    //Patch_Jump(0x0062FD70, &TechnoClassExt::_Assign_Target);
 }

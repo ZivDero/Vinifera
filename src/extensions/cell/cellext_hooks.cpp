@@ -528,15 +528,15 @@ DECLARE_PATCH(_CellClass_Update_Wall_Owner_Skip_Buildings_That_Cannot_Own_Walls_
  */
 void CellClassExtension_Hooks()
 {
-    Patch_Jump(0x0045882C, &_CellClass_Goodie_Check_Veterency_Trainable_BugFix_Patch);
-    Patch_Jump(0x00457EAB, &_CellClass_Goodie_Check_Crates_Disabled_Respawn_BugFix_Patch);
-    Patch_Jump(0x00454E60, &_CellClass_Draw_Shroud_Fog_Patch);
-    Patch_Jump(0x00455130, &_CellClass_Draw_Fog_Patch);
-    Patch_Jump(0x004596C0, &CellClassExt::_Can_Tiberium_Germinate);
-    Patch_Jump(0x00459300, &CellClassExt::_Can_Tiberium_Spread);
-    Patch_Jump(0x0045B0D0, &CellClassExt::_Can_Place_Veins);
-    Patch_Jump(0x004594D0, &CellClassExt::_Spread_Tiberium);
-    Patch_Jump(0x00459A00, &CellClassExt::_Recalc_Passability);
-    Patch_Jump(0x00456BF0, &CellClassExt::_Reduce_Tiberium);
-    Patch_Jump(0x004531E4, &_CellClass_Update_Wall_Owner_Skip_Buildings_That_Cannot_Own_Walls_Patch);
+    //Patch_Jump(0x0045882C, &_CellClass_Goodie_Check_Veterency_Trainable_BugFix_Patch);
+    //Patch_Jump(0x00457EAB, &_CellClass_Goodie_Check_Crates_Disabled_Respawn_BugFix_Patch);
+    //Patch_Jump(0x00454E60, &_CellClass_Draw_Shroud_Fog_Patch);
+    //Patch_Jump(0x00455130, &_CellClass_Draw_Fog_Patch);
+    //Patch_Jump(0x004596C0, &CellClassExt::_Can_Tiberium_Germinate);
+    //Patch_Jump(0x00459300, &CellClassExt::_Can_Tiberium_Spread);
+    //Patch_Jump(0x0045B0D0, &CellClassExt::_Can_Place_Veins);
+    //Patch_Jump(0x004594D0, &CellClassExt::_Spread_Tiberium);
+    //Patch_Jump(0x00459A00, &CellClassExt::_Recalc_Passability);
+    //Patch_Jump(0x00456BF0, &CellClassExt::_Reduce_Tiberium);
+    //Patch_Jump(0x004531E4, &_CellClass_Update_Wall_Owner_Skip_Buildings_That_Cannot_Own_Walls_Patch);
 }

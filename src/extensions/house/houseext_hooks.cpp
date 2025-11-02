@@ -1345,52 +1345,52 @@ void HouseClassExtension_Hooks()
      */
     HouseClassExtension_Init();
 
-    Patch_Jump(0x004BBD26, &_HouseClass_Can_Build_BuildCheat_Patch);
-    Patch_Jump(0x004BD30B, &_HouseClass_Super_Weapon_Handler_InstantRecharge_Patch);
+    //Patch_Jump(0x004BBD26, &_HouseClass_Can_Build_BuildCheat_Patch);
+    //Patch_Jump(0x004BD30B, &_HouseClass_Super_Weapon_Handler_InstantRecharge_Patch);
 
-    Patch_Jump(0x004CB777, &_HouseClass_ShouldDisableCameo_BuildLimit_Fix);
-    Patch_Jump(0x004BC187, &_HouseClass_Can_Build_BuildLimit_Handle_Vehicle_Transform);
-    Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
+    //Patch_Jump(0x004CB777, &_HouseClass_ShouldDisableCameo_BuildLimit_Fix);
+    //Patch_Jump(0x004BC187, &_HouseClass_Can_Build_BuildLimit_Handle_Vehicle_Transform);
+    //Patch_Jump(0x004CB6C1, &_HouseClass_Enable_SWs_Check_For_Building_Power);
 
-    Patch_Jump(0x004C10E0, &HouseClassExt::_AI_Building);
-    Patch_Jump(0x004C1650, &HouseClassExt::_AI_Unit);
-    Patch_Jump(0x004C0630, &HouseClassExt::_Expert_AI);
-    Patch_Jump(0x004BBC74, &_Can_Build_Required_Forbidden_Houses_Patch);
+    //Patch_Jump(0x004C10E0, &HouseClassExt::_AI_Building);
+    //Patch_Jump(0x004C1650, &HouseClassExt::_AI_Unit);
+    //Patch_Jump(0x004C0630, &HouseClassExt::_Expert_AI);
+    //Patch_Jump(0x004BBC74, &_Can_Build_Required_Forbidden_Houses_Patch);
 
-    Patch_Jump(0x004BAC2C, 0x004BAC39); // Patch a jump in the constructor to always allocate unit trackers
-    Patch_Jump(0x004BC0B7, &_HouseClass_Can_Build_Multi_MCV_Patch);
+    //Patch_Jump(0x004BAC2C, 0x004BAC39); // Patch a jump in the constructor to always allocate unit trackers
+    //Patch_Jump(0x004BC0B7, &_HouseClass_Can_Build_Multi_MCV_Patch);
 
-    Patch_Jump(0x004CB73D, &_HouseClass_Exhausted_Build_Limit_Fetch_Factory_Patch);
-    Patch_Jump(0x0042AACF, &_BuildingClass_Unlimbo_Update_Factories_Patch);
-    Patch_Jump(0x0042DFBE, &_BuildingClass_Limbo_Update_Factories_Patch);
-    Patch_Jump(0x0042FCF8, &_BuildingClass_Captured_Update_Factories_Patch);
-    Patch_Jump(0x00434C78, &_BuildingClass_Read_INI_Update_Factories_Patch);
-    Patch_Jump(0x00436855, &_BuildingClass_Turn_On_Update_Factories_Patch);
-    Patch_Jump(0x00436911, &_BuildingClass_Turn_Off_Update_Factories_Patch);
-    Patch_Jump(0x004C0F40, &_HouseClass_Raise_Money_BuildNavalUnit_Patch);
-    Patch_Jump(0x004BD0E5, &_HouseClass_AI_BuildNavalUnit_Patch);
+    //Patch_Jump(0x004CB73D, &_HouseClass_Exhausted_Build_Limit_Fetch_Factory_Patch);
+    //Patch_Jump(0x0042AACF, &_BuildingClass_Unlimbo_Update_Factories_Patch);
+    //Patch_Jump(0x0042DFBE, &_BuildingClass_Limbo_Update_Factories_Patch);
+    //Patch_Jump(0x0042FCF8, &_BuildingClass_Captured_Update_Factories_Patch);
+    //Patch_Jump(0x00434C78, &_BuildingClass_Read_INI_Update_Factories_Patch);
+    //Patch_Jump(0x00436855, &_BuildingClass_Turn_On_Update_Factories_Patch);
+    //Patch_Jump(0x00436911, &_BuildingClass_Turn_Off_Update_Factories_Patch);
+    //Patch_Jump(0x004C0F40, &_HouseClass_Raise_Money_BuildNavalUnit_Patch);
+    //Patch_Jump(0x004BD0E5, &_HouseClass_AI_BuildNavalUnit_Patch);
 
-    Patch_Jump(0x004C23B0, &HouseClassExt::_Active_Remove);
-    Patch_Jump(0x004C2450, &HouseClassExt::_Active_Add);
+    //Patch_Jump(0x004C23B0, &HouseClassExt::_Active_Remove);
+    //Patch_Jump(0x004C2450, &HouseClassExt::_Active_Add);
 
-    Patch_Call(0x0042D460, &HouseClassExt::_Find_Build_Location);
-    Patch_Call(0x0042D53C, &HouseClassExt::_Find_Build_Location);
-    Patch_Call(0x004C8104, &HouseClassExt::_Find_Build_Location);
+    //Patch_Call(0x0042D460, &HouseClassExt::_Find_Build_Location);
+    //Patch_Call(0x0042D53C, &HouseClassExt::_Find_Build_Location);
+    //Patch_Call(0x004C8104, &HouseClassExt::_Find_Build_Location);
 
-    Patch_Jump(0x004C5920, &HouseClassExt::_AI_Has_Prerequisites);
+    //Patch_Jump(0x004C5920, &HouseClassExt::_AI_Has_Prerequisites);
 
-    Patch_Jump(0x004C2CA0, &HouseClassExt::_Fetch_Factory);
-    Patch_Jump(0x004C2D20, &HouseClassExt::_Set_Factory);
-    Patch_Jump(0x004C2330, &HouseClassExt::_Factory_Counter);
-    Patch_Jump(0x004C2DB0, &HouseClassExt::_Factory_Count);
-    Patch_Jump(0x004BE5D0, &HouseClassExt::_Suspend_Production);
-    Patch_Jump(0x004BE200, &HouseClassExt::_Begin_Production);
-    Patch_Jump(0x004BE6A0, &HouseClassExt::_Abandon_Production);
-    Patch_Jump(0x004BEA10, &HouseClassExt::_Place_Object);
-    Patch_Jump(0x004BF180, &HouseClassExt::_Suggest_New_Object);
-    Patch_Jump(0x004BD590, &HouseClassExt::_Harvested);
+    //Patch_Jump(0x004C2CA0, &HouseClassExt::_Fetch_Factory);
+    //Patch_Jump(0x004C2D20, &HouseClassExt::_Set_Factory);
+    //Patch_Jump(0x004C2330, &HouseClassExt::_Factory_Counter);
+    //Patch_Jump(0x004C2DB0, &HouseClassExt::_Factory_Count);
+    //Patch_Jump(0x004BE5D0, &HouseClassExt::_Suspend_Production);
+    //Patch_Jump(0x004BE200, &HouseClassExt::_Begin_Production);
+    //Patch_Jump(0x004BE6A0, &HouseClassExt::_Abandon_Production);
+    //Patch_Jump(0x004BEA10, &HouseClassExt::_Place_Object);
+    //Patch_Jump(0x004BF180, &HouseClassExt::_Suggest_New_Object);
+    //Patch_Jump(0x004BD590, &HouseClassExt::_Harvested);
 
-    Patch_Jump(0x004BC78D, &_HouseClass_AI_Fix_Player_Losing_When_Their_Allies_Win);
-    Patch_Jump(0x004BC855, &_HouseClass_AI_Fix_Player_Winning_When_Their_Allies_Lose);
-    Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
+    //Patch_Jump(0x004BC78D, &_HouseClass_AI_Fix_Player_Losing_When_Their_Allies_Win);
+    //Patch_Jump(0x004BC855, &_HouseClass_AI_Fix_Player_Winning_When_Their_Allies_Lose);
+    //Patch_Jump(0x004C0F87, &_HouseClass_AI_Raise_Money_Fix_Memory_Corruption);
 }

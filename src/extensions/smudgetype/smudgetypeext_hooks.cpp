@@ -106,5 +106,5 @@ void SmudgeTypeClassExtension_Hooks()
      */
     SmudgeTypeClassExtension_Init();
 
-    Patch_Jump(0x005FBE30, &SmudgeTypeClassExt::_Can_Place_Here);
+    //Patch_Jump(0x005FBE30, &SmudgeTypeClassExt::_Can_Place_Here);
 }

@@ -126,6 +126,6 @@ loop_continue:
  */
 void EMPulseClassExtension_Hooks()
 {
-    Patch_Jump(0x00492E84, _EMPulseClass_Create_Foot_EMPImmune_Patch);
-    Patch_Jump(0x00492C45, _EMPulseClass_Create_Building_EMPImmune_Patch);
+    //Patch_Jump(0x00492E84, _EMPulseClass_Create_Foot_EMPImmune_Patch);
+    //Patch_Jump(0x00492C45, _EMPulseClass_Create_Building_EMPImmune_Patch);
 }

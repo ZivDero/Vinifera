@@ -152,5 +152,5 @@ bool ObjectClassExt::_Paradrop(Coord const& coord)
  */
 void ObjectClassExtension_Hooks()
 {
-    Patch_Jump(0x005864C0, &ObjectClassExt::_Paradrop);
+    //Patch_Jump(0x005864C0, &ObjectClassExt::_Paradrop);
 }

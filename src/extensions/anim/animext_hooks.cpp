@@ -796,11 +796,11 @@ void AnimClassExtension_Hooks()
     AnimClassExtension_Init();
 
     Patch_Jump(0x00413D3E, &_AnimClass_Constructor_Layer_Set_Z_Height_Patch);
-    Patch_Jump(0x00414B42, &_AnimClass_Draw_It_Shadow_Patch);
-    Patch_Call(0x00414BA9, &Draw_Shape_Proxy);
-    Patch_Jump(0x00415D30, &AnimClassExt::_In_Which_Layer);
-    Patch_Jump(0x00414E80, &AnimClassExt::_AI);
-    Patch_Jump(0x00415D60, &AnimClassExt::_Start);
-    Patch_Jump(0x00415F40, &AnimClassExt::_Middle);
-    Patch_Jump(0x004167C0, &AnimClassExt::_Delete_Me);
+    //Patch_Jump(0x00414B42, &_AnimClass_Draw_It_Shadow_Patch);
+    //Patch_Call(0x00414BA9, &Draw_Shape_Proxy);
+    //Patch_Jump(0x00415D30, &AnimClassExt::_In_Which_Layer);
+    //Patch_Jump(0x00414E80, &AnimClassExt::_AI);
+    //Patch_Jump(0x00415D60, &AnimClassExt::_Start);
+    //Patch_Jump(0x00415F40, &AnimClassExt::_Middle);
+    //Patch_Jump(0x004167C0, &AnimClassExt::_Delete_Me);
 }

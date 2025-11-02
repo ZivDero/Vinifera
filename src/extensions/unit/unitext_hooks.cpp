@@ -1510,27 +1510,27 @@ void UnitClassExtension_Hooks()
      */
     UnitClassExtension_Init();
 
-    Patch_Jump(0x006517BE, &_UnitClass_Per_Cell_Process_AutoHarvest_Assign_Harvest_Mission_Patch);
-    Patch_Jump(0x0065B547, &_UnitClass_Explode_ShakeScreen_Division_BugFix_Patch);
-    Patch_Jump(0x006530EB, &_UnitClass_Draw_Shape_Primary_Facing_Patch);
-    Patch_Jump(0x006537A8, &_UnitClass_Draw_Shape_Turret_Facing_Patch);
-    Patch_Jump(0x00653D7F, &_UnitClass_Draw_It_Unloading_Harvester_Patch);
-    Patch_Jump(0x00654399, &_UnitClass_Mission_Unload_Transport_Detach_Sound_Patch);
-    Patch_Jump(0x00653114, &_UnitClass_Draw_Shape_IdleRate_Patch);
-    Patch_Jump(0x00656623, &_UnitClass_What_Action_ACTION_HARVEST_Block_On_Bridge_Patch); // IsToHarvest
-    Patch_Jump(0x0065665D, &_UnitClass_What_Action_ACTION_HARVEST_Block_On_Bridge_Patch); // IsToVeinHarvest
-    Patch_Jump(0x0064F2BE, &_UnitClass_Jellyfish_AI_Armor_Patch);
-    Patch_Jump(0x00650BAE, &_UnitClass_Try_To_Deploy_Transform_To_Vehicle_Patch);
-    Patch_Jump(0x00656017, &_UnitClass_What_Action_Self_Check_For_Vehicle_Transform_Patch);
-    Patch_Jump(0x006543DB, &_UnitClass_Mission_Unload_Transform_To_Vehicle_Patch);
-    Patch_Jump(0x0064E920, &UnitClassExt::_Firing_AI);
-    Patch_Jump(0x006527B1, &_UnitClass_Draw_Voxel_Patch);
-    Patch_Jump(0x00654EEE, &_UnitClass_Mission_Harvest_FINDHOME_Find_Nearest_Refinery_Patch);
-    //Patch_Jump(0x0065054F, &_UnitClass_Enter_Idle_Mode_Block_Harvesting_On_Bridge_Patch); // Removed, keeping code for reference.
-    //Patch_Jump(0x00654AB0, &_UnitClass_Mission_Harvest_Block_Harvesting_On_Bridge_Patch); // Removed, keeping code for reference.
-    Patch_Jump(0x0064E560, &UnitClassExt::_Rotation_AI);
-    Patch_Jump(0x00656F99, &_UnitClass_Can_Fire_IsOmniFire_Patch);
-    Patch_Jump(0x006571E0, &UnitClassExt::_Approach_Target);
+    //Patch_Jump(0x006517BE, &_UnitClass_Per_Cell_Process_AutoHarvest_Assign_Harvest_Mission_Patch);
+    //Patch_Jump(0x0065B547, &_UnitClass_Explode_ShakeScreen_Division_BugFix_Patch);
+    //Patch_Jump(0x006530EB, &_UnitClass_Draw_Shape_Primary_Facing_Patch);
+    //Patch_Jump(0x006537A8, &_UnitClass_Draw_Shape_Turret_Facing_Patch);
+    //Patch_Jump(0x00653D7F, &_UnitClass_Draw_It_Unloading_Harvester_Patch);
+    //Patch_Jump(0x00654399, &_UnitClass_Mission_Unload_Transport_Detach_Sound_Patch);
+    //Patch_Jump(0x00653114, &_UnitClass_Draw_Shape_IdleRate_Patch);
+    //Patch_Jump(0x00656623, &_UnitClass_What_Action_ACTION_HARVEST_Block_On_Bridge_Patch); // IsToHarvest
+    //Patch_Jump(0x0065665D, &_UnitClass_What_Action_ACTION_HARVEST_Block_On_Bridge_Patch); // IsToVeinHarvest
+    //Patch_Jump(0x0064F2BE, &_UnitClass_Jellyfish_AI_Armor_Patch);
+    //Patch_Jump(0x00650BAE, &_UnitClass_Try_To_Deploy_Transform_To_Vehicle_Patch);
+    //Patch_Jump(0x00656017, &_UnitClass_What_Action_Self_Check_For_Vehicle_Transform_Patch);
+    //Patch_Jump(0x006543DB, &_UnitClass_Mission_Unload_Transform_To_Vehicle_Patch);
+    //Patch_Jump(0x0064E920, &UnitClassExt::_Firing_AI);
+    //Patch_Jump(0x006527B1, &_UnitClass_Draw_Voxel_Patch);
+    //Patch_Jump(0x00654EEE, &_UnitClass_Mission_Harvest_FINDHOME_Find_Nearest_Refinery_Patch);
+    ////Patch_Jump(0x0065054F, &_UnitClass_Enter_Idle_Mode_Block_Harvesting_On_Bridge_Patch); // Removed, keeping code for reference.
+    ////Patch_Jump(0x00654AB0, &_UnitClass_Mission_Harvest_Block_Harvesting_On_Bridge_Patch); // Removed, keeping code for reference.
+    //Patch_Jump(0x0064E560, &UnitClassExt::_Rotation_AI);
+    //Patch_Jump(0x00656F99, &_UnitClass_Can_Fire_IsOmniFire_Patch);
+    //Patch_Jump(0x006571E0, &UnitClassExt::_Approach_Target);
 
-    Patch_Byte(0x00658961, 0xEB); // Allow pre-placed units to have missions in multiplayer, change JZ to JMP
+    //Patch_Byte(0x00658961, 0xEB); // Allow pre-placed units to have missions in multiplayer, change JZ to JMP
 }

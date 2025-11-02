@@ -797,14 +797,14 @@ bool FootClassExt::_Limbo()
  */
 void FootClassExtension_Hooks()
 {
-    Patch_Jump(0x004A6866, &_FootClass_Is_Allowed_To_Recloak_Cloak_Stop_BugFix_Patch);
-    Patch_Jump(0x004A59E1, &_FootClass_AI_IdleRate_Patch);
-    Patch_Jump(0x004A2BE7, &_FootClass_Mission_Guard_Area_Can_Passive_Acquire_Patch);
-    Patch_Jump(0x004A1AAE, &_FootClass_Mission_Guard_Can_Passive_Acquire_Patch);
-    Patch_Jump(0x004A102F, &_FootClass_Mission_Move_Can_Passive_Acquire_Patch);
-    Patch_Jump(0x004A6A40, &FootClassExt::_Draw_Action_Line);
-    Patch_Jump(0x004A4D60, &FootClassExt::_Death_Announcement);
-    Patch_Jump(0x004A76F0, &FootClassExt::_Search_For_Tiberium);
-    Patch_Jump(0x004A2C70, &FootClassExt::_Unlimbo);
-    Patch_Jump(0x004A5E80, &FootClassExt::_Limbo);
+    //Patch_Jump(0x004A6866, &_FootClass_Is_Allowed_To_Recloak_Cloak_Stop_BugFix_Patch);
+    //Patch_Jump(0x004A59E1, &_FootClass_AI_IdleRate_Patch);
+    //Patch_Jump(0x004A2BE7, &_FootClass_Mission_Guard_Area_Can_Passive_Acquire_Patch);
+    //Patch_Jump(0x004A1AAE, &_FootClass_Mission_Guard_Can_Passive_Acquire_Patch);
+    //Patch_Jump(0x004A102F, &_FootClass_Mission_Move_Can_Passive_Acquire_Patch);
+    //Patch_Jump(0x004A6A40, &FootClassExt::_Draw_Action_Line);
+    //Patch_Jump(0x004A4D60, &FootClassExt::_Death_Announcement);
+    //Patch_Jump(0x004A76F0, &FootClassExt::_Search_For_Tiberium);
+    //Patch_Jump(0x004A2C70, &FootClassExt::_Unlimbo);
+    //Patch_Jump(0x004A5E80, &FootClassExt::_Limbo);
 }
