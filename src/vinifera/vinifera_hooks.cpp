@@ -26,6 +26,9 @@
  *
  ******************************************************************************/
 #include "vinifera_hooks.h"
+
+#include "abuffer.h"
+#include "alphalighting.h"
 #include "tibsun_globals.h"
 #include "tibsun_functions.h"
 #include "vinifera_globals.h"
@@ -52,10 +55,13 @@
 #include "spawnmanager.h"
 #include "armortype.h"
 #include "beacon.h"
+#include "buildingext.h"
 #include "layer.h"
 #include "prerequisitegroup.h"
+#include "rleblitter.h"
 #include "rockettype.h"
 #include "syringe.h"
+#include "zbuffer.h"
 
 
 /**
@@ -558,9 +564,126 @@ bool LayerClassExt::_Submit(const ObjectClass* object, bool sort)
 }
 
 
+inline int Skip_Leading_Pixels(unsigned char const*& sptr, int skipper)
+{
+    /*
+    **	Skip leading pixels as requested.
+    */
+    while (skipper > 0) {
+        if (*sptr++ == '\0') {
+            skipper -= *sptr++;
+        } else {
+            skipper--;
+        }
+    }
+
+    /*
+    **	Return with then number of leading transparent pixels in the pixel stream
+    **	after the end of the skip process. This value must be tracked since the pixel
+    **	skip process may have ended in the middle of a transparent pixel run.
+    */
+    return (-skipper);
+}
+
+
+inline unsigned short* Wrap_Z_Buffer(unsigned short* buf)
+{
+    return (unsigned short*)DepthBuffer->Wrap_Overflow((unsigned int)buf);
+}
+
+inline unsigned short* Wrap_A_Buffer(unsigned short* buf)
+{
+    return (unsigned short*)AlphaBuffer->Wrap_Overflow((unsigned int)buf);
+}
+
+
+template<class T>
+class RLEBlitTransXlatAlphaZReadWriteFake : public RLEBlitter
+{
+public:
+    RLEBlitTransXlatAlphaZReadWriteFake(T const* translator, int arg) : TranslateTable(translator), AlphaLightingRemap(nullptr)
+    {
+        AlphaLightingRemap = AlphaLightingRemapInit.Init(arg);
+    }
+    virtual ~RLEBlitTransXlatAlphaZReadWriteFake(void)
+    {
+        AlphaLightingRemapInit.Deinit(AlphaLightingRemap);
+        AlphaLightingRemap = nullptr;
+    }
+
+    virtual void entry_4(void* dest, void* source, unsigned length, unsigned rle_length, int a5, int a6, int a7, int a8, int a9, int a10) {}
+
+    void BlitFake(void* dest, void const* source, int length, int leadskip = 0, int z_min = 0, int z_buff = NULL, int a_buff = NULL, int alpha_level = 0, int warp_offset = 0, int zshape = NULL) const
+    {
+        unsigned char const* sptr = (unsigned char const*)source;
+        T* dptr = (T*)dest;
+        unsigned short* zp = (unsigned short*)(z_buff);
+        unsigned short* ap = (unsigned short*)(a_buff);
+        const signed char* zs = (const signed char*)(zshape);
+
+        const unsigned short* aLUT = AlphaLightingRemap->Get_Table(alpha_level);
+
+        /*
+        **	Skip any leading pixels as requested.
+        */
+        if (leadskip > 0) {
+            int transcount = Skip_Leading_Pixels(sptr, leadskip);
+            dptr += transcount;
+            length -= transcount;
+
+            zp += transcount;
+            zp = Wrap_Z_Buffer(zp);
+
+            ap += transcount;
+            ap = Wrap_A_Buffer(ap);
+        }
+
+        const char* zshape_data = (const char*)BuildingTypeClass::BuildingZShape->Get_Data(0);
+        const signed char* zshape_or = zs;
+
+        /*
+        **	Uncompress and store the pixel stream until the length has been
+        **	exhausted.
+        */
+        while (length > 0) {
+            unsigned char value = *sptr++;
+
+            if (value == '\0') {
+                value = *sptr++;
+                length -= value;
+                dptr += value;
+                zp += value;
+                zs += value;
+                ap += value;
+            } else {
+                if ((z_min - (int)*zs) < (int)*zp) {
+                    *dptr++ = TranslateTable[value | aLUT[*ap]];
+                    *zp++ = z_min - *zs++;
+                    length--;
+                } else {
+                    zs++;
+                    dptr++;
+                    zp++;
+                    length--;
+                }
+                ap++;
+            }
+            zp = Wrap_Z_Buffer(zp);
+            ap = Wrap_A_Buffer(ap);
+        }
+    }
+
+
+private:
+    T const* TranslateTable;
+    AlphaLightingRemapClass* AlphaLightingRemap;
+};
+
 
 void Vinifera_Hooks()
 {
+    Patch_Jump(0x0046C6A0, &RLEBlitTransXlatAlphaZReadWriteFake<unsigned short>::BlitFake);
+
     /**
      *  Remove the requirement for BLOWFISH.DLL (Blowfish encryption).
      */
