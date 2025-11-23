@@ -385,4 +385,9 @@ public:
      *  Should this unit not spawn wakes when it's cloaked? Usually useful for submarines.
      */
     bool IsHideWakeWhenCloaked;
+
+    /**
+     *  Is this a transport capable of carrying vehicles?
+     */
+    bool IsVehicleTransport;
 };

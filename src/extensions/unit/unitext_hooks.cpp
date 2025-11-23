@@ -1287,6 +1287,99 @@ set_mission_delay_and_return:
 }
 
 
+DEFINE_HOOK(0x0065627D, _UnitClass_What_Action_Vehicle_Transport_Patch, 0)
+{
+    GET(UnitClass*, this_ptr, ESI);
+    GET(TechnoClass*, techno, EDI);
+    REF_STACK(ActionType, action, 0x28);
+
+    /**
+     *  Check to see if it can enter a transporter.
+     */
+    if (techno && this_ptr->House->Is_Ally(techno) && this_ptr->House->Is_Player_Control()) {
+        if (action != ACTION_ATTACK && action != ACTION_GREPAIR && action != ACTION_GUARD_AREA && action != ACTION_TOGGLE_SELECT) {
+            if (techno != this_ptr && techno->TClass->MaxPassengers > 0 && Extension::Fetch(techno->TClass)->IsVehicleTransport) {
+                if (techno->Is_Foot() && static_cast<FootClass*>(techno)->Locomotion->Is_Moving()) {
+                    action = ACTION_NO_ENTER;
+                } else {
+                    switch (this_ptr->Transmit_Message(RADIO_CAN_LOAD, techno)) {
+                    case RADIO_ROGER:
+                        action = ACTION_ENTER;
+                        break;
+
+                    case RADIO_NEGATIVE:
+                        action = ACTION_NO_ENTER;
+                        break;
+
+                    default:
+                        action = ACTION_NONE;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     *  Stolen check, continue execution.
+     */
+    if (this_ptr->Combat_Damage() < 0) {
+        return 0x0065628E;
+    }
+
+    return 0x0065641F;
+}
+
+
+DEFINE_HOOK(0x00655A51, _UnitClass_Can_Enter_Cell_VehicleTransport_Patch, 0)
+{
+    GET(UnitClass*, this_ptr, EBX);
+    GET(ObjectClass*, occupier, ESI);
+
+    if (this_ptr->In_Radio_Contact() && occupier->RTTI == RTTI_UNIT) {
+        return 0x006554A5;
+    }
+
+    return 0x00655A5F;
+}
+
+
+DEFINE_HOOK(0x0065427F, _UnitClass_Do_MISSION_UNLOAD_VehicleTransport_Patch, 5)
+{
+    REF_STACK(Cell, newcell, 0x10);
+    GET(TechnoClass*, passenger, EBP);
+    GET(FacingType, newface, EDI);
+
+    Coord ucoord;
+    if (passenger->RTTI == RTTI_INFANTRY) {
+        ucoord = newcell.As_Coord();
+        ucoord = Map.Closest_Free_Spot(ucoord);
+    } else {
+        Cell nearby = Map.Nearby_Location(newcell, passenger->TClass->Speed);
+        ucoord = nearby.As_Coord();
+    }
+
+    ScenarioInit++;
+    bool placed = passenger->Unlimbo(ucoord, DirType(newface).Get_Dir());
+    ScenarioInit--;
+
+    R->EAX(placed);
+    return 0x00654365;
+}
+
+//
+//DEFINE_HOOK(0x00480828, _DriveTest, 0)
+//{
+//    GET(FootClass*, linked_to, ECX);
+//
+//    if (!linked_to->In_Radio_Contact() && linked_to->Mission != MISSION_ENTER) {
+//        return 0x00480833;
+//    }
+//
+//    return 0x004808E8;
+//}
+//
+
 /**
  *  Main function for patching the hooks.
  */
