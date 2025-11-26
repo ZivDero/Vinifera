@@ -31,6 +31,8 @@
 #include "debughandler.h"
 #include "asserthandler.h"
 
+#include <algorithm>
+
 
 struct ma_sound;
 struct ma_decoder;

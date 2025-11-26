@@ -147,6 +147,7 @@ bool ObjectClassExt::_Paradrop(Coord const& coord)
     return false;
 }
 
+#if 0
 /**
  *  x
  * 
@@ -188,7 +189,7 @@ DECLARE_PATCH(_ObjectClass_AI_AmbientSound_Patch)
 
     //JMP();
 }
-
+#endif
 
 /**
  *  Main function for patching the hooks.
