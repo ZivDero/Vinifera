@@ -499,23 +499,6 @@ bool Vinifera_Parse_Command_Line(int argc, char *argv[])
  */
 bool Vinifera_Startup()
 {
-    /**
-     *  Load Vinifera settings and overrides.
-     */
-    if (Vinifera_Load_INI()) {
-        DEBUG_INFO("\n");
-        DEBUG_INFO("Project information:\n");
-        DEBUG_INFO("  Title: %s\n", Vinifera_ProjectName);
-        DEBUG_INFO("  Version: %s\n", Vinifera_ProjectVersion);
-        DEBUG_INFO("\n");
-    } else {
-        DEBUG_WARNING("Failed to load VINIFERA.INI!\n");
-#if defined(TS_CLIENT)
-        MessageBoxA(nullptr, "Failed to load VINIFERA.INI!", "Vinifera", MB_ICONERROR|MB_OK);
-        return false;
-#endif
-    }
-
     DWORD rc;
 
     ViniferaSearchPaths.Clear();
@@ -565,37 +548,21 @@ bool Vinifera_Startup()
 #endif
 
     /**
-     *  #issue-514:
-     * 
-     *  Adds various search paths for loading files locally for the TS-Client builds only.
-     * 
-     *  #NOTE: REMOVED: Additional paths must now be set via SearchPaths in VINIFERA.INI!
-     * 
-     *  @author: CCHyper
+     *  Load Vinifera settings and overrides.
      */
-#if 0 // #if defined(TS_CLIENT)
-
-    // Only required for the TS Client builds as most projects will
-    // put VINIFERA.INI in this directory.
-    ViniferaSearchPaths.Add("INI");
-
-    // Required for startup mix files to be found.
-    ViniferaSearchPaths.Add("MIX");
+    if (Vinifera_Load_INI()) {
+        DEBUG_INFO("\n");
+        DEBUG_INFO("Project information:\n");
+        DEBUG_INFO("  Title: %s\n", Vinifera_ProjectName);
+        DEBUG_INFO("  Version: %s\n", Vinifera_ProjectVersion);
+        DEBUG_INFO("\n");
+    } else {
+        DEBUG_WARNING("Failed to load VINIFERA.INI!\n");
+#if defined(TS_CLIENT)
+        MessageBoxA(nullptr, "Failed to load VINIFERA.INI!", "Vinifera", MB_ICONERROR | MB_OK);
+        return false;
 #endif
-
-#if !defined(TS_CLIENT)
-    // Required for startup movies to be found.
-    ViniferaSearchPaths.Add("MOVIES");
-#endif
-
-    // REMOVED: Paths are now set via SearchPaths in VINIFERA.INI
-//#if defined(TS_CLIENT)
-//    ViniferaSearchPaths.Add("MUSIC");
-//    ViniferaSearchPaths.Add("SOUNDS");
-//    ViniferaSearchPaths.Add("MAPS");
-//    ViniferaSearchPaths.Add("MAPS\\MULTIPLAYER");
-//    ViniferaSearchPaths.Add("MAPS\\MISSION");
-//#endif
+    }
 
     DEBUG_INFO("Setting up conditional hooks.\n");
     Setup_Conditional_Hooks();
