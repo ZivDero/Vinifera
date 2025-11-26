@@ -65,7 +65,7 @@ AudioManagerClass AudioManager;
 #include "stb/stb_vorbis.c"
 #endif
 
-#define MINIAUDIO_IMPLEMENTATION // Actually implements the methods when we define this.
+//#define MINIAUDIO_IMPLEMENTATION // Actually implements the methods when we define this.
 #include <miniaudio/miniaudio.h>
 
 //#ifndef MA_NO_VORBIS
