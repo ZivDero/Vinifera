@@ -102,4 +102,24 @@ public:
      *  Is VSync on?
      */
     bool IsVSync;
+
+    enum RendererDriverType {
+        RENDERER_DRIVER_DIRECT3D,
+        RENDERER_DRIVER_DIRECT3D11,
+        RENDERER_DRIVER_DIRECT3D12,
+        RENDERER_DRIVER_OPENGL,
+        RENDERER_DRIVER_VULKAN,
+        RENDERER_DRIVER_AUTO = -1,
+    } RendererDriver;
+
+    inline static struct {
+        char const* Name;
+        RendererDriverType Type;
+    } RendererDrivers[] = {
+        { "Direct3D", RENDERER_DRIVER_DIRECT3D },
+        { "Direct3D11", RENDERER_DRIVER_DIRECT3D11 },
+        { "Direct3D12", RENDERER_DRIVER_DIRECT3D12 },
+        { "OpenGL", RENDERER_DRIVER_OPENGL },
+        {"Vulkan", RENDERER_DRIVER_VULKAN }
+    };
 };

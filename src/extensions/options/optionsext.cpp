@@ -53,7 +53,8 @@ OptionsClassExtension::OptionsClassExtension(const OptionsClass *this_ptr) :
     WindowHeight(-1),
     ScaleMode(SDL_SCALEMODE_PIXELART),
     CursorScale(0),
-    IsVSync(true)
+    IsVSync(true),
+    RendererDriver(RENDERER_DRIVER_AUTO)
 {
     //EXT_DEBUG_TRACE("OptionsClassExtension::OptionsClassExtension - 0x%08X\n", (uintptr_t)(This()));
 }
@@ -221,6 +222,15 @@ void OptionsClassExtension::Load_Init_Settings()
     CursorScale = ConfigINI.Get_Int("Video", "CursorScale", CursorScale);
     WindowedMode = ConfigINI.Get_Bool("Video", "Windowed", WindowedMode);
     IsVSync = ConfigINI.Get_Bool("Video", "VSync", IsVSync);
+
+    if (ConfigINI.Get_String("Video", "RendererDriver", "", buffer, std::size(buffer)) > 0) {
+        for (auto& driver : RendererDrivers) {
+            if (stricmp(buffer, driver.Name) == 0) {
+                RendererDriver = driver.Type;
+                break;
+            }
+        }
+    }
 }
 
 

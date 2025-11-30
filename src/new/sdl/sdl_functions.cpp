@@ -45,6 +45,7 @@
 #include "windialog.h"
 #include "wsproto.h"
 #include "wwmouse.h"
+#include "SDL3/SDL_hints.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_oldnames.h"
 #include "SDL3/SDL_render.h"
@@ -158,6 +159,13 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     }
 
     DEBUG_INFO("Pixel format: %s (%d bpp)\n", SDL_GetPixelFormatName(pixel_format), SDL_BITSPERPIXEL(pixel_format));
+
+    /**
+     *  Manual renderer driver selection.
+     */
+    if (OptionsExtension->RendererDriver != OptionsClassExtension::RENDERER_DRIVER_AUTO) {
+        SDL_SetHint(SDL_HINT_RENDER_DRIVER, OptionsClassExtension::RendererDrivers[OptionsExtension->RendererDriver].Name);
+    }
 
     /**
      *  Create the renderer for window.
@@ -485,6 +493,13 @@ bool SDL_Create_Main_Window(HINSTANCE instance, int width, int height)
     }
 
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, Vinifera_Get_Window_Title(dwPid));
+
+    /**
+     *  To use Vulkan the window must be create with this property set to true.
+     */
+    if (OptionsExtension->RendererDriver == OptionsClassExtension::RENDERER_DRIVER_VULKAN) {
+        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
+    }
 
     /**
      *  Create the window.
