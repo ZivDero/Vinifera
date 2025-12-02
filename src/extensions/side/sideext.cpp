@@ -47,10 +47,10 @@ SideClassExtension::SideClassExtension(const SideClass *this_ptr) :
     AbstractTypeClassExtension(this_ptr),
     UIColor(COLORSCHEME_FIRST),
     ToolTipColor(COLORSCHEME_FIRST),
-    Crew(nullptr),
-    Engineer(nullptr),
-    Technician(nullptr),
-    Disguise(nullptr),
+    Crew(),
+    Engineer(),
+    Technician(),
+    Disguise(),
     SurvivorDivisor(100),
     RegularPowerPlant(nullptr),
     AdvancedPowerPlant(nullptr),
@@ -69,7 +69,11 @@ SideClassExtension::SideClassExtension(const SideClass *this_ptr) :
  *  @author: CCHyper
  */
 SideClassExtension::SideClassExtension(const NoInitClass &noinit) :
-    AbstractTypeClassExtension(noinit)
+    AbstractTypeClassExtension(noinit),
+    Crew(noinit),
+    Engineer(noinit),
+    Technician(noinit),
+    Disguise(noinit)
 {
     //EXT_DEBUG_TRACE("SideClassExtension::SideClassExtension(NoInitClass) - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
 }
@@ -237,11 +241,11 @@ bool SideClassExtension::Read_INI(CCINIClass &ini)
     UIColor = ini.Get_Scheme_Index(ini_name, "UIColor", UIColor);
     ToolTipColor = ini.Get_Scheme_Index(ini_name, "ToolTipColor", ToolTipColor);
 
-    Crew = TGet_Class(ini, ini_name, "Crew", Crew);
-    Engineer = TGet_Class(ini, ini_name, "Engineer", Engineer);
-    Technician = TGet_Class(ini, ini_name, "Technician", Technician);
-    Disguise = TGet_Class(ini, ini_name, "Disguise", Disguise);
-    SurvivorDivisor = ini.Get_Int(ini_name, "SurvivorDivisor", SurvivorDivisor);
+    Crew.Read_INI(ini, ini_name, "Crew");
+    Engineer.Read_INI(ini, ini_name, "Engineer");
+    Technician.Read_INI(ini, ini_name, "Technician");
+    Disguise.Read_INI(ini, ini_name, "Disguise");
+    SurvivorDivisor.Read_INI(ini, ini_name, "SurvivorDivisor");
 
     RegularPowerPlant = TGet_Class(ini, ini_name, "RegularPowerPlant", RegularPowerPlant);
     AdvancedPowerPlant = TGet_Class(ini, ini_name, "AdvancedPowerPlant", AdvancedPowerPlant);

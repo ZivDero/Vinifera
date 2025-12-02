@@ -28,9 +28,11 @@
 #pragma once
 
 #include "abstracttypeext.h"
+#include "defaultable.h"
 #include "side.h"
 #include "house.h"
 #include "housetype.h"
+#include "rules.h"
 #include "tibsun_globals.h"
 
 
@@ -93,27 +95,27 @@ SideClassExtension final : public AbstractTypeClassExtension
         /**
          *  InfantryType used as this Side's crew.
          */
-        const InfantryTypeClass* Crew;
+        Defaultable<InfantryTypeClass*, []{ return Rule->Crew; }> Crew;
 
         /**
          *  InfantryType used as this Side's engineer.
          */
-        const InfantryTypeClass* Engineer;
+        Defaultable<InfantryTypeClass*, [] { return Rule->Crew; }> Engineer;
 
         /**
          *  InfantryType used as this Side's technician.
          */
-        const InfantryTypeClass* Technician;
+        Defaultable<InfantryTypeClass*, [] { return Rule->Technician; }> Technician;
 
         /**
          *  InfantryType used as this Side's disguise.
          */
-        const InfantryTypeClass* Disguise;
+        Defaultable<InfantryTypeClass*, [] { return Rule->Disguise; }> Disguise;
 
         /**
          *  The number of survivors is divided by this much when calculating a building's number of survivors.
          */
-        int SurvivorDivisor;
+        Defaultable<int, [] { return Rule->SurvivorDivisor; }> SurvivorDivisor;
 
         /**
          *  BuildingType used as this Side's regular power plant.
