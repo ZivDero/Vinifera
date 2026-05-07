@@ -337,20 +337,26 @@ namespace
         return static_cast<float>(y) * static_cast<float>(VideoHeight) / static_cast<float>(SDLWindowHeight);
     }
 
-    std::string Get_Font_Path()
+    std::string Get_Windows_Font_Path(const char* filename)
     {
         char windows_directory[MAX_PATH] = {};
         GetWindowsDirectoryA(windows_directory, static_cast<UINT>(std::size(windows_directory)));
 
         std::string path = windows_directory;
-        path += "\\Fonts\\segoeui.ttf";
-        if (GetFileAttributesA(path.c_str()) != INVALID_FILE_ATTRIBUTES) {
-            return path;
+        path += "\\Fonts\\";
+        path += filename;
+        return path;
+    }
+
+    bool Register_Font_Face(const std::string& path, const char* family, Rml::Style::FontWeight weight)
+    {
+        if (GetFileAttributesA(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            return false;
         }
 
-        path = windows_directory;
-        path += "\\Fonts\\arial.ttf";
-        return path;
+        const bool explicit_family = Rml::LoadFontFace(path, family, Rml::Style::FontStyle::Normal, weight, false);
+        const bool fallback_family = Rml::LoadFontFace(path, family, Rml::Style::FontStyle::Normal, weight, true);
+        return explicit_family || fallback_family;
     }
 }
 
@@ -384,9 +390,13 @@ bool ViniferaRmlUi::Initialize(HWND hwnd, SDL_Renderer* renderer)
         return false;
     }
 
-    const std::string font_path = Get_Font_Path();
-    if (!Rml::LoadFontFace(font_path, true, Rml::Style::FontWeight::Normal)) {
-        DEBUG_WARNING("RmlUi could not load font face \"%s\".\n", font_path.c_str());
+    bool loaded_font = Register_Font_Face(Get_Windows_Font_Path("segoeui.ttf"), "ViniferaUi", Rml::Style::FontWeight::Normal);
+    loaded_font = Register_Font_Face(Get_Windows_Font_Path("segoeuib.ttf"), "ViniferaUi", Rml::Style::FontWeight::Bold) || loaded_font;
+    loaded_font = Register_Font_Face(Get_Windows_Font_Path("arial.ttf"), "ViniferaUi", Rml::Style::FontWeight::Normal) || loaded_font;
+    loaded_font = Register_Font_Face(Get_Windows_Font_Path("arialbd.ttf"), "ViniferaUi", Rml::Style::FontWeight::Bold) || loaded_font;
+
+    if (!loaded_font) {
+        DEBUG_WARNING("RmlUi could not load a Windows UI font.\n");
     }
 
     Context = Rml::CreateContext("vinifera", Rml::Vector2i(std::max(VideoWidth, 1), std::max(VideoHeight, 1)));

@@ -164,7 +164,7 @@ namespace
         std::ostringstream out;
         out
             << "<rml><head><title>" << Escape_Rml(title) << "</title><style>"
-            << "body{margin:0;font-family:\"Segoe UI\",\"Arial\";font-size:13px;color:#ecf2f4;}"
+            << "body{margin:0;font-family:ViniferaUi;font-size:13px;color:#ecf2f4;}"
             << "#shade{position:absolute;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,0.42);}"
             << ".dialog{position:absolute;left:" << Dialog_Left(width) << "px;top:" << Dialog_Top(height) << "px;"
             << "width:" << Px(width) << ";height:" << Px(height) << ";background-color:#1f2b32;border:2px #80919a;"
