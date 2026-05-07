@@ -10,3 +10,6 @@
 [submodule "RmlUi"]
 	path = RmlUi
 	url = https://github.com/mikke89/RmlUi
+[submodule "freetype"]
+	path = freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype.git

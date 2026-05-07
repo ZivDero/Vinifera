@@ -31,6 +31,7 @@
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
 #include "vinifera_imgui.h"
+#include "vinifera_rmlui.h"
 #include "vinifera_util.h"
 #include "windialog.h"
 #include "wsproto.h"
@@ -281,6 +282,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
     }
 
+    if (!ViniferaRmlUi::Initialize(MainWindow, SDLWindowRenderer)) {
+        DEBUG_ERROR("Vinifera RmlUi could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -292,6 +297,7 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
  */
 void SDL_Reset_Video_Mode()
 {
+    ViniferaRmlUi::Shutdown();
     ViniferaImGui::Shutdown();
 
     /**
@@ -330,6 +336,10 @@ LRESULT CALLBACK SDL_Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, L
     const LPARAM original_lParam = lParam;
 
     if (ViniferaImGui::Process_Window_Message(hwnd, message, wParam, original_lParam)) {
+        return 0;
+    }
+
+    if (ViniferaRmlUi::Process_Window_Message(hwnd, message, wParam, original_lParam)) {
         return 0;
     }
 
@@ -710,6 +720,7 @@ bool SDL_Update_Screen(Surface* surface)
      *  Present the image to the window.
      */
     ViniferaImGui::Render();
+    ViniferaRmlUi::Render();
 
     SDL_RenderPresent(SDLWindowRenderer);
 
@@ -726,7 +737,7 @@ bool SDL_Update_Screen(Surface* surface)
  */
 bool SDL_Should_Scale()
 {
-    return WSDialogCount == 0 && SpecialDialog == SDLG_NONE;
+    return WSDialogCount == 0 && (SpecialDialog == SDLG_NONE || ViniferaRmlUi::Is_Dialog_Open());
 }
 
 

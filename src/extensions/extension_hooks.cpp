@@ -88,6 +88,7 @@
 #include "skirmishdlg_hooks.h"
 #include "smudgeext_hooks.h"
 #include "smudgetypeext_hooks.h"
+#include "specialdlg_hooks.h"
 #include "spawnmanager_hooks.h"
 #include "storageext_hooks.h"
 #include "superext_hooks.h"
@@ -266,6 +267,7 @@ void Extension_Hooks()
      *  Dialogs and associated code.
      */
     SkirmishDialog_Hooks();
+    SpecialDialog_Hooks();
 
     /**
      *  Miscellaneous hooks
