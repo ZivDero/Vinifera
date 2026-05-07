@@ -39,6 +39,7 @@ button {
     line-height: 28px;
     text-align: center;
     vertical-align: middle;
+    overflow: hidden;
     background-color: #d6dde0;
     border: 1px #111;
     color: #101820;
@@ -47,6 +48,7 @@ button {
 
 button:hover { background-color: #eef5f7; }
 button:disabled { background-color: #586166; color: #9aa2a7; }
+button[disabled] { background-color: #586166; color: #9aa2a7; }
 
 .label {
     position: absolute;
@@ -87,15 +89,70 @@ select {
     color: #101820;
     border: 1px #101820;
     font-size: 13px;
+    line-height: 26px;
 }
 
-input[type=range] {
-    height: 26px;
+option {
+    background-color: #eef5f7;
+    color: #101820;
 }
 
-input[type=checkbox] {
-    width: 16px;
-    height: 16px;
+.slider {
+    position: absolute;
+}
+
+.slider-button {
+    top: 3px;
+    width: 22px;
+    height: 22px;
+    line-height: 20px;
+}
+
+.slider-dec {
+    left: 0;
+}
+
+.slider-inc {
+    right: 0;
+}
+
+.slider-track {
+    position: absolute;
+    left: 28px;
+    top: 12px;
+    height: 6px;
+    background-color: #4b5d66;
+    border: 1px #101820;
+}
+
+.slider-fill {
+    position: absolute;
+    left: 28px;
+    top: 12px;
+    height: 6px;
+    background-color: #9fb8c4;
+}
+
+.slider-thumb {
+    position: absolute;
+    top: 5px;
+    width: 12px;
+    height: 20px;
+    background-color: #d6dde0;
+    border: 1px #101820;
+}
+
+.checkbox {
+    text-align: left;
+    line-height: 20px;
+    padding-left: 4px;
+    background-color: transparent;
+    border: 0px;
+    color: #ecf2f4;
+}
+
+.checkbox:hover {
+    background-color: #2e414b;
 }
 
 .checklabel {
@@ -109,4 +166,29 @@ input[type=checkbox] {
     color: #101820;
     border: 1px #101820;
     line-height: 28px;
+}
+
+.listbox {
+    position: absolute;
+    background-color: #eef5f7;
+    border: 1px #101820;
+    overflow-y: auto;
+}
+
+.listitem {
+    text-align: left;
+    padding-left: 4px;
+    line-height: 20px;
+    background-color: #eef5f7;
+    border: 0px;
+    color: #101820;
+}
+
+.listitem:hover {
+    background-color: #cddbe0;
+}
+
+.listitem.selected {
+    background-color: #3a6473;
+    color: #ffffff;
 }

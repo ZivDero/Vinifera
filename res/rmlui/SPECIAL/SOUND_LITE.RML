@@ -6,11 +6,11 @@
 <div id="shade"></div>
 <div class="dialog d294x112">
     <div class="label right" style="left:44px;top:34px;width:140px;height:30px;">Music Volume:</div>
-    <input type="range" id="music_volume" min="0" max="10" value="0" style="left:198px;top:34px;width:346px;height:30px;"/>
+    <div id="music_volume" class="slider" style="left:198px;top:34px;width:346px;height:30px;"><button id="music_volume_dec" class="slider-button slider-dec">-</button><div id="music_volume_track" class="slider-track" style="width:290px;"></div><div id="music_volume_fill" class="slider-fill"></div><div id="music_volume_thumb" class="slider-thumb"></div><button id="music_volume_inc" class="slider-button slider-inc">+</button></div>
     <div class="label right" style="left:44px;top:80px;width:142px;height:30px;">Sound Volume:</div>
-    <input type="range" id="sound_volume" min="0" max="10" value="0" style="left:198px;top:80px;width:346px;height:30px;"/>
+    <div id="sound_volume" class="slider" style="left:198px;top:80px;width:346px;height:30px;"><button id="sound_volume_dec" class="slider-button slider-dec">-</button><div id="sound_volume_track" class="slider-track" style="width:290px;"></div><div id="sound_volume_fill" class="slider-fill"></div><div id="sound_volume_thumb" class="slider-thumb"></div><button id="sound_volume_inc" class="slider-button slider-inc">+</button></div>
     <div class="label right" style="left:44px;top:124px;width:142px;height:30px;">Voice Volume:</div>
-    <input type="range" id="voice_volume" min="0" max="10" value="0" style="left:198px;top:124px;width:346px;height:30px;"/>
+    <div id="voice_volume" class="slider" style="left:198px;top:124px;width:346px;height:30px;"><button id="voice_volume_dec" class="slider-button slider-dec">-</button><div id="voice_volume_track" class="slider-track" style="width:290px;"></div><div id="voice_volume_fill" class="slider-fill"></div><div id="voice_volume_thumb" class="slider-thumb"></div><button id="voice_volume_inc" class="slider-button slider-inc">+</button></div>
     <button id="ok" style="left:230px;top:172px;width:124px;height:28px;">OK</button>
 </div>
 </body>

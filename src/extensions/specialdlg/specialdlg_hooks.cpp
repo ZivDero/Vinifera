@@ -11,6 +11,8 @@
 
 #include "specialdlg_hooks.h"
 
+#include "audio_theme.h"
+#include "audio_util.h"
 #include "ccini.h"
 #include "command.h"
 #include "debughandler.h"
@@ -40,6 +42,7 @@
 #include "lib/tooltip.h"
 
 #include <RmlUi/Core/Context.h>
+#include <RmlUi/Core/Box.h>
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Event.h>
@@ -51,6 +54,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -92,6 +96,13 @@ namespace
         CommandClass* Command;
     };
 
+    struct SliderState
+    {
+        int Min = 0;
+        int Max = 0;
+        int Value = 0;
+    };
+
     ModalResult CurrentResult = ModalResult::Pending;
     ModalKind CurrentKind = ModalKind::Main;
     bool SpecialDialogFlag = true;
@@ -99,6 +110,12 @@ namespace
     std::string SelectedHotkeyCategory;
     std::string SelectedHotkeyCommandName;
     Rml::ElementDocument* ActiveDocument = nullptr;
+    std::map<std::string, SliderState> SliderValues;
+    std::map<std::string, bool> CheckboxValues;
+    std::map<std::string, std::string> CheckboxLabels;
+    std::vector<ThemeType> VisibleThemes;
+    std::vector<std::string> VisibleHotkeyCommandNames;
+    ThemeType SelectedTheme = THEME_NONE;
 
     constexpr int MAX_SPEED_SETTING = 7;
     constexpr int MAX_SCROLL_SETTING = 7;
@@ -108,6 +125,12 @@ namespace
     // Current retail WOL module starts at 0x006867B0; DoFindPage is the first public WOL dialog helper.
     using DoFindPageFunc = void(__fastcall*)();
     DoFindPageFunc DoFindPage = reinterpret_cast<DoFindPageFunc>(0x00687660);
+
+    void Set_Text(const char* id, const std::string& text);
+    const char* Speed_Label(int pos);
+    const char* Detail_Label(int pos);
+    const char* Difficulty_Label(int pos);
+    const char* Connection_Label(int pos);
 
     std::string Escape_Rml(const char* text)
     {
@@ -165,6 +188,11 @@ namespace
 
     int Control_Int(const char* id, int fallback = 0)
     {
+        const auto slider = SliderValues.find(id);
+        if (slider != SliderValues.end()) {
+            return slider->second.Value;
+        }
+
         Rml::Element* element = Find_Element(id);
         Rml::ElementFormControl* control = rmlui_dynamic_cast<Rml::ElementFormControl*>(element);
         return control != nullptr ? std::atoi(control->GetValue().c_str()) : fallback;
@@ -172,6 +200,11 @@ namespace
 
     bool Checkbox_Value(const char* id, bool fallback = false)
     {
+        const auto checkbox = CheckboxValues.find(id);
+        if (checkbox != CheckboxValues.end()) {
+            return checkbox->second;
+        }
+
         Rml::Element* element = Find_Element(id);
         if (element == nullptr) {
             return fallback;
@@ -195,8 +228,84 @@ namespace
         }
     }
 
+    void Update_Slider_Label(const char* id)
+    {
+        if (std::strcmp(id, "game_speed") == 0) Set_Text("game_speed_label", Speed_Label(Control_Int("game_speed")));
+        if (std::strcmp(id, "scroll_speed") == 0) Set_Text("scroll_speed_label", Speed_Label(Control_Int("scroll_speed")));
+        if (std::strcmp(id, "detail_level") == 0) Set_Text("detail_label", Detail_Label(Control_Int("detail_level")));
+        if (std::strcmp(id, "difficulty") == 0) Set_Text("difficulty_label", Difficulty_Label(Control_Int("difficulty")));
+        if (std::strcmp(id, "latency") == 0) Set_Text("latency_label", Connection_Label(Control_Int("latency")));
+    }
+
+    void Update_Slider_View(const char* id)
+    {
+        Rml::Element* slider = Find_Element(id);
+        Rml::Element* fill = Find_Element((std::string(id) + "_fill").c_str());
+        Rml::Element* thumb = Find_Element((std::string(id) + "_thumb").c_str());
+        const auto state_it = SliderValues.find(id);
+        if (slider == nullptr || fill == nullptr || thumb == nullptr || state_it == SliderValues.end()) {
+            return;
+        }
+
+        const SliderState& state = state_it->second;
+        const int span = std::max(1, state.Max - state.Min);
+        const float percent = static_cast<float>(state.Value - state.Min) / static_cast<float>(span);
+        const float width = std::max(64.0f, slider->GetBox().GetSize().x);
+        const float track_left = 28.0f;
+        const float track_width = std::max(1.0f, width - 56.0f);
+        const float thumb_width = 12.0f;
+
+        fill->SetProperty("width", std::to_string(static_cast<int>(percent * track_width)) + "px");
+        thumb->SetProperty("left", std::to_string(static_cast<int>(track_left + percent * (track_width - thumb_width))) + "px");
+        Update_Slider_Label(id);
+    }
+
+    void Set_Slider_Value(const char* id, int min_value, int max_value, int value)
+    {
+        SliderState& state = SliderValues[id];
+        state.Min = min_value;
+        state.Max = max_value;
+        state.Value = std::clamp(value, min_value, max_value);
+        Set_Control_Value(id, state.Value);
+        Update_Slider_View(id);
+    }
+
+    void Set_Slider_Value(const char* id, int value)
+    {
+        const auto state_it = SliderValues.find(id);
+        if (state_it == SliderValues.end()) {
+            Set_Control_Value(id, value);
+            return;
+        }
+
+        SliderState state = state_it->second;
+        Set_Slider_Value(id, state.Min, state.Max, value);
+    }
+
+    void Set_Checkbox_Label(const char* id, const char* label, bool checked)
+    {
+        CheckboxLabels[id] = label != nullptr ? label : "";
+        CheckboxValues[id] = checked;
+
+        if (Rml::Element* element = Find_Element(id)) {
+            element->SetInnerRML(std::string(checked ? "[X] " : "[ ] ") + Escape_Rml(CheckboxLabels[id]));
+            if (checked) {
+                element->SetAttribute("checked", "");
+            } else {
+                element->RemoveAttribute("checked");
+            }
+        }
+    }
+
     void Set_Checkbox(const char* id, bool checked)
     {
+        const auto label = CheckboxLabels.find(id);
+        if (label != CheckboxLabels.end()) {
+            Set_Checkbox_Label(id, label->second.c_str(), checked);
+            return;
+        }
+
+        CheckboxValues[id] = checked;
         if (Rml::Element* element = Find_Element(id)) {
             if (checked) {
                 element->SetAttribute("checked", "");
@@ -329,18 +438,14 @@ namespace
             Options.Set_Shuffle(shuffle);
             if (shuffle) {
                 Options.Set_Repeat(false);
-                if (Rml::Element* repeat = Find_Element("repeat")) {
-                    repeat->RemoveAttribute("checked");
-                }
+                Set_Checkbox("repeat", false);
             }
         } else if (std::strcmp(id, "repeat") == 0) {
             const bool repeat = Checkbox_Value("repeat", Options.IsScoreRepeat);
             Options.Set_Repeat(repeat);
             if (repeat) {
                 Options.Set_Shuffle(false);
-                if (Rml::Element* shuffle = Find_Element("shuffle")) {
-                    shuffle->RemoveAttribute("checked");
-                }
+                Set_Checkbox("shuffle", false);
             }
         }
     }
@@ -547,31 +652,54 @@ namespace
 
     void Play_Selected_Theme()
     {
-        Rml::Element* element = Find_Element("theme_list");
-        Rml::ElementFormControlSelect* select = rmlui_dynamic_cast<Rml::ElementFormControlSelect*>(element);
-        if (select == nullptr) {
+        if (SelectedTheme < THEME_FIRST || SelectedTheme >= AudioTheme.Max_Themes()) {
             return;
         }
 
-        const int value = std::atoi(select->GetValue().c_str());
-        Theme.Stop();
-        Theme.Queue_Song(static_cast<ThemeType>(value));
+        AudioTheme.Stop();
+        AudioTheme.Queue_Song(SelectedTheme);
+    }
+
+    void Populate_Theme_List()
+    {
+        Rml::Element* list = Find_Element("theme_list");
+        if (list == nullptr) {
+            return;
+        }
+
+        std::string markup;
+        for (int row = 0; row < static_cast<int>(VisibleThemes.size()); ++row) {
+            const ThemeType theme = VisibleThemes[row];
+            const int length = AudioTheme.Track_Length(theme);
+            char buffer[160];
+            std::snprintf(buffer, sizeof(buffer), "%02d - %s [%d:%02d]", row + 1, AudioTheme.Full_Name(theme), length / 60, length % 60);
+
+            markup += "<button id=\"theme_";
+            markup += std::to_string(static_cast<int>(theme));
+            markup += "\" class=\"listitem";
+            if (theme == SelectedTheme) {
+                markup += " selected";
+            }
+            markup += "\" style=\"left:0px;top:";
+            markup += std::to_string(row * 20);
+            markup += "px;width:348px;height:20px;\">";
+            markup += Escape_Rml(buffer);
+            markup += "</button>";
+        }
+
+        list->SetInnerRML(markup);
     }
 
     void Populate_Settings_Document()
     {
-        Set_Control_Value("game_speed", (MAX_SPEED_SETTING - 1) - Options.GameSpeed);
-        Set_Control_Value("scroll_speed", (MAX_SCROLL_SETTING - 1) - Options.ScrollRate);
-        Set_Control_Value("detail_level", Options.DetailLevel);
-        Set_Control_Value("difficulty", Options.Difficulty);
-        Set_Text("game_speed_label", Speed_Label((MAX_SPEED_SETTING - 1) - Options.GameSpeed));
-        Set_Text("scroll_speed_label", Speed_Label((MAX_SCROLL_SETTING - 1) - Options.ScrollRate));
-        Set_Text("detail_label", Detail_Label(Options.DetailLevel));
-        Set_Text("difficulty_label", Difficulty_Label(Options.Difficulty));
-        Set_Checkbox("cameo_text", Options.SidebarCameoText);
-        Set_Checkbox("action_lines", Options.ActionLines);
-        Set_Checkbox("tooltips", Options.ToolTips);
-        Set_Checkbox("scroll_coasting", Options.ScrollMethod == 0);
+        Set_Slider_Value("game_speed", 0, MAX_SPEED_SETTING - 1, (MAX_SPEED_SETTING - 1) - Options.GameSpeed);
+        Set_Slider_Value("scroll_speed", 0, MAX_SCROLL_SETTING - 1, (MAX_SCROLL_SETTING - 1) - Options.ScrollRate);
+        Set_Slider_Value("detail_level", 0, MAX_DETAIL_SETTING - 1, Options.DetailLevel);
+        Set_Slider_Value("difficulty", 0, MAX_DIFFICULTY_SETTING - 1, Options.Difficulty);
+        Set_Checkbox_Label("cameo_text", !GameActive ? "Cameo Text" : "Sidebar Text", Options.SidebarCameoText);
+        Set_Checkbox_Label("action_lines", "Target Lines", Options.ActionLines);
+        Set_Checkbox_Label("tooltips", "Tooltips", Options.ToolTips);
+        Set_Checkbox_Label("scroll_coasting", "Scroll Coasting", Options.ScrollMethod == 0);
     }
 
     void Populate_Main_Document()
@@ -580,68 +708,87 @@ namespace
         const bool saves_present = Save_Files_Present();
         Set_Enabled("load", saves_present);
         Set_Enabled("delete", saves_present);
-        Set_Control_Value("latency", 3 - Session.LatencyFudge);
-        Set_Control_Value("game_speed", (MAX_SPEED_SETTING - 1) - Options.GameSpeed);
-        Set_Text("latency_label", Connection_Label(3 - Session.LatencyFudge));
-        Set_Text("game_speed_label", Speed_Label((MAX_SPEED_SETTING - 1) - Options.GameSpeed));
+        Set_Slider_Value("latency", 0, 3, 3 - Session.LatencyFudge);
+        Set_Slider_Value("game_speed", 0, MAX_SPEED_SETTING - 1, (MAX_SPEED_SETTING - 1) - Options.GameSpeed);
     }
 
     void Populate_Sound_Document()
     {
-        Set_Control_Value("music_volume", static_cast<int>(Options.ScoreVolume * 10.0f + 0.5f));
-        Set_Control_Value("sound_volume", static_cast<int>(Options.SoundVolume * 10.0f + 0.5f));
-        Set_Control_Value("voice_volume", static_cast<int>(Options.VoiceVolume * 10.0f + 0.5f));
-        Set_Checkbox("shuffle", Options.IsScoreShuffle);
-        Set_Checkbox("repeat", Options.IsScoreRepeat);
+        Set_Slider_Value("music_volume", 0, 10, static_cast<int>(Options.ScoreVolume * 10.0f + 0.5f));
+        Set_Slider_Value("sound_volume", 0, 10, static_cast<int>(Options.SoundVolume * 10.0f + 0.5f));
+        Set_Slider_Value("voice_volume", 0, 10, static_cast<int>(Options.VoiceVolume * 10.0f + 0.5f));
+        Set_Checkbox_Label("shuffle", "Shuffle", Options.IsScoreShuffle);
+        Set_Checkbox_Label("repeat", "Repeat", Options.IsScoreRepeat);
 
-        Rml::ElementFormControlSelect* select = Select_Control("theme_list");
-        if (select == nullptr) {
-            return;
-        }
-
-        select->RemoveAll();
-
-        int active_row = 0;
-        int row = 0;
-        int visible_num = 1;
-        for (ThemeType theme = THEME_FIRST; theme < Theme.Max_Themes(); theme = static_cast<ThemeType>(theme + 1)) {
-            if (!Theme.Is_Allowed(theme)) {
+        VisibleThemes.clear();
+        SelectedTheme = THEME_NONE;
+        for (ThemeType theme = THEME_FIRST; theme < AudioTheme.Max_Themes(); theme = static_cast<ThemeType>(theme + 1)) {
+            if (!AudioTheme.Is_Allowed(theme)) {
                 continue;
             }
 
-            char buffer[160];
-            const int length = Theme.Track_Length(theme);
-            std::snprintf(buffer, sizeof(buffer), "%02d - %s [%d:%02d]", visible_num++, Theme.Full_Name(theme), length / 60, length % 60);
-            select->Add(Escape_Rml(buffer), std::to_string(static_cast<int>(theme)));
-            if (Theme.What_Is_Playing() == theme) {
-                active_row = row;
+            VisibleThemes.push_back(theme);
+            if (AudioTheme.What_Is_Playing() == theme) {
+                SelectedTheme = theme;
             }
-            ++row;
         }
-        select->SetSelection(active_row);
+
+        if (VisibleThemes.empty()) {
+            for (ThemeType theme = THEME_FIRST; theme < AudioTheme.Max_Themes(); theme = static_cast<ThemeType>(theme + 1)) {
+                if (!AudioTheme.Is_Playable(theme)) {
+                    continue;
+                }
+
+                VisibleThemes.push_back(theme);
+                if (AudioTheme.What_Is_Playing() == theme) {
+                    SelectedTheme = theme;
+                }
+            }
+        }
+
+        DEV_DEBUG_INFO("RmlUi sound dialog: %d visible themes from %d total themes\n", static_cast<int>(VisibleThemes.size()), AudioTheme.Max_Themes());
+
+        if (SelectedTheme == THEME_NONE && !VisibleThemes.empty()) {
+            SelectedTheme = VisibleThemes.front();
+        }
+
+        Populate_Theme_List();
     }
 
     void Populate_Command_List()
     {
-        Rml::ElementFormControlSelect* select = Select_Control("command_list");
-        if (select == nullptr) {
+        Rml::Element* list = Find_Element("command_list");
+        if (list == nullptr) {
             return;
         }
 
-        select->RemoveAll();
-
+        VisibleHotkeyCommandNames.clear();
         const std::vector<CommandClass*> commands = Commands_For_Category(SelectedHotkeyCategory);
         for (CommandClass* command : commands) {
-            select->Add(Escape_Rml(command->Get_UI_Name()), command->Get_Name());
+            VisibleHotkeyCommandNames.push_back(command->Get_Name());
         }
 
         if (SelectedHotkeyCommandName.empty() && !commands.empty()) {
             SelectedHotkeyCommandName = commands.front()->Get_Name();
         }
 
-        if (!SelectedHotkeyCommandName.empty()) {
-            select->SetValue(SelectedHotkeyCommandName);
+        std::string markup;
+        for (int row = 0; row < static_cast<int>(commands.size()); ++row) {
+            CommandClass* command = commands[row];
+            markup += "<button id=\"cmd_";
+            markup += std::to_string(row);
+            markup += "\" class=\"listitem";
+            if (stricmp(command->Get_Name(), SelectedHotkeyCommandName.c_str()) == 0) {
+                markup += " selected";
+            }
+            markup += "\" style=\"left:0px;top:";
+            markup += std::to_string(row * 20);
+            markup += "px;width:290px;height:20px;\">";
+            markup += Escape_Rml(command->Get_UI_Name());
+            markup += "</button>";
         }
+
+        list->SetInnerRML(markup);
     }
 
     void Populate_Keyboard_Document()
@@ -793,6 +940,121 @@ namespace
         dialog->SetProperty("margin-top", "0px");
     }
 
+    bool Is_Disabled(Rml::Element* element)
+    {
+        while (element != nullptr) {
+            if (element->GetAttribute("disabled") != nullptr) {
+                return true;
+            }
+            element = element->GetParentNode();
+        }
+        return false;
+    }
+
+    bool Slider_Base_Id(const std::string& id, std::string& base_id)
+    {
+        static const char* suffixes[] = { "_dec", "_inc", "_track", "_fill", "_thumb" };
+        if (SliderValues.find(id) != SliderValues.end()) {
+            base_id = id;
+            return true;
+        }
+
+        for (const char* suffix : suffixes) {
+            const size_t suffix_length = std::strlen(suffix);
+            if (id.length() > suffix_length && id.compare(id.length() - suffix_length, suffix_length, suffix) == 0) {
+                base_id = id.substr(0, id.length() - suffix_length);
+                return SliderValues.find(base_id) != SliderValues.end();
+            }
+        }
+
+        return false;
+    }
+
+    bool Handle_Slider_Click(const std::string& id, Rml::Event& event)
+    {
+        std::string base_id;
+        if (!Slider_Base_Id(id, base_id)) {
+            return false;
+        }
+
+        const auto state_it = SliderValues.find(base_id);
+        if (state_it == SliderValues.end()) {
+            return false;
+        }
+
+        SliderState state = state_it->second;
+        int value = state.Value;
+        if (id.length() >= 4 && id.compare(id.length() - 4, 4, "_dec") == 0) {
+            --value;
+        } else if (id.length() >= 4 && id.compare(id.length() - 4, 4, "_inc") == 0) {
+            ++value;
+        } else {
+            Rml::Element* slider = Find_Element(base_id.c_str());
+            if (slider != nullptr) {
+                const Rml::Vector2f mouse = event.GetUnprojectedMouseScreenPos();
+                const float width = std::max(64.0f, slider->GetBox().GetSize().x);
+                const float track_left = 28.0f;
+                const float track_width = std::max(1.0f, width - 56.0f);
+                const float local_x = std::clamp(mouse.x - slider->GetAbsoluteOffset().x - track_left, 0.0f, track_width);
+                const float percent = local_x / track_width;
+                value = state.Min + static_cast<int>(percent * static_cast<float>(state.Max - state.Min) + 0.5f);
+            }
+        }
+
+        Set_Slider_Value(base_id.c_str(), value);
+        if (base_id == "music_volume" || base_id == "sound_volume" || base_id == "voice_volume") {
+            Apply_Sound_Slider(base_id.c_str(), true);
+        }
+
+        event.StopPropagation();
+        return true;
+    }
+
+    bool Handle_Checkbox_Click(const std::string& id, Rml::Event& event)
+    {
+        if (CheckboxValues.find(id) == CheckboxValues.end()) {
+            return false;
+        }
+
+        Set_Checkbox(id.c_str(), !Checkbox_Value(id.c_str()));
+        if (id == "shuffle" || id == "repeat") {
+            Apply_Sound_Checks(id.c_str());
+        }
+
+        event.StopPropagation();
+        return true;
+    }
+
+    bool Handle_List_Click(const std::string& id, Rml::Event& event)
+    {
+        if (id.rfind("theme_", 0) == 0) {
+            const int theme_id = std::atoi(id.c_str() + 6);
+            for (ThemeType theme : VisibleThemes) {
+                if (static_cast<int>(theme) == theme_id) {
+                    SelectedTheme = theme;
+                    Populate_Theme_List();
+                    event.StopPropagation();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        if (id.rfind("cmd_", 0) == 0) {
+            const int index = std::atoi(id.c_str() + 4);
+            if (index >= 0 && index < static_cast<int>(VisibleHotkeyCommandNames.size())) {
+                SelectedHotkeyCommandName = VisibleHotkeyCommandNames[index];
+                PendingHotkey = KN_NONE;
+                Populate_Command_List();
+                Update_Hotkey_Details();
+                event.StopPropagation();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     class SpecialDialogEventListener : public Rml::EventListener
     {
     public:
@@ -800,6 +1062,11 @@ namespace
         {
             Rml::Element* element = Element_From_Event(event);
             const std::string id = element != nullptr ? element->GetId() : "";
+
+            if (element != nullptr && Is_Disabled(element)) {
+                event.StopPropagation();
+                return;
+            }
 
             if (event == "keydown" && CurrentKind == ModalKind::Keyboard) {
                 PendingHotkey = Rml_Key_To_KeyNum(event.GetParameter<int>("key_identifier", Rml::Input::KI_UNKNOWN));
@@ -809,11 +1076,7 @@ namespace
             }
 
             if (event == "change" || event == "input") {
-                if (id == "game_speed") Set_Text("game_speed_label", Speed_Label(Control_Int("game_speed")));
-                if (id == "scroll_speed") Set_Text("scroll_speed_label", Speed_Label(Control_Int("scroll_speed")));
-                if (id == "detail_level") Set_Text("detail_label", Detail_Label(Control_Int("detail_level")));
-                if (id == "difficulty") Set_Text("difficulty_label", Difficulty_Label(Control_Int("difficulty")));
-                if (id == "latency") Set_Text("latency_label", Connection_Label(Control_Int("latency")));
+                if (SliderValues.find(id) != SliderValues.end()) Update_Slider_Label(id.c_str());
                 if (id == "music_volume" || id == "sound_volume" || id == "voice_volume") Apply_Sound_Slider(id.c_str(), true);
                 if (id == "shuffle" || id == "repeat") Apply_Sound_Checks(id.c_str());
                 if (id == "category_list") {
@@ -825,19 +1088,16 @@ namespace
                         Update_Hotkey_Details();
                     }
                 }
-                if (id == "command_list") {
-                    if (Rml::ElementFormControlSelect* select = Select_Control("command_list")) {
-                        SelectedHotkeyCommandName = select->GetValue();
-                    }
-                    PendingHotkey = KN_NONE;
-                    Update_Hotkey_Details();
-                }
                 return;
             }
 
             if (!(event == "click")) {
                 return;
             }
+
+            if (Handle_Slider_Click(id, event)) return;
+            if (Handle_Checkbox_Click(id, event)) return;
+            if (Handle_List_Click(id, event)) return;
 
             if (id == "resume") CurrentResult = ModalResult::Resume;
             else if (id == "restate") CurrentResult = ModalResult::Restate;
@@ -852,8 +1112,13 @@ namespace
             else if (id == "ok") CurrentResult = ModalResult::Ok;
             else if (id == "cancel") CurrentResult = ModalResult::Cancel;
             else if (id == "play") Play_Selected_Theme();
-            else if (id == "stop") Theme.Queue_Song(THEME_QUIET);
-            else if (id == "assign") CurrentResult = ModalResult::AssignHotkey;
+            else if (id == "stop") AudioTheme.Queue_Song(THEME_QUIET);
+            else if (id == "assign") {
+                Assign_Hotkey();
+                PendingHotkey = KN_NONE;
+                Populate_Command_List();
+                Update_Hotkey_Details();
+            }
             else if (id == "reset") CurrentResult = ModalResult::ResetHotkeys;
         }
     };
@@ -1000,12 +1265,9 @@ namespace
                         Play_Selected_Theme();
                         break;
                     case ModalResult::Stop:
-                        Theme.Queue_Song(THEME_QUIET);
+                        AudioTheme.Queue_Song(THEME_QUIET);
                         break;
                     default:
-                        Apply_Sound_Slider("music_volume", false);
-                        Apply_Sound_Slider("sound_volume", false);
-                        Apply_Sound_Slider("voice_volume", false);
                         Options.Save_Settings();
                         stay = false;
                         break;
