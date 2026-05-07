@@ -305,6 +305,24 @@ set(MINIAUDIO_FORCE_CXX ON)
 add_subdirectory(${CMAKE_SOURCE_DIR}/miniaudio)
 target_compile_options(miniaudio PRIVATE /Gr)
 
+set(BUILD_SHARED_LIBS OFF)
+set(RMLUI_SAMPLES OFF)
+set(RMLUI_LUA_BINDINGS OFF)
+set(RMLUI_LOTTIE_PLUGIN OFF)
+set(RMLUI_SVG_PLUGIN OFF)
+set(RMLUI_HARFBUZZ_SAMPLE OFF)
+set(RMLUI_FONT_ENGINE "none")
+set(RMLUI_PRECOMPILED_HEADERS OFF)
+add_subdirectory(${CMAKE_SOURCE_DIR}/RmlUi EXCLUDE_FROM_ALL)
+
+target_compile_options(rmlui_core PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:/Gr>
+)
+
+target_compile_options(rmlui_debugger PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:/Gr>
+)
+
 
 ################################################################################
 # Embed some git version information in the binary.
@@ -615,6 +633,7 @@ add_dependencies(${PROJECT_NAME} TSpp)
 
 target_link_libraries(${PROJECT_NAME} SDL3::SDL3)
 target_link_libraries(${PROJECT_NAME} miniaudio)
+target_link_libraries(${PROJECT_NAME} RmlUi::RmlUi)
 
 set(REQUIRED_LIBRARIES ws2_32 dbghelp shlwapi version comctl32)
 

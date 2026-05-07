@@ -7,3 +7,6 @@
 [submodule "miniaudio"]
 	path = miniaudio
 	url = https://github.com/mackron/miniaudio.git
+[submodule "RmlUi"]
+	path = RmlUi
+	url = https://github.com/mikke89/RmlUi
