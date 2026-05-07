@@ -723,6 +723,76 @@ namespace
         return "";
     }
 
+    void Dialog_Size(ModalKind kind, int& width, int& height)
+    {
+        switch (kind) {
+        case ModalKind::Main:
+            if (Session.Type == GAME_INTERNET) {
+                width = 680;
+                height = 336;
+            } else if (Session.Type == GAME_NORMAL || Session.Type == GAME_SKIRMISH) {
+                width = 418;
+                height = 280;
+            } else {
+                width = 418;
+                height = 150;
+            }
+            break;
+        case ModalKind::Settings:
+            if (GameActive && Session.Type == GAME_INTERNET) {
+                width = 588;
+                height = 252;
+            } else if (!GameActive) {
+                width = 584;
+                height = 326;
+            } else {
+                width = 584;
+                height = 314;
+            }
+            break;
+        case ModalKind::Sound:
+            width = 588;
+            height = !GameActive ? 224 : 430;
+            break;
+        case ModalKind::Keyboard:
+            width = 672;
+            height = 416;
+            break;
+        case ModalKind::Abort:
+        case ModalKind::Surrender:
+        case ModalKind::ResetHotkeysConfirm:
+            width = 512;
+            height = 126;
+            break;
+        }
+    }
+
+    void Center_Dialog(ModalKind kind)
+    {
+        if (ActiveDocument == nullptr) {
+            return;
+        }
+
+        Rml::Element* dialog = ActiveDocument->QuerySelector(".dialog");
+        if (dialog == nullptr) {
+            return;
+        }
+
+        int width = 0;
+        int height = 0;
+        Dialog_Size(kind, width, height);
+
+        const int left = std::max(0, (VideoWidth - width) / 2);
+        const int top = std::max(0, (VideoHeight - height) / 2);
+
+        dialog->SetProperty("left", std::to_string(left) + "px");
+        dialog->SetProperty("top", std::to_string(top) + "px");
+        dialog->SetProperty("width", std::to_string(width) + "px");
+        dialog->SetProperty("height", std::to_string(height) + "px");
+        dialog->SetProperty("margin-left", "0px");
+        dialog->SetProperty("margin-top", "0px");
+    }
+
     class SpecialDialogEventListener : public Rml::EventListener
     {
     public:
@@ -809,6 +879,7 @@ namespace
         }
 
         ActiveDocument = rml_document;
+        Center_Dialog(kind);
         Populate_Document(kind);
         rml_document->AddEventListener("click", &Listener);
         rml_document->AddEventListener("change", &Listener);
