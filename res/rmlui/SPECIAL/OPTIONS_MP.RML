@@ -1,0 +1,13 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d209x75">
+    <button id="settings" style="left:110px;top:24px;width:198px;height:28px;">Game Controls</button>
+    <button id="abort" style="left:110px;top:60px;width:198px;height:28px;">Abort Mission</button>
+    <button id="resume" style="left:110px;top:96px;width:198px;height:28px;">Resume Mission</button>
+</div>
+</body>
+</rml>

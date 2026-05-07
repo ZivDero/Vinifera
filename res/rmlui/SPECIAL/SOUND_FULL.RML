@@ -1,0 +1,22 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d294x215">
+    <div class="label right" style="left:44px;top:24px;width:140px;height:30px;">Music Volume:</div>
+    <input type="range" id="music_volume" min="0" max="10" value="0" style="left:194px;top:24px;width:350px;height:30px;"/>
+    <div class="label right" style="left:44px;top:68px;width:140px;height:30px;">Sound Volume:</div>
+    <input type="range" id="sound_volume" min="0" max="10" value="0" style="left:194px;top:68px;width:350px;height:30px;"/>
+    <div class="label right" style="left:44px;top:112px;width:140px;height:30px;">Voice Volume:</div>
+    <input type="range" id="voice_volume" min="0" max="10" value="0" style="left:194px;top:112px;width:350px;height:30px;"/>
+    <button id="play" style="left:44px;top:172px;width:140px;height:28px;">Play</button>
+    <button id="stop" style="left:44px;top:226px;width:140px;height:28px;">Stop</button>
+    <input type="checkbox" id="shuffle" style="left:44px;top:280px;"/><label for="shuffle" class="checklabel" style="left:66px;top:280px;width:118px;height:28px;">Shuffle</label>
+    <input type="checkbox" id="repeat" style="left:44px;top:334px;"/><label for="repeat" class="checklabel" style="left:66px;top:334px;width:118px;height:28px;">Repeat</label>
+    <select id="theme_list" size="8" style="left:194px;top:164px;width:350px;height:198px;"></select>
+    <button id="ok" style="left:420px;top:378px;width:124px;height:28px;">OK</button>
+</div>
+</body>
+</rml>

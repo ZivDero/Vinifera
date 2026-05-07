@@ -475,6 +475,13 @@ PostBuild_WindowsCopyFiles(${PROJECT_NAME}
 	"${TARGET_EDB}"
 )
 
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+		"${CMAKE_SOURCE_DIR}/res/rmlui"
+		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/RMLUI"
+	COMMENT "Copying RmlUi runtime assets"
+)
+
 # Create post build script to copy the DLL to the custom debugger directory.
 if(NOT ${OPTION_CUSTOM_DEBUGGER_DIRECTORY_PATH} STREQUAL " ")
 
@@ -512,6 +519,13 @@ if(NOT ${OPTION_CUSTOM_DEBUGGER_DIRECTORY_PATH} STREQUAL " ")
 		${COPY_SOURCE_FILE_PATH}
 		${COPY_DESTINATION_PATH}
 		"${TARGET_EDB}"
+	)
+
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+			"${CMAKE_SOURCE_DIR}/res/rmlui"
+			"${OPTION_CUSTOM_DEBUGGER_DIRECTORY_PATH}/RMLUI"
+		COMMENT "Copying RmlUi runtime assets to debugger directory"
 	)
 endif()
 

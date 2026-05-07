@@ -1,0 +1,17 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d294x112">
+    <div class="label right" style="left:44px;top:34px;width:140px;height:30px;">Music Volume:</div>
+    <input type="range" id="music_volume" min="0" max="10" value="0" style="left:198px;top:34px;width:346px;height:30px;"/>
+    <div class="label right" style="left:44px;top:80px;width:142px;height:30px;">Sound Volume:</div>
+    <input type="range" id="sound_volume" min="0" max="10" value="0" style="left:198px;top:80px;width:346px;height:30px;"/>
+    <div class="label right" style="left:44px;top:124px;width:142px;height:30px;">Voice Volume:</div>
+    <input type="range" id="voice_volume" min="0" max="10" value="0" style="left:198px;top:124px;width:346px;height:30px;"/>
+    <button id="ok" style="left:230px;top:172px;width:124px;height:28px;">OK</button>
+</div>
+</body>
+</rml>

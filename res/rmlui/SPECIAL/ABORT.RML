@@ -1,0 +1,14 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d256x63">
+    <div class="label center" style="left:44px;top:24px;width:424px;height:38px;">Do you want to abort the mission?</div>
+    <button id="abort" style="left:44px;top:74px;width:120px;height:28px;">Abort</button>
+    <button id="surrender" style="left:196px;top:74px;width:120px;height:28px;">Surrender</button>
+    <button id="cancel" style="left:348px;top:74px;width:120px;height:28px;">Cancel</button>
+</div>
+</body>
+</rml>

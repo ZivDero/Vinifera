@@ -1,0 +1,13 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d256x63">
+    <div class="label center" style="left:44px;top:24px;width:424px;height:38px;">Do you want to surrender?</div>
+    <button id="surrender" style="left:116px;top:74px;width:120px;height:28px;">Surrender</button>
+    <button id="cancel" style="left:276px;top:74px;width:120px;height:28px;">Cancel</button>
+</div>
+</body>
+</rml>

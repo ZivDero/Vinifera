@@ -14,18 +14,24 @@
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_surface.h"
 #include "SDL3/SDL_video.h"
+#include "ccfile.h"
 #include "debughandler.h"
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
 
+#include "lib/rawfile.h"
+
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/FileInterface.h>
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/SystemInterface.h>
 
 #include <algorithm>
+#include <climits>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -263,10 +269,95 @@ namespace
         LARGE_INTEGER Startup = {};
     };
 
+    class ViniferaFileInterface : public Rml::FileInterface
+    {
+    public:
+        Rml::FileHandle Open(const Rml::String& path) override
+        {
+            std::string normalized = path;
+            std::replace(normalized.begin(), normalized.end(), '/', '\\');
+            while (!normalized.empty() && (normalized.front() == '\\' || normalized.front() == '.')) {
+                if (normalized.front() == '.') {
+                    if (normalized.size() > 1 && normalized[1] == '\\') {
+                        normalized.erase(0, 2);
+                    } else {
+                        break;
+                    }
+                } else {
+                    normalized.erase(normalized.begin());
+                }
+            }
+
+            const bool raw_filesystem_path = normalized.size() > 1 && normalized[1] == ':';
+            FileClass* file = raw_filesystem_path ? static_cast<FileClass*>(new RawFileClass(normalized.c_str())) : static_cast<FileClass*>(new CCFileClass(normalized.c_str()));
+            if (!file->Open(FILE_ACCESS_READ)) {
+                delete file;
+                return 0;
+            }
+
+            return reinterpret_cast<Rml::FileHandle>(file);
+        }
+
+        void Close(Rml::FileHandle handle) override
+        {
+            FileClass* file = reinterpret_cast<FileClass*>(handle);
+            if (file != nullptr) {
+                file->Close();
+                delete file;
+            }
+        }
+
+        size_t Read(void* buffer, size_t size, Rml::FileHandle handle) override
+        {
+            FileClass* file = reinterpret_cast<FileClass*>(handle);
+            if (file == nullptr || buffer == nullptr || size == 0) {
+                return 0;
+            }
+
+            const size_t read_size = std::min<size_t>(size, static_cast<size_t>(INT_MAX));
+            return static_cast<size_t>(std::max<long>(0, file->Read(buffer, static_cast<int>(read_size))));
+        }
+
+        bool Seek(Rml::FileHandle handle, long offset, int origin) override
+        {
+            FileClass* file = reinterpret_cast<FileClass*>(handle);
+            if (file == nullptr) {
+                return false;
+            }
+
+            FileSeekType seek_type = FILE_SEEK_CURRENT;
+            if (origin == SEEK_SET) {
+                seek_type = FILE_SEEK_START;
+            } else if (origin == SEEK_END) {
+                seek_type = FILE_SEEK_END;
+            }
+
+            return file->Seek(offset, seek_type) >= 0;
+        }
+
+        size_t Tell(Rml::FileHandle handle) override
+        {
+            FileClass* file = reinterpret_cast<FileClass*>(handle);
+            if (file == nullptr) {
+                return 0;
+            }
+
+            return static_cast<size_t>(std::max<off_t>(0, file->Tell()));
+        }
+    };
+
+    struct DocumentRecord
+    {
+        Rml::ElementDocument* Document = nullptr;
+        ViniferaRmlUi::DocumentLayer Layer = ViniferaRmlUi::DocumentLayer::Overlay;
+    };
+
     std::unique_ptr<ViniferaSystemInterface> SystemInterface;
     std::unique_ptr<ViniferaRenderInterface> RenderInterface;
+    std::unique_ptr<ViniferaFileInterface> FileInterface;
     Rml::Context* Context = nullptr;
     Rml::ElementDocument* Document = nullptr;
+    std::vector<DocumentRecord> Documents;
     bool Initialized = false;
 
     int Get_Key_Modifiers()
@@ -358,6 +449,36 @@ namespace
         const bool fallback_family = Rml::LoadFontFace(path, family, Rml::Style::FontStyle::Normal, weight, true);
         return explicit_family || fallback_family;
     }
+
+    bool Has_Documents()
+    {
+        return !Documents.empty();
+    }
+
+    bool Has_Documents(ViniferaRmlUi::DocumentLayer layer)
+    {
+        for (const DocumentRecord& record : Documents) {
+            if (record.Layer == layer && record.Document != nullptr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void Remove_Document_Record(Rml::ElementDocument* document)
+    {
+        Documents.erase(std::remove_if(Documents.begin(), Documents.end(), [document](const DocumentRecord& record) {
+            return record.Document == document;
+        }), Documents.end());
+
+        Document = nullptr;
+        for (auto it = Documents.rbegin(); it != Documents.rend(); ++it) {
+            if (it->Layer == ViniferaRmlUi::DocumentLayer::Modal && it->Document != nullptr) {
+                Document = it->Document;
+                break;
+            }
+        }
+    }
 }
 
 bool ViniferaRmlUi::Initialize(HWND hwnd, SDL_Renderer* renderer)
@@ -379,12 +500,15 @@ bool ViniferaRmlUi::Initialize(HWND hwnd, SDL_Renderer* renderer)
     SystemInterface = std::make_unique<ViniferaSystemInterface>();
     SystemInterface->Set_Window(hwnd);
     RenderInterface = std::make_unique<ViniferaRenderInterface>(renderer);
+    FileInterface = std::make_unique<ViniferaFileInterface>();
 
     Rml::SetSystemInterface(SystemInterface.get());
     Rml::SetRenderInterface(RenderInterface.get());
+    Rml::SetFileInterface(FileInterface.get());
 
     if (!Rml::Initialise()) {
         DEBUG_ERROR("RmlUi initialization failed.\n");
+        FileInterface.reset();
         RenderInterface.reset();
         SystemInterface.reset();
         return false;
@@ -402,6 +526,7 @@ bool ViniferaRmlUi::Initialize(HWND hwnd, SDL_Renderer* renderer)
     Context = Rml::CreateContext("vinifera", Rml::Vector2i(std::max(VideoWidth, 1), std::max(VideoHeight, 1)));
     if (Context == nullptr) {
         Rml::Shutdown();
+        FileInterface.reset();
         RenderInterface.reset();
         SystemInterface.reset();
         return false;
@@ -417,13 +542,16 @@ void ViniferaRmlUi::Shutdown()
         return;
     }
 
-    Close_Document();
+    Close_Documents(DocumentLayer::Hud);
+    Close_Documents(DocumentLayer::Overlay);
+    Close_Documents(DocumentLayer::Modal);
     if (Context != nullptr) {
         Rml::RemoveContext("vinifera");
         Context = nullptr;
     }
 
     Rml::Shutdown();
+    FileInterface.reset();
     RenderInterface.reset();
     SystemInterface.reset();
     Initialized = false;
@@ -431,7 +559,7 @@ void ViniferaRmlUi::Shutdown()
 
 bool ViniferaRmlUi::Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-    if (!Initialized || Context == nullptr || Document == nullptr) {
+    if (!Initialized || Context == nullptr || !Is_Input_Captured()) {
         return false;
     }
 
@@ -499,7 +627,7 @@ bool ViniferaRmlUi::Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, L
 
 void ViniferaRmlUi::Render()
 {
-    if (!Initialized || Context == nullptr || Document == nullptr || RenderInterface == nullptr) {
+    if (!Initialized || Context == nullptr || !Has_Documents() || RenderInterface == nullptr) {
         return;
     }
 
@@ -520,7 +648,17 @@ bool ViniferaRmlUi::Is_Initialized()
 
 bool ViniferaRmlUi::Is_Dialog_Open()
 {
-    return Initialized && Document != nullptr;
+    return Initialized && Has_Documents();
+}
+
+bool ViniferaRmlUi::Has_Modal()
+{
+    return Initialized && Has_Documents(DocumentLayer::Modal);
+}
+
+bool ViniferaRmlUi::Is_Input_Captured()
+{
+    return Has_Modal();
 }
 
 Rml::Context* ViniferaRmlUi::Get_Context()
@@ -534,23 +672,72 @@ Rml::ElementDocument* ViniferaRmlUi::Load_Document(const char* rml)
         return nullptr;
     }
 
-    Close_Document();
+    Close_Documents(DocumentLayer::Modal);
     Document = Context->LoadDocumentFromMemory(rml);
     if (Document != nullptr) {
+        Documents.push_back({ Document, DocumentLayer::Modal });
         Document->Show(Rml::ModalFlag::Modal, Rml::FocusFlag::Auto);
     }
 
     return Document;
 }
 
-void ViniferaRmlUi::Close_Document()
+Rml::ElementDocument* ViniferaRmlUi::Open_Document(const char* path, DocumentLayer layer)
 {
-    if (Document != nullptr) {
-        Document->Close();
-        Document = nullptr;
+    if (!Initialized || Context == nullptr || path == nullptr) {
+        return nullptr;
     }
+
+    if (layer == DocumentLayer::Modal) {
+        Close_Documents(DocumentLayer::Modal);
+    }
+
+    Rml::ElementDocument* document = Context->LoadDocument(path);
+    if (document == nullptr) {
+        DEBUG_WARNING("RmlUi could not load document '%s'.\n", path);
+        return nullptr;
+    }
+
+    Documents.push_back({ document, layer });
+    if (layer == DocumentLayer::Modal) {
+        Document = document;
+        document->Show(Rml::ModalFlag::Modal, Rml::FocusFlag::Auto);
+    } else {
+        document->Show(Rml::ModalFlag::None, Rml::FocusFlag::None);
+    }
+
+    return document;
+}
+
+void ViniferaRmlUi::Close_Document(Rml::ElementDocument* document)
+{
+    if (document == nullptr) {
+        return;
+    }
+
+    Remove_Document_Record(document);
+    document->Close();
 
     if (Context != nullptr) {
         Context->Update();
     }
+}
+
+void ViniferaRmlUi::Close_Documents(DocumentLayer layer)
+{
+    std::vector<Rml::ElementDocument*> closing;
+    for (const DocumentRecord& record : Documents) {
+        if (record.Layer == layer && record.Document != nullptr) {
+            closing.push_back(record.Document);
+        }
+    }
+
+    for (Rml::ElementDocument* document : closing) {
+        Close_Document(document);
+    }
+}
+
+void ViniferaRmlUi::Close_Document()
+{
+    Close_Documents(DocumentLayer::Modal);
 }

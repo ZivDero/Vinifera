@@ -1,0 +1,27 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d336x208">
+    <div class="title" style="left:44px;top:24px;width:584px;height:22px;">Customize Keyboard</div>
+    <div class="label" style="left:44px;top:54px;width:292px;height:18px;">Category:</div>
+    <select id="category_list" style="left:44px;top:84px;width:276px;height:28px;"></select>
+    <div class="label" style="left:336px;top:54px;width:292px;height:18px;">Commands:</div>
+    <select id="command_list" size="11" style="left:336px;top:82px;width:292px;height:208px;"></select>
+    <div class="box" style="left:44px;top:114px;width:276px;height:114px;"><div class="legend">Description:</div></div>
+    <div id="description" class="label" style="left:58px;top:136px;width:254px;height:84px;"></div>
+    <div class="label" style="left:44px;top:238px;width:256px;height:18px;">Press new shortcut key:</div>
+    <div id="new_shortcut" class="label center shortcut" style="left:44px;top:262px;width:170px;height:28px;">Press a key</div>
+    <button id="assign" style="left:220px;top:264px;width:100px;height:28px;">Assign</button>
+    <div class="label" style="left:44px;top:302px;width:292px;height:22px;">Currently assigned to:</div>
+    <div class="label" style="left:336px;top:302px;width:292px;height:22px;">Current shortcut:</div>
+    <div id="assigned_to" class="label center" style="left:44px;top:332px;width:292px;height:20px;"></div>
+    <div id="current_shortcut" class="label center" style="left:336px;top:332px;width:292px;height:20px;"></div>
+    <button id="reset" style="left:44px;top:362px;width:108px;height:28px;">Reset All</button>
+    <button id="ok" style="left:374px;top:362px;width:100px;height:28px;">OK</button>
+    <button id="cancel" style="left:528px;top:362px;width:100px;height:28px;">Cancel</button>
+</div>
+</body>
+</rml>

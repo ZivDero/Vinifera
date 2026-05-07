@@ -21,6 +21,12 @@ namespace Rml
 
 namespace ViniferaRmlUi
 {
+    enum class DocumentLayer {
+        Hud,
+        Overlay,
+        Modal,
+    };
+
     bool Initialize(HWND hwnd, SDL_Renderer* renderer);
     void Shutdown();
 
@@ -29,8 +35,13 @@ namespace ViniferaRmlUi
 
     bool Is_Initialized();
     bool Is_Dialog_Open();
+    bool Has_Modal();
+    bool Is_Input_Captured();
 
     Rml::Context* Get_Context();
+    Rml::ElementDocument* Open_Document(const char* path, DocumentLayer layer);
     Rml::ElementDocument* Load_Document(const char* rml);
+    void Close_Document(Rml::ElementDocument* document);
+    void Close_Documents(DocumentLayer layer);
     void Close_Document();
 }

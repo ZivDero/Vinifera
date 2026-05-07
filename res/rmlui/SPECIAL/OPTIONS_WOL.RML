@@ -1,0 +1,20 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d340x168">
+    <button id="settings" style="left:240px;top:24px;width:198px;height:28px;">Game Controls</button>
+    <button id="abort" style="left:240px;top:60px;width:198px;height:28px;">Abort Mission</button>
+    <button id="resume" style="left:240px;top:96px;width:198px;height:28px;">Resume Mission</button>
+    <div class="box" style="left:56px;top:150px;width:566px;height:136px;"><div class="legend">Internet Game Controls</div></div>
+    <div class="label" style="left:78px;top:186px;width:116px;height:26px;">Connection</div>
+    <input type="range" id="latency" min="0" max="3" value="0" style="left:190px;top:186px;width:296px;height:26px;"/>
+    <div id="latency_label" class="label right" style="left:494px;top:186px;width:90px;height:26px;"></div>
+    <div class="label" style="left:78px;top:230px;width:116px;height:26px;">Game Speed</div>
+    <input type="range" id="game_speed" min="0" max="6" value="0" style="left:190px;top:230px;width:296px;height:26px;"/>
+    <div id="game_speed_label" class="label right" style="left:494px;top:230px;width:90px;height:26px;"></div>
+</div>
+</body>
+</rml>

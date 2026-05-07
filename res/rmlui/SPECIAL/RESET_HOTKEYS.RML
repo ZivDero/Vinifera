@@ -1,0 +1,13 @@
+<rml>
+<head>
+    <link type="text/rcss" href="/RMLUI/COMMON.RCSS"/>
+</head>
+<body>
+<div id="shade"></div>
+<div class="dialog d256x63">
+    <div class="label center" style="left:44px;top:24px;width:424px;height:38px;">Reset all keyboard shortcuts?</div>
+    <button id="ok" style="left:116px;top:74px;width:120px;height:28px;">Yes</button>
+    <button id="cancel" style="left:276px;top:74px;width:120px;height:28px;">No</button>
+</div>
+</body>
+</rml>

@@ -1,0 +1,112 @@
+body {
+    margin: 0;
+    font-family: ViniferaUi;
+    font-size: 13px;
+    color: #ecf2f4;
+}
+
+#shade {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.42);
+}
+
+.dialog {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background-color: #1f2b32;
+    border: 2px #80919a;
+}
+
+.d209x140 { width: 418px; height: 280px; margin-left: -209px; margin-top: -140px; }
+.d340x168 { width: 680px; height: 336px; margin-left: -340px; margin-top: -168px; }
+.d209x75 { width: 418px; height: 150px; margin-left: -209px; margin-top: -75px; }
+.d294x126 { width: 588px; height: 252px; margin-left: -294px; margin-top: -126px; }
+.d292x163 { width: 584px; height: 326px; margin-left: -292px; margin-top: -163px; }
+.d292x157 { width: 584px; height: 314px; margin-left: -292px; margin-top: -157px; }
+.d294x215 { width: 588px; height: 430px; margin-left: -294px; margin-top: -215px; }
+.d294x112 { width: 588px; height: 224px; margin-left: -294px; margin-top: -112px; }
+.d336x208 { width: 672px; height: 416px; margin-left: -336px; margin-top: -208px; }
+.d256x63 { width: 512px; height: 126px; margin-left: -256px; margin-top: -63px; }
+
+button {
+    position: absolute;
+    padding: 0;
+    line-height: 28px;
+    text-align: center;
+    vertical-align: middle;
+    background-color: #d6dde0;
+    border: 1px #111;
+    color: #101820;
+    font-size: 13px;
+}
+
+button:hover { background-color: #eef5f7; }
+button:disabled { background-color: #586166; color: #9aa2a7; }
+
+.label {
+    position: absolute;
+    color: #ecf2f4;
+    line-height: 20px;
+}
+
+.title {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    color: #ffffff;
+    line-height: 22px;
+}
+
+.right { text-align: right; }
+.center { text-align: center; }
+
+.box {
+    position: absolute;
+    border: 1px #8ca0aa;
+    color: #ecf2f4;
+}
+
+.legend {
+    position: absolute;
+    left: 16px;
+    top: -16px;
+    background-color: #1f2b32;
+    color: #ecf2f4;
+}
+
+input,
+select {
+    position: absolute;
+    padding: 0;
+    background-color: #eef5f7;
+    color: #101820;
+    border: 1px #101820;
+    font-size: 13px;
+}
+
+input[type=range] {
+    height: 26px;
+}
+
+input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+}
+
+.checklabel {
+    position: absolute;
+    color: #ecf2f4;
+    line-height: 20px;
+}
+
+.shortcut {
+    background-color: #eef5f7;
+    color: #101820;
+    border: 1px #101820;
+    line-height: 28px;
+}
