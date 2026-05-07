@@ -674,17 +674,15 @@ namespace
             char buffer[160];
             std::snprintf(buffer, sizeof(buffer), "%02d - %s [%d:%02d]", row + 1, AudioTheme.Full_Name(theme), length / 60, length % 60);
 
-            markup += "<button id=\"theme_";
+            markup += "<div id=\"theme_";
             markup += std::to_string(static_cast<int>(theme));
             markup += "\" class=\"listitem";
             if (theme == SelectedTheme) {
                 markup += " selected";
             }
-            markup += "\" style=\"left:0px;top:";
-            markup += std::to_string(row * 20);
-            markup += "px;width:348px;height:20px;\">";
+            markup += "\">";
             markup += Escape_Rml(buffer);
-            markup += "</button>";
+            markup += "</div>";
         }
 
         list->SetInnerRML(markup);
@@ -775,17 +773,15 @@ namespace
         std::string markup;
         for (int row = 0; row < static_cast<int>(commands.size()); ++row) {
             CommandClass* command = commands[row];
-            markup += "<button id=\"cmd_";
+            markup += "<div id=\"cmd_";
             markup += std::to_string(row);
             markup += "\" class=\"listitem";
             if (stricmp(command->Get_Name(), SelectedHotkeyCommandName.c_str()) == 0) {
                 markup += " selected";
             }
-            markup += "\" style=\"left:0px;top:";
-            markup += std::to_string(row * 20);
-            markup += "px;width:290px;height:20px;\">";
+            markup += "\">";
             markup += Escape_Rml(command->Get_UI_Name());
-            markup += "</button>";
+            markup += "</div>";
         }
 
         list->SetInnerRML(markup);

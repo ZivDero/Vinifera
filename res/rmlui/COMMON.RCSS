@@ -175,13 +175,41 @@ option {
     overflow-y: auto;
 }
 
+scrollbarvertical {
+    width: 12px;
+    margin-left: 0px;
+}
+
+scrollbarvertical slidertrack {
+    background-color: #c8d2d6;
+}
+
+scrollbarvertical sliderbar {
+    background-color: #80919a;
+    border: 1px #101820;
+    margin-left: 0px;
+    width: 12px;
+    min-height: 16px;
+}
+
+scrollbarvertical sliderarrowdec,
+scrollbarvertical sliderarrowinc {
+    width: 0px;
+    height: 0px;
+}
+
 .listitem {
+    position: relative;
+    display: block;
+    width: auto;
+    height: 20px;
     text-align: left;
     padding-left: 4px;
     line-height: 20px;
     background-color: #eef5f7;
     border: 0px;
     color: #101820;
+    white-space: nowrap;
 }
 
 .listitem:hover {
