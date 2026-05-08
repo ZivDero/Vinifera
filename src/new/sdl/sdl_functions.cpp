@@ -18,7 +18,8 @@
 #include "cdctrl.h"
 #include "command.h"
 #include "convert.h"
-#include "d3d11_renderer.h"
+#include "graphics_device.h"
+#include "shp_viewer.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -30,7 +31,6 @@
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
 #include "vinifera_imgui.h"
-#include "vinifera_rmlui.h"
 #include "vinifera_util.h"
 #include "windialog.h"
 #include "wsproto.h"
@@ -214,21 +214,21 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     /**
      *  Create the D3D11 renderer (device, swap chain, present-quad pipeline).
      */
-    if (D3DRenderer == nullptr) {
-        D3DRenderer = new D3D11Renderer();
+    if (Vinifera::Gfx::Device == nullptr) {
+        Vinifera::Gfx::Device = new Vinifera::Gfx::GraphicsDevice();
     }
-    if (!D3DRenderer->Initialize(MainWindow, SDLWindowWidth, SDLWindowHeight, OptionsExtension->IsVSync)) {
-        DEBUG_ERROR("D3D11Renderer could not be initialized.\n");
-        delete D3DRenderer;
-        D3DRenderer = nullptr;
+    if (!Vinifera::Gfx::Device->Initialize(MainWindow, SDLWindowWidth, SDLWindowHeight, OptionsExtension->IsVSync)) {
+        DEBUG_ERROR("GraphicsDevice could not be initialized.\n");
+        delete Vinifera::Gfx::Device;
+        Vinifera::Gfx::Device = nullptr;
         return false;
     }
 
     /**
      *  Allocate the streaming texture used to upload the game surface each frame.
      */
-    if (!D3DRenderer->Set_Surface_Format(width, height)) {
-        DEBUG_ERROR("D3D11Renderer surface texture creation failed.\n");
+    if (!Vinifera::Gfx::Device->Set_Surface_Format(width, height)) {
+        DEBUG_ERROR("GraphicsDevice surface texture creation failed.\n");
         return false;
     }
 
@@ -239,12 +239,15 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     VideoHeight = height;
     VideoBitsPerPixel = bits_per_pixel;
 
-    if (!ViniferaImGui::Initialize(MainWindow, D3DRenderer->Get_Device(), D3DRenderer->Get_Context())) {
+    if (!ViniferaImGui::Initialize(MainWindow, Vinifera::Gfx::Device->Get_Device(), Vinifera::Gfx::Device->Get_Context())) {
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
     }
 
-    if (!ViniferaRmlUi::Initialize(MainWindow, D3DRenderer)) {
-        DEBUG_ERROR("Vinifera RmlUi could not be initialized.\n");
+    if (Vinifera::Gfx::g_ShpViewer == nullptr) {
+        Vinifera::Gfx::g_ShpViewer = new Vinifera::Gfx::ShpViewer();
+    }
+    if (!Vinifera::Gfx::g_ShpViewer->Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera SHP Viewer could not be initialized.\n");
     }
 
     return true;
@@ -258,15 +261,18 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
  */
 void SDL_Reset_Video_Mode()
 {
-    ViniferaRmlUi::Shutdown();
+    if (Vinifera::Gfx::g_ShpViewer != nullptr) {
+        delete Vinifera::Gfx::g_ShpViewer;
+        Vinifera::Gfx::g_ShpViewer = nullptr;
+    }
     ViniferaImGui::Shutdown();
 
     /**
      *  Tear down the D3D11 renderer (device, swap chain, surface texture).
      */
-    if (D3DRenderer != nullptr) {
-        delete D3DRenderer;
-        D3DRenderer = nullptr;
+    if (Vinifera::Gfx::Device != nullptr) {
+        delete Vinifera::Gfx::Device;
+        Vinifera::Gfx::Device = nullptr;
     }
 
     /**
@@ -293,10 +299,6 @@ LRESULT CALLBACK SDL_Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, L
     const LPARAM original_lParam = lParam;
 
     if (ViniferaImGui::Process_Window_Message(hwnd, message, wParam, original_lParam)) {
-        return 0;
-    }
-
-    if (ViniferaRmlUi::Process_Window_Message(hwnd, message, wParam, original_lParam)) {
         return 0;
     }
 
@@ -445,8 +447,8 @@ LRESULT CALLBACK SDL_Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, L
         const int new_w = LOWORD(lParam);
         const int new_h = HIWORD(lParam);
         if (new_w > 0 && new_h > 0) {
-            if (D3DRenderer != nullptr) {
-                D3DRenderer->Resize_Backbuffer(new_w, new_h);
+            if (Vinifera::Gfx::Device != nullptr) {
+                Vinifera::Gfx::Device->Resize_Backbuffer(new_w, new_h);
             }
             SDLWindowWidth = new_w;
             SDLWindowHeight = new_h;
@@ -632,19 +634,19 @@ void SDL_Destroy_Main_Window()
  */
 bool SDL_Update_Screen(Surface* surface)
 {
-    if (D3DRenderer == nullptr) {
+    if (Vinifera::Gfx::Device == nullptr) {
         return false;
     }
 
-    D3DRenderer->Set_VSync(OptionsExtension->IsVSync);
-    D3DRenderer->Begin_Frame();
+    Vinifera::Gfx::Device->Set_VSync(OptionsExtension->IsVSync);
+    Vinifera::Gfx::Device->Begin_Frame();
 
     /**
      *  Blit game's surface to the back buffer via the present quad.
      */
     if (surface) {
         if (void* pixels = surface->Lock()) {
-            D3DRenderer->Upload_Surface(pixels, surface->Stride());
+            Vinifera::Gfx::Device->Upload_Surface(pixels, surface->Stride());
             surface->Unlock();
         }
 
@@ -659,9 +661,9 @@ bool SDL_Update_Screen(Surface* surface)
         if (!SDL_Should_Scale()) {
             dst = surface->Get_Rect();
         } else {
-            dst = Rect(0, 0, D3DRenderer->Get_Backbuffer_Width(), D3DRenderer->Get_Backbuffer_Height());
+            dst = Rect(0, 0, Vinifera::Gfx::Device->Get_Backbuffer_Width(), Vinifera::Gfx::Device->Get_Backbuffer_Height());
         }
-        D3DRenderer->Draw_Surface(dst, scale_mode);
+        Vinifera::Gfx::Device->Draw_Surface(dst, scale_mode);
 
         /**
          *  If the scale has changed, recalculate the mouse cursor image.
@@ -676,10 +678,12 @@ bool SDL_Update_Screen(Surface* surface)
      *  Draw overlays, then present.
      */
     ViniferaImGui::Render();
-    D3DRenderer->Bind_Backbuffer();
-    ViniferaRmlUi::Render();
 
-    D3DRenderer->End_Frame();
+    if (Vinifera::Gfx::g_ShpViewer != nullptr) {
+        Vinifera::Gfx::g_ShpViewer->Render(*Vinifera::Gfx::Device);
+    }
+
+    Vinifera::Gfx::Device->End_Frame();
 
     return true;
 }
@@ -694,7 +698,7 @@ bool SDL_Update_Screen(Surface* surface)
  */
 bool SDL_Should_Scale()
 {
-    return WSDialogCount == 0 && (SpecialDialog == SDLG_NONE || ViniferaRmlUi::Is_Dialog_Open());
+    return WSDialogCount == 0 && SpecialDialog == SDLG_NONE;
 }
 
 

@@ -308,40 +308,6 @@ set(MINIAUDIO_FORCE_CXX ON)
 add_subdirectory(${CMAKE_SOURCE_DIR}/miniaudio)
 target_compile_options(miniaudio PRIVATE /Gr)
 
-set(BUILD_SHARED_LIBS OFF)
-set(FT_DISABLE_ZLIB ON)
-set(FT_DISABLE_BZIP2 ON)
-set(FT_DISABLE_PNG ON)
-set(FT_DISABLE_HARFBUZZ ON)
-set(FT_DISABLE_BROTLI ON)
-set(FT_DISABLE_HVF ON)
-set(SKIP_INSTALL_ALL ON)
-add_subdirectory(${CMAKE_SOURCE_DIR}/freetype EXCLUDE_FROM_ALL)
-if(NOT TARGET Freetype::Freetype)
-    add_library(Freetype::Freetype ALIAS freetype)
-endif()
-target_compile_options(freetype PRIVATE
-    $<$<COMPILE_LANGUAGE:C>:/Gr>
-)
-
-set(RMLUI_SAMPLES OFF)
-set(RMLUI_LUA_BINDINGS OFF)
-set(RMLUI_LOTTIE_PLUGIN OFF)
-set(RMLUI_SVG_PLUGIN OFF)
-set(RMLUI_HARFBUZZ_SAMPLE OFF)
-set(RMLUI_FONT_ENGINE "freetype")
-set(RMLUI_PRECOMPILED_HEADERS OFF)
-add_subdirectory(${CMAKE_SOURCE_DIR}/RmlUi EXCLUDE_FROM_ALL)
-
-target_compile_options(rmlui_core PRIVATE
-    $<$<COMPILE_LANGUAGE:CXX>:/Gr>
-)
-
-target_compile_options(rmlui_debugger PRIVATE
-    $<$<COMPILE_LANGUAGE:CXX>:/Gr>
-)
-
-
 ################################################################################
 # Embed some git version information in the binary.
 ################################################################################
@@ -478,13 +444,6 @@ PostBuild_WindowsCopyFiles(${PROJECT_NAME}
 	"${TARGET_EDB}"
 )
 
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory
-		"${CMAKE_SOURCE_DIR}/res/rmlui"
-		"${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/RMLUI"
-	COMMENT "Copying RmlUi runtime assets"
-)
-
 # Create post build script to copy the DLL to the custom debugger directory.
 if(NOT ${OPTION_CUSTOM_DEBUGGER_DIRECTORY_PATH} STREQUAL " ")
 
@@ -524,12 +483,6 @@ if(NOT ${OPTION_CUSTOM_DEBUGGER_DIRECTORY_PATH} STREQUAL " ")
 		"${TARGET_EDB}"
 	)
 
-	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_directory
-			"${CMAKE_SOURCE_DIR}/res/rmlui"
-			"${OPTION_CUSTOM_DEBUGGER_DIRECTORY_PATH}/RMLUI"
-		COMMENT "Copying RmlUi runtime assets to debugger directory"
-	)
 endif()
 
 
@@ -665,8 +618,6 @@ add_dependencies(${PROJECT_NAME} TSpp)
 
 target_link_libraries(${PROJECT_NAME} SDL3::SDL3)
 target_link_libraries(${PROJECT_NAME} miniaudio)
-target_link_libraries(${PROJECT_NAME} RmlUi::RmlUi)
-target_link_libraries(${PROJECT_NAME} Freetype::Freetype)
 
 set(REQUIRED_LIBRARIES ws2_32 dbghelp shlwapi version comctl32 d3d11 dxgi d3dcompiler)
 

@@ -1,0 +1,406 @@
+/*******************************************************************************
+/*                 O P E N  S O U R C E  --  V I N I F E R A                  **
+/*******************************************************************************
+ *  @brief  D3D11 device + DXGI swap chain + present-quad pipeline.
+ *
+ *  SPDX-License-Identifier: GPL-3.0-or-later
+ *  Copyright (c) 2020-2026 Vinifera contributors
+ ******************************************************************************/
+
+#include "always.h"
+
+#include "graphics_device.h"
+
+#include "debughandler.h"
+#include "gfx_utils.h"
+#include "render_target_2d.h"
+
+#include <dxgi1_5.h>
+
+
+namespace Vinifera::Gfx
+{
+    GraphicsDevice* Device = nullptr;
+
+
+    namespace
+    {
+        const char PresentShaderHLSL[] =
+            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };\n"
+            "VSOut VSMain(uint id : SV_VertexID) {\n"
+            "    VSOut o;\n"
+            "    float2 uv = float2((id << 1) & 2, id & 2);\n"
+            "    o.pos = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);\n"
+            "    o.uv = uv;\n"
+            "    return o;\n"
+            "}\n"
+            "Texture2D Tex : register(t0);\n"
+            "SamplerState Smp : register(s0);\n"
+            "float4 PSMain(VSOut v) : SV_Target { return Tex.Sample(Smp, v.uv); }\n";
+    }
+
+
+    GraphicsDevice::~GraphicsDevice()
+    {
+        Shutdown();
+    }
+
+
+    bool GraphicsDevice::Initialize(HWND hwnd, int backbuffer_width, int backbuffer_height, bool vsync)
+    {
+        if (Device != nullptr) {
+            return true;
+        }
+
+        WindowHandle = hwnd;
+        VSync = vsync;
+        BackbufferWidth = backbuffer_width;
+        BackbufferHeight = backbuffer_height;
+
+        if (!Create_Device()) {
+            Shutdown();
+            return false;
+        }
+        if (!Create_Swap_Chain(hwnd, backbuffer_width, backbuffer_height)) {
+            Shutdown();
+            return false;
+        }
+        if (!Create_Backbuffer_RTV()) {
+            Shutdown();
+            return false;
+        }
+
+        StateCacheInstance.Initialize(Device);
+
+        if (!Create_Present_Pipeline()) {
+            Shutdown();
+            return false;
+        }
+
+        DEBUG_INFO("Gfx::GraphicsDevice initialized (%dx%d, vsync=%d).\n",
+            backbuffer_width, backbuffer_height, VSync ? 1 : 0);
+        return true;
+    }
+
+
+    void GraphicsDevice::Shutdown()
+    {
+        Release_Surface_Texture();
+        Release_Present_Pipeline();
+        StateCacheInstance.Shutdown();
+        Release_Backbuffer_RTV();
+        Safe_Release(SwapChain);
+        Safe_Release(DxgiFactory);
+        if (Context != nullptr) {
+            Context->ClearState();
+            Context->Flush();
+        }
+        Safe_Release(Context);
+        Safe_Release(Device);
+        BackbufferWidth = 0;
+        BackbufferHeight = 0;
+        SurfaceWidth = 0;
+        SurfaceHeight = 0;
+        WindowHandle = nullptr;
+    }
+
+
+    bool GraphicsDevice::Create_Device()
+    {
+        UINT flags = 0;
+#ifndef NDEBUG
+        flags |= D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#endif
+
+        const D3D_FEATURE_LEVEL feature_levels[] = {
+            D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
+            D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
+        };
+
+        D3D_FEATURE_LEVEL obtained_level = D3D_FEATURE_LEVEL_11_0;
+        HRESULT hr = D3D11CreateDevice(
+            nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
+            feature_levels, _countof(feature_levels), D3D11_SDK_VERSION,
+            &Device, &obtained_level, &Context);
+
+        if (FAILED(hr)) {
+            DEBUG_ERROR("D3D11CreateDevice failed (HRESULT 0x%08X).\n", hr);
+            return false;
+        }
+
+        DEBUG_INFO("D3D11 feature level: 0x%X\n", obtained_level);
+
+        IDXGIDevice* dxgi_device = nullptr;
+        if (FAILED(Device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgi_device)))) {
+            return false;
+        }
+        IDXGIAdapter* adapter = nullptr;
+        hr = dxgi_device->GetAdapter(&adapter);
+        dxgi_device->Release();
+        if (FAILED(hr)) {
+            return false;
+        }
+        hr = adapter->GetParent(__uuidof(IDXGIFactory2), reinterpret_cast<void**>(&DxgiFactory));
+        adapter->Release();
+        if (FAILED(hr) || DxgiFactory == nullptr) {
+            return false;
+        }
+
+        IDXGIFactory5* factory5 = nullptr;
+        if (SUCCEEDED(DxgiFactory->QueryInterface(__uuidof(IDXGIFactory5), reinterpret_cast<void**>(&factory5)))) {
+            BOOL allow_tearing = FALSE;
+            if (SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow_tearing, sizeof(allow_tearing)))) {
+                TearingSupported = (allow_tearing == TRUE);
+            }
+            factory5->Release();
+        }
+
+        return true;
+    }
+
+
+    bool GraphicsDevice::Create_Swap_Chain(HWND hwnd, int width, int height)
+    {
+        DXGI_SWAP_CHAIN_DESC1 desc = {};
+        desc.Width = width;
+        desc.Height = height;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        desc.BufferCount = 2;
+        desc.Scaling = DXGI_SCALING_STRETCH;
+        desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+        desc.Flags = TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+
+        if (FAILED(DxgiFactory->CreateSwapChainForHwnd(Device, hwnd, &desc, nullptr, nullptr, &SwapChain))) {
+            DEBUG_ERROR("CreateSwapChainForHwnd failed.\n");
+            return false;
+        }
+        DxgiFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_PRINT_SCREEN);
+        return true;
+    }
+
+
+    bool GraphicsDevice::Create_Backbuffer_RTV()
+    {
+        ID3D11Texture2D* back_buffer = nullptr;
+        if (FAILED(SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&back_buffer)))) {
+            return false;
+        }
+        HRESULT hr = Device->CreateRenderTargetView(back_buffer, nullptr, &BackbufferRTV);
+        back_buffer->Release();
+        return SUCCEEDED(hr);
+    }
+
+
+    void GraphicsDevice::Release_Backbuffer_RTV()
+    {
+        Safe_Release(BackbufferRTV);
+    }
+
+
+    bool GraphicsDevice::Create_Present_Pipeline()
+    {
+        ID3DBlob* vs_blob = nullptr;
+        ID3DBlob* ps_blob = nullptr;
+        if (!Compile_HLSL(PresentShaderHLSL, sizeof(PresentShaderHLSL) - 1, "present_quad", "VSMain", "vs_4_0", &vs_blob)) {
+            return false;
+        }
+        if (!Compile_HLSL(PresentShaderHLSL, sizeof(PresentShaderHLSL) - 1, "present_quad", "PSMain", "ps_4_0", &ps_blob)) {
+            vs_blob->Release();
+            return false;
+        }
+        HRESULT hr = Device->CreateVertexShader(vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), nullptr, &PresentVS);
+        vs_blob->Release();
+        if (FAILED(hr)) { ps_blob->Release(); return false; }
+
+        hr = Device->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &PresentPS);
+        ps_blob->Release();
+        return SUCCEEDED(hr);
+    }
+
+
+    void GraphicsDevice::Release_Present_Pipeline()
+    {
+        Safe_Release(PresentPS);
+        Safe_Release(PresentVS);
+    }
+
+
+    void GraphicsDevice::Release_Surface_Texture()
+    {
+        Safe_Release(SurfaceSRV);
+        Safe_Release(SurfaceTex);
+        SurfaceWidth = 0;
+        SurfaceHeight = 0;
+    }
+
+
+    bool GraphicsDevice::Resize_Backbuffer(int width, int height)
+    {
+        if (SwapChain == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+        if (width == BackbufferWidth && height == BackbufferHeight) {
+            return true;
+        }
+
+        Context->OMSetRenderTargets(0, nullptr, nullptr);
+        Release_Backbuffer_RTV();
+
+        UINT flags = TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+        if (FAILED(SwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, flags))) {
+            return false;
+        }
+        BackbufferWidth = width;
+        BackbufferHeight = height;
+        return Create_Backbuffer_RTV();
+    }
+
+
+    bool GraphicsDevice::Set_Surface_Format(int width, int height)
+    {
+        if (Device == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+        if (SurfaceTex != nullptr && SurfaceWidth == width && SurfaceHeight == height) {
+            return true;
+        }
+        Release_Surface_Texture();
+
+        D3D11_TEXTURE2D_DESC td = {};
+        td.Width = width;
+        td.Height = height;
+        td.MipLevels = 1;
+        td.ArraySize = 1;
+        td.Format = DXGI_FORMAT_B5G6R5_UNORM;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_DYNAMIC;
+        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        if (FAILED(Device->CreateTexture2D(&td, nullptr, &SurfaceTex))) {
+            return false;
+        }
+        if (FAILED(Device->CreateShaderResourceView(SurfaceTex, nullptr, &SurfaceSRV))) {
+            Release_Surface_Texture();
+            return false;
+        }
+        SurfaceWidth = width;
+        SurfaceHeight = height;
+        return true;
+    }
+
+
+    bool GraphicsDevice::Upload_Surface(const void* pixels, int pitch_bytes)
+    {
+        if (SurfaceTex == nullptr || pixels == nullptr) {
+            return false;
+        }
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        if (FAILED(Context->Map(SurfaceTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+            return false;
+        }
+        const int row_bytes = SurfaceWidth * 2;
+        const unsigned char* src = static_cast<const unsigned char*>(pixels);
+        unsigned char* dst = static_cast<unsigned char*>(mapped.pData);
+        if (mapped.RowPitch == (UINT)pitch_bytes && pitch_bytes == row_bytes) {
+            memcpy(dst, src, (size_t)pitch_bytes * SurfaceHeight);
+        } else {
+            for (int y = 0; y < SurfaceHeight; ++y) {
+                memcpy(dst + y * mapped.RowPitch, src + y * pitch_bytes, row_bytes);
+            }
+        }
+        Context->Unmap(SurfaceTex, 0);
+        return true;
+    }
+
+
+    void GraphicsDevice::Begin_Frame()
+    {
+        if (BackbufferRTV == nullptr) {
+            return;
+        }
+        const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+        Context->OMSetRenderTargets(1, &BackbufferRTV, nullptr);
+        Context->ClearRenderTargetView(BackbufferRTV, clear_color);
+
+        D3D11_VIEWPORT vp = {};
+        vp.Width  = (float)BackbufferWidth;
+        vp.Height = (float)BackbufferHeight;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        Context->RSSetViewports(1, &vp);
+    }
+
+
+    void GraphicsDevice::Set_Render_Target(RenderTarget2D* target)
+    {
+        if (Context == nullptr) {
+            return;
+        }
+        ID3D11RenderTargetView* rtv = (target != nullptr) ? target->Get_RTV() : BackbufferRTV;
+        Context->OMSetRenderTargets(1, &rtv, nullptr);
+
+        D3D11_VIEWPORT vp = {};
+        if (target != nullptr) {
+            vp.Width  = (float)target->Width();
+            vp.Height = (float)target->Height();
+        } else {
+            vp.Width  = (float)BackbufferWidth;
+            vp.Height = (float)BackbufferHeight;
+        }
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        Context->RSSetViewports(1, &vp);
+    }
+
+
+    void GraphicsDevice::Draw_Surface(const Rect& dst_rect, SDL_ScaleMode scale_mode)
+    {
+        if (SurfaceSRV == nullptr || PresentVS == nullptr) {
+            return;
+        }
+
+        D3D11_VIEWPORT vp = {};
+        vp.TopLeftX = (float)dst_rect.X;
+        vp.TopLeftY = (float)dst_rect.Y;
+        vp.Width    = (float)dst_rect.Width;
+        vp.Height   = (float)dst_rect.Height;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        Context->RSSetViewports(1, &vp);
+
+        Context->IASetInputLayout(nullptr);
+        Context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        Context->VSSetShader(PresentVS, nullptr, 0);
+        Context->PSSetShader(PresentPS, nullptr, 0);
+
+        ID3D11SamplerState* sampler =
+            StateCacheInstance.Get(scale_mode == SDL_SCALEMODE_LINEAR ? ESampler::LinearClamp : ESampler::PointClamp);
+        Context->PSSetSamplers(0, 1, &sampler);
+        Context->PSSetShaderResources(0, 1, &SurfaceSRV);
+
+        const float blend_factor[4] = { 0, 0, 0, 0 };
+        Context->OMSetBlendState(StateCacheInstance.Get(EBlend::Opaque), blend_factor, 0xFFFFFFFF);
+        Context->OMSetDepthStencilState(StateCacheInstance.Get(EDepthStencil::None), 0);
+        Context->RSSetState(StateCacheInstance.Get(ERasterizer::CullNone));
+
+        Context->Draw(3, 0);
+
+        ID3D11ShaderResourceView* null_srv = nullptr;
+        Context->PSSetShaderResources(0, 1, &null_srv);
+    }
+
+
+    void GraphicsDevice::End_Frame()
+    {
+        if (SwapChain == nullptr) {
+            return;
+        }
+        UINT sync_interval = VSync ? 1 : 0;
+        UINT flags = (!VSync && TearingSupported) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+        SwapChain->Present(sync_interval, flags);
+    }
+}

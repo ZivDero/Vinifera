@@ -1,0 +1,87 @@
+/*******************************************************************************
+/*                 O P E N  S O U R C E  --  V I N I F E R A                  **
+/*******************************************************************************
+ *  @brief  Stage 2a palette-LUT sprite Effect.
+ *
+ *          A pixel-shader uber-effect that takes paletted (R8_UINT) atlas
+ *          textures and converts them to RGBA via a 256-entry palette LUT,
+ *          with optional house-color remap and the SHAPE_DARKEN /
+ *          SHAPE_TRANSLUCENT* flags collapsed into shader uniforms.
+ *
+ *          Bind layout:
+ *            t0 — paletted atlas (R8_UINT)
+ *            t1 — palette LUT (RGBA8, 256x1)
+ *            t2 — remap LUT (R8_UINT, 16x1)
+ *            s0 — point-clamp sampler (atlas is loaded, not sampled, but UVs use s0 for the LUTs)
+ *            b0 — SpriteBatch ProjMtx
+ *            b1 — palette-effect parameters (SpriteEffectParams)
+ *
+ *  SPDX-License-Identifier: GPL-3.0-or-later
+ *  Copyright (c) 2020-2026 Vinifera contributors
+ ******************************************************************************/
+
+#pragma once
+
+#include <cstdint>
+#include <d3d11.h>
+
+#include "effect.h"
+
+
+namespace Vinifera::Gfx
+{
+    class GraphicsDevice;
+    class PaletteLUT;
+    class Texture2D;
+
+
+    /**
+     *  Per-draw flags. The shader's PerDrawFlags uniform is the bitwise-OR of
+     *  these. Multiple translucent levels are mutually exclusive — the
+     *  highest-set wins.
+     */
+    enum SpriteEffectFlag : uint32_t
+    {
+        SEF_NONE          = 0,
+        SEF_USE_REMAP     = 1u << 0,
+        SEF_DARKEN        = 1u << 1,
+        SEF_TRANSLUCENT25 = 1u << 2,    // alpha 0.75
+        SEF_TRANSLUCENT50 = 1u << 3,    // alpha 0.50
+        SEF_TRANSLUCENT75 = 1u << 4,    // alpha 0.25
+    };
+
+
+    struct SpriteEffectParams
+    {
+        float    AtlasSize[2];      // pixels — used for int2(uv * AtlasSize) -> Load() coord
+        float    _Pad0[2];
+        uint32_t Flags;
+        uint32_t _Pad1[3];
+    };
+
+
+    class SpriteEffect : public Effect
+    {
+    public:
+        SpriteEffect() = default;
+        ~SpriteEffect() = default;
+
+        bool Initialize(GraphicsDevice& device);
+        void Shutdown();
+
+        /**
+         *  Bind palette + remap to t1 / t2 on both VS and PS slots. Call after
+         *  SpriteBatch::Begin (which sets up t0) but before SpriteBatch::End.
+         */
+        void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);
+
+        /**
+         *  Update per-draw effect parameters in the b1 CB. Call before
+         *  SpriteBatch::End.
+         */
+        void Set_Params(GraphicsDevice& device, const SpriteEffectParams& params);
+
+    private:
+        ID3D11Buffer* ParamsCB = nullptr;
+    };
+}
