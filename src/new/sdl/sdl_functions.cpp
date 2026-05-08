@@ -11,15 +11,14 @@
 
 #include "sdl_functions.h"
 
-#include "SDL3/SDL_hints.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_oldnames.h"
-#include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
 #include "cctooltip.h"
 #include "cdctrl.h"
 #include "command.h"
 #include "convert.h"
+#include "d3d11_renderer.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -42,25 +41,6 @@
 
 namespace
 {
-    /**
-     *  Applies the SDL renderer driver hint for the selected backend.
-     *
-     *  @author: ZivDero
-     */
-    void SDL_Apply_Renderer_Driver_Hint()
-    {
-        const char* requested_driver_name = OptionsClassExtension::Get_Renderer_Driver_SDL_Name(OptionsExtension->RendererDriver);
-        const char* requested_driver_config_name = OptionsClassExtension::Get_Renderer_Driver_Config_Name(OptionsExtension->RendererDriver);
-
-        DEBUG_INFO("Requested renderer driver: %s\n", requested_driver_config_name);
-
-        if (requested_driver_name != nullptr) {
-            SDL_SetHint(SDL_HINT_RENDER_DRIVER, requested_driver_name);
-        } else {
-            SDL_ResetHint(SDL_HINT_RENDER_DRIVER);
-        }
-    }
-
     /**
      *  Computes the tactical display rectangle for the given visible area.
      *
@@ -232,44 +212,25 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     DEBUG_INFO("Pixel format: %s (%d bpp)\n", SDL_GetPixelFormatName(pixel_format), SDL_BITSPERPIXEL(pixel_format));
 
     /**
-     *  Apply the renderer backend selection before creating the renderer.
+     *  Create the D3D11 renderer (device, swap chain, present-quad pipeline).
      */
-    SDL_Apply_Renderer_Driver_Hint();
-
-    /**
-     *  Create the renderer for window.
-     */
-    SDLWindowRenderer = SDL_CreateRenderer(SDLWindow, nullptr);
-    if (SDLWindowRenderer == nullptr) {
-        DEBUG_ERROR("SDLWindowRenderer could not be created! SDL Error: %s\n", SDL_GetError());
+    if (D3DRenderer == nullptr) {
+        D3DRenderer = new D3D11Renderer();
+    }
+    if (!D3DRenderer->Initialize(MainWindow, SDLWindowWidth, SDLWindowHeight, OptionsExtension->IsVSync)) {
+        DEBUG_ERROR("D3D11Renderer could not be initialized.\n");
+        delete D3DRenderer;
+        D3DRenderer = nullptr;
         return false;
     }
-    DEBUG_INFO("SDLWindowRenderer created.\n");
-
-    const char* driver_name = SDL_GetRendererName(SDLWindowRenderer);
-    DEBUG_INFO("Renderer driver: %s\n", driver_name != nullptr ? driver_name : "<unknown>");
 
     /**
-     *  Toggle VSync.
+     *  Allocate the streaming texture used to upload the game surface each frame.
      */
-    SDL_SetRenderVSync(SDLWindowRenderer, OptionsExtension->IsVSync ? 1 : 0);
-
-    /**
-     *  Set the scaling mode if specified.
-     */
-    if (OptionsExtension->ScaleMode != SDL_SCALEMODE_INVALID) {
-        SDL_SetDefaultTextureScaleMode(SDLWindowRenderer, OptionsExtension->ScaleMode);
-    }
-
-    /**
-     *  Create the window texture.
-     */
-    SDLWindowTexture = SDL_CreateTexture(SDLWindowRenderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, width, height);
-    if (SDLWindowTexture == nullptr) {
-        DEBUG_ERROR("SDLWindowTexture could not be created! SDL_Error: %s\n", SDL_GetError());
+    if (!D3DRenderer->Set_Surface_Format(width, height)) {
+        DEBUG_ERROR("D3D11Renderer surface texture creation failed.\n");
         return false;
     }
-    DEBUG_INFO("SDLWindowTexture created.\n");
 
     /**
      *  Save video mode information.
@@ -278,11 +239,11 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     VideoHeight = height;
     VideoBitsPerPixel = bits_per_pixel;
 
-    if (!ViniferaImGui::Initialize(MainWindow, SDLWindowRenderer)) {
+    if (!ViniferaImGui::Initialize(MainWindow, D3DRenderer->Get_Device(), D3DRenderer->Get_Context())) {
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
     }
 
-    if (!ViniferaRmlUi::Initialize(MainWindow, SDLWindowRenderer)) {
+    if (!ViniferaRmlUi::Initialize(MainWindow, D3DRenderer)) {
         DEBUG_ERROR("Vinifera RmlUi could not be initialized.\n");
     }
 
@@ -301,16 +262,12 @@ void SDL_Reset_Video_Mode()
     ViniferaImGui::Shutdown();
 
     /**
-     *  Destroy the renderer.
+     *  Tear down the D3D11 renderer (device, swap chain, surface texture).
      */
-    SDL_DestroyRenderer(SDLWindowRenderer);
-    SDLWindowRenderer = nullptr;
-
-    /**
-     *  Deallocate the texture.
-     */
-    SDL_DestroyTexture(SDLWindowTexture);
-    SDLWindowTexture = nullptr;
+    if (D3DRenderer != nullptr) {
+        delete D3DRenderer;
+        D3DRenderer = nullptr;
+    }
 
     /**
      *  Clear video mode information.
@@ -484,6 +441,19 @@ LRESULT CALLBACK SDL_Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, L
         Map.field_1D0C = false;
         break;
 
+    case WM_SIZE: {
+        const int new_w = LOWORD(lParam);
+        const int new_h = HIWORD(lParam);
+        if (new_w > 0 && new_h > 0) {
+            if (D3DRenderer != nullptr) {
+                D3DRenderer->Resize_Backbuffer(new_w, new_h);
+            }
+            SDLWindowWidth = new_w;
+            SDLWindowHeight = new_h;
+        }
+        break;
+    }
+
     case WM_MOVING:
         On_WM_MOVING(hwnd, wParam, lParam);
         return CallWindowProc(SDL_Proc, hwnd, message, wParam, lParam);
@@ -585,15 +555,6 @@ bool SDL_Create_Main_Window(HINSTANCE instance, int width, int height)
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, Vinifera_Get_Window_Title(dwPid));
 
     /**
-     *  OpenGL and Vulkan renderers need a matching graphics-capable window from the start on Windows.
-     */
-    if (OptionsExtension->RendererDriver == OptionsClassExtension::RENDERER_DRIVER_OPENGL) {
-        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
-    } else if (OptionsExtension->RendererDriver == OptionsClassExtension::RENDERER_DRIVER_VULKAN) {
-        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
-    }
-
-    /**
      *  Create the window.
      */
     SDLWindow = SDL_CreateWindowWithProperties(props);
@@ -671,41 +632,36 @@ void SDL_Destroy_Main_Window()
  */
 bool SDL_Update_Screen(Surface* surface)
 {
-    SDL_RenderClear(SDLWindowRenderer);
+    if (D3DRenderer == nullptr) {
+        return false;
+    }
+
+    D3DRenderer->Set_VSync(OptionsExtension->IsVSync);
+    D3DRenderer->Begin_Frame();
 
     /**
-     *  Blit game's surface to SDL's window surface.
+     *  Blit game's surface to the back buffer via the present quad.
      */
     if (surface) {
-
-        /**
-         *  First, update the texture with the pixels from the game's surface.
-         */
         if (void* pixels = surface->Lock()) {
-#if 0
-            void* tex_pixels;
-            int tex_pitch;
-            SDL_LockTexture(SDLWindowTexture, nullptr, &tex_pixels, &tex_pitch);
-            memcpy(tex_pixels, pixels, surface->Get_Height() * surface->Stride());
-            SDL_UnlockTexture(SDLWindowTexture);
-#else
-            SDL_UpdateTexture(SDLWindowTexture, nullptr, pixels, surface->Stride());
-#endif
+            D3DRenderer->Upload_Surface(pixels, surface->Stride());
             surface->Unlock();
         }
 
         static bool scaled = SDL_Should_Scale();
 
-        /**
-         *  Then, copy the texture to the renderer.
-         */
-        if (!SDL_Should_Scale()) {
-            Rect src_rect = surface->Get_Rect();
-            SDL_FRect dst_rect = {static_cast<float>(src_rect.X), static_cast<float>(src_rect.Y), static_cast<float>(src_rect.Width), static_cast<float>(src_rect.Height)};
-            SDL_RenderTexture(SDLWindowRenderer, SDLWindowTexture, nullptr, &dst_rect);
-        } else {
-            SDL_RenderTexture(SDLWindowRenderer, SDLWindowTexture, nullptr, nullptr);
+        SDL_ScaleMode scale_mode = OptionsExtension->ScaleMode;
+        if (scale_mode == SDL_SCALEMODE_INVALID) {
+            scale_mode = SDL_SCALEMODE_NEAREST;
         }
+
+        Rect dst;
+        if (!SDL_Should_Scale()) {
+            dst = surface->Get_Rect();
+        } else {
+            dst = Rect(0, 0, D3DRenderer->Get_Backbuffer_Width(), D3DRenderer->Get_Backbuffer_Height());
+        }
+        D3DRenderer->Draw_Surface(dst, scale_mode);
 
         /**
          *  If the scale has changed, recalculate the mouse cursor image.
@@ -717,12 +673,13 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     /**
-     *  Present the image to the window.
+     *  Draw overlays, then present.
      */
     ViniferaImGui::Render();
+    D3DRenderer->Bind_Backbuffer();
     ViniferaRmlUi::Render();
 
-    SDL_RenderPresent(SDLWindowRenderer);
+    D3DRenderer->End_Frame();
 
     return true;
 }

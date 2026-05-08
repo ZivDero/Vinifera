@@ -277,20 +277,23 @@ set(SDL_DUMMYVIDEO OFF)
 set(SDL_OFFSCREEN OFF)
 set(SDL_OPENGLES OFF)
 
-set(SDL_RENDER_GPU OFF)
 set(SDL_XINPUT OFF)
 set(SDL_VIRTUAL_JOYSTICK OFF)
 set(SDL_HIDAPI_JOYSTICK OFF)
 
 set(SDL_VIDEO ON)
-set(SDL_RENDER ON)
-set(SDL_DIRECTX ON)
-set(SDL_RENDER_D3D ON)
-set(SDL_RENDER_D3D11 ON)
-set(SDL_RENDER_D3D12 ON)
-set(SDL_OPENGL ON)
-set(SDL_VULKAN ON)
-set(SDL_RENDER_VULKAN ON)
+
+# Vinifera renders natively via Direct3D 11. SDL is kept only for window
+# creation, input, and timing — no SDL_Renderer or graphics-API backends.
+set(SDL_RENDER OFF)
+set(SDL_RENDER_GPU OFF)
+set(SDL_DIRECTX OFF)
+set(SDL_RENDER_D3D OFF)
+set(SDL_RENDER_D3D11 OFF)
+set(SDL_RENDER_D3D12 OFF)
+set(SDL_OPENGL OFF)
+set(SDL_VULKAN OFF)
+set(SDL_RENDER_VULKAN OFF)
 
 set(SDL_AVX512F OFF)
 add_subdirectory(${CMAKE_SOURCE_DIR}/SDL)
@@ -665,7 +668,7 @@ target_link_libraries(${PROJECT_NAME} miniaudio)
 target_link_libraries(${PROJECT_NAME} RmlUi::RmlUi)
 target_link_libraries(${PROJECT_NAME} Freetype::Freetype)
 
-set(REQUIRED_LIBRARIES ws2_32 dbghelp shlwapi version comctl32)
+set(REQUIRED_LIBRARIES ws2_32 dbghelp shlwapi version comctl32 d3d11 dxgi d3dcompiler)
 
 # Link to any required libraries.
 target_link_libraries(${PROJECT_NAME} ${REQUIRED_LIBRARIES})

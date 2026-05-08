@@ -27,8 +27,6 @@ class RocketTypeClass;
 class MouseTypeClass;
 class ActionTypeClass;
 struct SDL_Window;
-struct SDL_Renderer;
-struct SDL_Texture;
 
 
 extern bool Vinifera_DeveloperMode;
@@ -78,8 +76,6 @@ extern bool Vinifera_Developer_IsToReloadRules;
  *  SDL globals.
  */
 extern SDL_Window* SDLWindow;
-extern SDL_Renderer* SDLWindowRenderer;
-extern SDL_Texture* SDLWindowTexture;
 extern int SDLWindowWidth;
 extern int SDLWindowHeight;
 

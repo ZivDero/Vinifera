@@ -16,7 +16,7 @@
 #include "vinifera_globals.h"
 
 #include <imgui.h>
-#include <imgui_impl_sdlrenderer3.h>
+#include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
 #ifndef WM_MOUSEHWHEEL
@@ -98,13 +98,13 @@ namespace
  *
  *  @author: ZivDero
  */
-bool ViniferaImGui::Initialize(HWND hwnd, SDL_Renderer* renderer)
+bool ViniferaImGui::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext* context)
 {
     if (IsInitialized) {
         return true;
     }
 
-    if (hwnd == nullptr || renderer == nullptr) {
+    if (hwnd == nullptr || device == nullptr || context == nullptr) {
         return false;
     }
 
@@ -124,7 +124,7 @@ bool ViniferaImGui::Initialize(HWND hwnd, SDL_Renderer* renderer)
         return false;
     }
 
-    if (!ImGui_ImplSDLRenderer3_Init(renderer)) {
+    if (!ImGui_ImplDX11_Init(device, context)) {
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
         return false;
@@ -146,7 +146,7 @@ void ViniferaImGui::Shutdown()
         return;
     }
 
-    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
@@ -200,17 +200,17 @@ bool ViniferaImGui::Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, L
 }
 
 /**
- *  Renders the main-window ImGui frame through the active SDL renderer.
+ *  Renders the main-window ImGui frame through the active D3D11 device.
  *
  *  @author: ZivDero
  */
 void ViniferaImGui::Render()
 {
-    if (!IsInitialized || SDLWindowRenderer == nullptr) {
+    if (!IsInitialized) {
         return;
     }
 
-    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
@@ -221,7 +221,7 @@ void ViniferaImGui::Render()
 #endif
 
     ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), SDLWindowRenderer);
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
 /**

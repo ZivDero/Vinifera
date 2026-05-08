@@ -9,15 +9,19 @@
 
 #pragma once
 
-#include <SDL3/SDL_render.h>
 #include <windows.h>
+
+
+struct ID3D11Device;
+struct ID3D11DeviceContext;
+
 
 namespace ViniferaImGui
 {
     /**
      *  Initializes the main-window ImGui context and backends.
      */
-    bool Initialize(HWND hwnd, SDL_Renderer* renderer);
+    bool Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext* context);
 
     /**
      *  Shuts down the main-window ImGui context and backends.
@@ -30,7 +34,7 @@ namespace ViniferaImGui
     bool Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
     /**
-     *  Renders the main-window ImGui frame through the active SDL renderer.
+     *  Renders the main-window ImGui frame through the active D3D11 device.
      */
     void Render();
 

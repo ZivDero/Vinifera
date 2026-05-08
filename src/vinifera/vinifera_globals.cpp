@@ -48,8 +48,6 @@ bool Vinifera_Developer_AIControl = false;
 bool Vinifera_Developer_IsToReloadRules = false;
 
 SDL_Window* SDLWindow = nullptr;
-SDL_Renderer* SDLWindowRenderer = nullptr;
-SDL_Texture* SDLWindowTexture = nullptr;
 int SDLWindowWidth = 0;
 int SDLWindowHeight = 0;
 

@@ -21,84 +21,6 @@
 #include "vinifera_globals.h"
 
 
-namespace
-{
-    struct RendererDriverInfo
-    {
-        const char* ConfigName;
-        const char* SDLName;
-        OptionsClassExtension::RendererDriverType Type;
-    };
-
-    const RendererDriverInfo RendererDrivers[] = {
-        {"Direct3D", "direct3d", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D},
-        {"Direct3D11", "direct3d11", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D11},
-        {"Direct3D12", "direct3d12", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D12},
-        {"OpenGL", "opengl", OptionsClassExtension::RENDERER_DRIVER_OPENGL},
-        {"Vulkan", "vulkan", OptionsClassExtension::RENDERER_DRIVER_VULKAN}
-    };
-}
-
-
-/**
- *  Parses the configured renderer driver name into an internal enum value.
- *
- *  @author: ZivDero
- */
-OptionsClassExtension::RendererDriverType OptionsClassExtension::Parse_Renderer_Driver(const char* name)
-{
-    if (name == nullptr || *name == '\0' || stricmp(name, "Auto") == 0) {
-        return RENDERER_DRIVER_AUTO;
-    }
-
-    for (const RendererDriverInfo& driver : RendererDrivers) {
-        if (stricmp(name, driver.ConfigName) == 0 || stricmp(name, driver.SDLName) == 0) {
-            return driver.Type;
-        }
-    }
-
-    return RENDERER_DRIVER_AUTO;
-}
-
-
-/**
- *  Returns the INI-facing renderer driver name for the given enum value.
- *
- *  @author: ZivDero
- */
-const char* OptionsClassExtension::Get_Renderer_Driver_Config_Name(RendererDriverType driver)
-{
-    if (driver == RENDERER_DRIVER_AUTO) {
-        return "Auto";
-    }
-
-    for (const RendererDriverInfo& renderer_driver : RendererDrivers) {
-        if (renderer_driver.Type == driver) {
-            return renderer_driver.ConfigName;
-        }
-    }
-
-    return "Auto";
-}
-
-
-/**
- *  Returns the SDL renderer driver name for the given enum value.
- *
- *  @author: ZivDero
- */
-const char* OptionsClassExtension::Get_Renderer_Driver_SDL_Name(RendererDriverType driver)
-{
-    for (const RendererDriverInfo& renderer_driver : RendererDrivers) {
-        if (renderer_driver.Type == driver) {
-            return renderer_driver.SDLName;
-        }
-    }
-
-    return nullptr;
-}
-
-
 /**
  *  Parses a SubtitleMode INI string into the internal enum value.
  *
@@ -151,7 +73,6 @@ OptionsClassExtension::OptionsClassExtension(const OptionsClass *this_ptr) :
     ScaleMode(SDL_SCALEMODE_PIXELART),
     CursorScale(0),
     IsVSync(false),
-    RendererDriver(RENDERER_DRIVER_AUTO),
     SubtitleMode(SUBTITLE_MODE_NONE)
 {
     //EXT_DEBUG_TRACE("OptionsClassExtension::OptionsClassExtension - 0x%08X\n", (uintptr_t)(This()));
@@ -333,14 +254,6 @@ void OptionsClassExtension::Load_Init_Settings()
     CursorScale = ConfigINI.Get_Int("Video", "CursorScale", CursorScale);
     WindowedMode = ConfigINI.Get_Bool("Video", "Windowed", WindowedMode);
     IsVSync = ConfigINI.Get_Bool("Video", "VSync", IsVSync);
-
-    if (ConfigINI.Get_String("Video", "RendererDriver", "", buffer, std::size(buffer)) > 0) {
-        RendererDriver = Parse_Renderer_Driver(buffer);
-
-        if (RendererDriver == RENDERER_DRIVER_AUTO && stricmp(buffer, "Auto") != 0) {
-            DEBUG_WARNING("Unknown renderer driver \"%s\", falling back to Auto.\n", buffer);
-        }
-    }
 }
 
 

@@ -11,7 +11,8 @@
 
 #include <Windows.h>
 
-struct SDL_Renderer;
+
+class D3D11Renderer;
 
 namespace Rml
 {
@@ -27,7 +28,7 @@ namespace ViniferaRmlUi
         Modal,
     };
 
-    bool Initialize(HWND hwnd, SDL_Renderer* renderer);
+    bool Initialize(HWND hwnd, D3D11Renderer* renderer);
     void Shutdown();
 
     bool Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
