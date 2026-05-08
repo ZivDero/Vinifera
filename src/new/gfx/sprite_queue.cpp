@@ -111,7 +111,17 @@ namespace Vinifera::Gfx
             params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
             params.Flags = head.EffectFlags;
 
-            Batch.Begin(device, EBlend::Premultiplied, ESampler::PointClamp, &PalEffect, bb_w, bb_h);
+            /**
+             *  SHAPE_DARKEN is a destination-multiply-by-0.5 op masked by the
+             *  shape's non-zero pixels — the source color is irrelevant. Use
+             *  the matching blend state for these groups; everything else
+             *  stays on the standard premultiplied-alpha path.
+             */
+            const EBlend blend = (head.EffectFlags & SEF_DARKEN)
+                ? EBlend::DestMultiplyHalf
+                : EBlend::Premultiplied;
+
+            Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, bb_w, bb_h);
             PalEffect.Bind_Palette(device, *head.Palette);
             PalEffect.Set_Params(device, params);
 

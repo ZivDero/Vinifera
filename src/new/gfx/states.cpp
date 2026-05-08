@@ -82,6 +82,20 @@ namespace Vinifera::Gfx
             bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
             bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
             break;
+        case EBlend::DestMultiplyHalf:
+            /**
+             *  output.rgb = (src*0) + (dest * blend_factor.rgb).
+             *  Caller must set blend_factor to (0.5, 0.5, 0.5, *) at
+             *  OMSetBlendState time. Alpha pass-through preserves dest.a.
+             */
+            bd.RenderTarget[0].BlendEnable    = TRUE;
+            bd.RenderTarget[0].SrcBlend       = D3D11_BLEND_ZERO;
+            bd.RenderTarget[0].DestBlend      = D3D11_BLEND_BLEND_FACTOR;
+            bd.RenderTarget[0].BlendOp        = D3D11_BLEND_OP_ADD;
+            bd.RenderTarget[0].SrcBlendAlpha  = D3D11_BLEND_ZERO;
+            bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
+            break;
         default:
             return nullptr;
         }

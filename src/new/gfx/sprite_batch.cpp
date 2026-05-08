@@ -200,7 +200,16 @@ namespace Vinifera::Gfx
         size_t total_quads = Pending.size();
         size_t consumed = 0;
 
-        const float blend_factor[4] = { 0, 0, 0, 0 };
+        /**
+         *  Blend factor matters only for blend states that use
+         *  D3D11_BLEND_BLEND_FACTOR / INV_BLEND_FACTOR. DestMultiplyHalf is
+         *  one such state (constant 0.5 for the destination-multiply path
+         *  used by SHAPE_DARKEN); everything else ignores the factor.
+         */
+        float blend_factor[4] = { 0, 0, 0, 0 };
+        if (ActiveBlend == EBlend::DestMultiplyHalf) {
+            blend_factor[0] = blend_factor[1] = blend_factor[2] = blend_factor[3] = 0.5f;
+        }
         ctx->OMSetBlendState(device.States().Get(ActiveBlend), blend_factor, 0xFFFFFFFFu);
         ctx->OMSetDepthStencilState(device.States().Get(EDepthStencil::None), 0);
         ctx->RSSetState(device.States().Get(ERasterizer::CullNone));

@@ -27,6 +27,7 @@ namespace Vinifera::Gfx
         AlphaBlend,         // SrcAlpha / InvSrcAlpha (non-premultiplied)
         Premultiplied,      // One     / InvSrcAlpha (matches RmlUi/many sprite paths)
         Additive,           // SrcAlpha / One
+        DestMultiplyHalf,   // dest *= 0.5 (vanilla SHAPE_DARKEN; src color irrelevant)
 
         Count
     };
