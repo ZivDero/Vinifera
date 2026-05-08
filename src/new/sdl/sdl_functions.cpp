@@ -19,7 +19,9 @@
 #include "command.h"
 #include "convert.h"
 #include "graphics_device.h"
+#include "shp_cache.h"
 #include "shp_viewer.h"
+#include "sprite_queue.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -250,6 +252,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera SHP Viewer could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::SpriteQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera SpriteQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -261,6 +267,15 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
  */
 void SDL_Reset_Video_Mode()
 {
+    /**
+     *  Asset caches and the sprite queue hold textures bound to the
+     *  GraphicsDevice — release them before the device tears down, since
+     *  re-initializing on a new device requires fresh resources anyway.
+     */
+    Vinifera::Gfx::SpriteQueue::Get().Shutdown();
+    Vinifera::Gfx::ShpCache::Get().Clear();
+    Vinifera::Gfx::PaletteCache::Get().Clear();
+
     if (Vinifera::Gfx::g_ShpViewer != nullptr) {
         delete Vinifera::Gfx::g_ShpViewer;
         Vinifera::Gfx::g_ShpViewer = nullptr;
@@ -673,6 +688,15 @@ bool SDL_Update_Screen(Surface* surface)
             static_cast<SDLMouseClass*>(MouseCursor)->Recalc_Cursor_Image();
         }
     }
+
+    /**
+     *  Flush the GPU sprite queue — patched Draw_Shape callsites populated it
+     *  during the game's render pass earlier this frame (Tactical::Render,
+     *  Layer::Draw, etc.). Drawing here puts them on top of the CompositeSurface
+     *  present output, preserving submission order as the layering mechanism
+     *  (until Stage 3 introduces a depth buffer).
+     */
+    Vinifera::Gfx::SpriteQueue::Get().Flush(*Vinifera::Gfx::Device);
 
     /**
      *  Draw overlays, then present.

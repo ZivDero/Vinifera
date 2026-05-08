@@ -19,7 +19,7 @@ bool Vinifera_DeveloperMode = false;
 
 bool Vinifera_AudioDebug = false;
 
-bool Vinifera_ShpViewer = true;
+bool Vinifera_ShpViewer = false;
 
 bool Vinifera_PerformingLoad = false;
 

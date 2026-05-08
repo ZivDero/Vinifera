@@ -57,6 +57,17 @@ namespace Vinifera::Gfx
          */
         bool Load(GraphicsDevice& device, const char* shp_path);
 
+        /**
+         *  Load directly from an already-resident SHP blob (e.g. a pointer
+         *  vanilla TS handed us via the Draw_Shape proxy). The blob layout
+         *  matches Tiberian-Sun ShapeSet — header followed by N records and
+         *  per-frame data referenced by absolute offsets from the blob start.
+         *  `blob_size` may be 0 if unknown; in that case the loader walks the
+         *  records to compute a safe upper bound.
+         */
+        bool Load_From_Memory(GraphicsDevice& device, const void* blob, size_t blob_size,
+                              const char* debug_name = "<memory>");
+
         void Unload();
 
         bool Is_Loaded() const { return Atlas.Get_SRV() != nullptr; }

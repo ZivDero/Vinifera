@@ -73,6 +73,7 @@ OptionsClassExtension::OptionsClassExtension(const OptionsClass *this_ptr) :
     ScaleMode(SDL_SCALEMODE_PIXELART),
     CursorScale(0),
     IsVSync(false),
+    LegacyRenderer(true),
     SubtitleMode(SUBTITLE_MODE_NONE)
 {
     //EXT_DEBUG_TRACE("OptionsClassExtension::OptionsClassExtension - 0x%08X\n", (uintptr_t)(This()));
@@ -254,6 +255,7 @@ void OptionsClassExtension::Load_Init_Settings()
     CursorScale = ConfigINI.Get_Int("Video", "CursorScale", CursorScale);
     WindowedMode = ConfigINI.Get_Bool("Video", "Windowed", WindowedMode);
     IsVSync = ConfigINI.Get_Bool("Video", "VSync", IsVSync);
+    LegacyRenderer = ConfigINI.Get_Bool("Video", "LegacyRenderer", LegacyRenderer);
 }
 
 
