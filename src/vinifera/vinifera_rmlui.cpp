@@ -11,8 +11,6 @@
 
 #include "vinifera_rmlui.h"
 
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_surface.h"
 #include "SDL3/SDL_video.h"
 #include "ccfile.h"
 #include "debughandler.h"
@@ -21,12 +19,13 @@
 
 #include "lib/rawfile.h"
 
+#include "../libs/rmlui_backend/RmlUi_Renderer_SDL_GPU.h"
+
 #include <RmlUi/Core.h>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/FileInterface.h>
 #include <RmlUi/Core/Input.h>
-#include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/SystemInterface.h>
 
 #include <algorithm>
@@ -39,158 +38,6 @@
 
 namespace
 {
-    struct CompiledGeometry
-    {
-        std::vector<Rml::Vertex> Vertices;
-        std::vector<int> Indices;
-    };
-
-    class ViniferaRenderInterface : public Rml::RenderInterface
-    {
-    public:
-        explicit ViniferaRenderInterface(SDL_Renderer* renderer) :
-            Renderer(renderer)
-        {
-            BlendMode = SDL_ComposeCustomBlendMode(
-                SDL_BLENDFACTOR_ONE,
-                SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                SDL_BLENDOPERATION_ADD,
-                SDL_BLENDFACTOR_ONE,
-                SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                SDL_BLENDOPERATION_ADD);
-        }
-
-        void Set_Renderer(SDL_Renderer* renderer)
-        {
-            Renderer = renderer;
-        }
-
-        void Set_Output_Scale(float xscale, float yscale)
-        {
-            XScale = xscale;
-            YScale = yscale;
-        }
-
-        Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override
-        {
-            CompiledGeometry* geometry = new CompiledGeometry;
-            geometry->Vertices.assign(vertices.begin(), vertices.end());
-            geometry->Indices.assign(indices.begin(), indices.end());
-            return reinterpret_cast<Rml::CompiledGeometryHandle>(geometry);
-        }
-
-        void RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector2f translation, Rml::TextureHandle texture) override
-        {
-            if (Renderer == nullptr || handle == 0) {
-                return;
-            }
-
-            const CompiledGeometry* geometry = reinterpret_cast<const CompiledGeometry*>(handle);
-            if (geometry->Vertices.empty() || geometry->Indices.empty()) {
-                return;
-            }
-
-            if (SDLVertices.size() < geometry->Vertices.size()) {
-                SDLVertices.resize(geometry->Vertices.size());
-            }
-
-            for (size_t index = 0; index < geometry->Vertices.size(); ++index) {
-                const Rml::Vertex& vertex = geometry->Vertices[index];
-                SDL_Vertex& sdl_vertex = SDLVertices[index];
-
-                sdl_vertex.position = {
-                    (vertex.position.x + translation.x) * XScale,
-                    (vertex.position.y + translation.y) * YScale
-                };
-                sdl_vertex.tex_coord = { vertex.tex_coord.x, vertex.tex_coord.y };
-                sdl_vertex.color = {
-                    vertex.colour.red / 255.0f,
-                    vertex.colour.green / 255.0f,
-                    vertex.colour.blue / 255.0f,
-                    vertex.colour.alpha / 255.0f
-                };
-            }
-
-            SDL_SetRenderDrawBlendMode(Renderer, BlendMode);
-            SDL_RenderGeometry(
-                Renderer,
-                reinterpret_cast<SDL_Texture*>(texture),
-                SDLVertices.data(),
-                static_cast<int>(geometry->Vertices.size()),
-                geometry->Indices.data(),
-                static_cast<int>(geometry->Indices.size()));
-        }
-
-        void ReleaseGeometry(Rml::CompiledGeometryHandle handle) override
-        {
-            delete reinterpret_cast<CompiledGeometry*>(handle);
-        }
-
-        Rml::TextureHandle LoadTexture(Rml::Vector2i&, const Rml::String&) override
-        {
-            return 0;
-        }
-
-        Rml::TextureHandle GenerateTexture(Rml::Span<const Rml::byte> source, Rml::Vector2i source_dimensions) override
-        {
-            if (Renderer == nullptr || source.empty()) {
-                return 0;
-            }
-
-            SDL_Surface* surface = SDL_CreateSurfaceFrom(
-                source_dimensions.x,
-                source_dimensions.y,
-                SDL_PIXELFORMAT_RGBA32,
-                const_cast<Rml::byte*>(source.data()),
-                source_dimensions.x * 4);
-
-            if (surface == nullptr) {
-                return 0;
-            }
-
-            SDL_Texture* texture = SDL_CreateTextureFromSurface(Renderer, surface);
-            SDL_DestroySurface(surface);
-
-            if (texture != nullptr) {
-                SDL_SetTextureBlendMode(texture, BlendMode);
-            }
-
-            return reinterpret_cast<Rml::TextureHandle>(texture);
-        }
-
-        void ReleaseTexture(Rml::TextureHandle texture) override
-        {
-            SDL_DestroyTexture(reinterpret_cast<SDL_Texture*>(texture));
-        }
-
-        void EnableScissorRegion(bool enable) override
-        {
-            ScissorEnabled = enable;
-            SDL_SetRenderClipRect(Renderer, enable ? &ScissorRect : nullptr);
-        }
-
-        void SetScissorRegion(Rml::Rectanglei region) override
-        {
-            ScissorRect.x = static_cast<int>(region.Left() * XScale);
-            ScissorRect.y = static_cast<int>(region.Top() * YScale);
-            ScissorRect.w = static_cast<int>(region.Width() * XScale);
-            ScissorRect.h = static_cast<int>(region.Height() * YScale);
-
-            if (ScissorEnabled) {
-                SDL_SetRenderClipRect(Renderer, &ScissorRect);
-            }
-        }
-
-    private:
-        SDL_Renderer* Renderer = nullptr;
-        SDL_BlendMode BlendMode = SDL_BLENDMODE_BLEND;
-        SDL_Rect ScissorRect = {};
-        bool ScissorEnabled = false;
-        float XScale = 1.0f;
-        float YScale = 1.0f;
-        std::vector<SDL_Vertex> SDLVertices;
-    };
-
     class ViniferaSystemInterface : public Rml::SystemInterface
     {
     public:
@@ -353,7 +200,7 @@ namespace
     };
 
     std::unique_ptr<ViniferaSystemInterface> SystemInterface;
-    std::unique_ptr<ViniferaRenderInterface> RenderInterface;
+    std::unique_ptr<RenderInterface_SDL_GPU> RenderInterface;
     std::unique_ptr<ViniferaFileInterface> FileInterface;
     Rml::Context* Context = nullptr;
     Rml::ElementDocument* Document = nullptr;
@@ -412,22 +259,6 @@ namespace
         }
     }
 
-    float Window_X_To_Logical(int x)
-    {
-        if (SDLWindowWidth <= 0 || VideoWidth <= 0) {
-            return static_cast<float>(x);
-        }
-        return static_cast<float>(x) * static_cast<float>(VideoWidth) / static_cast<float>(SDLWindowWidth);
-    }
-
-    float Window_Y_To_Logical(int y)
-    {
-        if (SDLWindowHeight <= 0 || VideoHeight <= 0) {
-            return static_cast<float>(y);
-        }
-        return static_cast<float>(y) * static_cast<float>(VideoHeight) / static_cast<float>(SDLWindowHeight);
-    }
-
     std::string Get_Windows_Font_Path(const char* filename)
     {
         char windows_directory[MAX_PATH] = {};
@@ -481,25 +312,22 @@ namespace
     }
 }
 
-bool ViniferaRmlUi::Initialize(HWND hwnd, SDL_Renderer* renderer)
+bool ViniferaRmlUi::Initialize(HWND hwnd, SDL_Window* window, SDL_GPUDevice* device)
 {
     if (Initialized) {
-        if (RenderInterface != nullptr) {
-            RenderInterface->Set_Renderer(renderer);
-        }
         if (SystemInterface != nullptr) {
             SystemInterface->Set_Window(hwnd);
         }
         return true;
     }
 
-    if (hwnd == nullptr || renderer == nullptr) {
+    if (hwnd == nullptr || window == nullptr || device == nullptr) {
         return false;
     }
 
     SystemInterface = std::make_unique<ViniferaSystemInterface>();
     SystemInterface->Set_Window(hwnd);
-    RenderInterface = std::make_unique<ViniferaRenderInterface>(renderer);
+    RenderInterface = std::make_unique<RenderInterface_SDL_GPU>(device, window);
     FileInterface = std::make_unique<ViniferaFileInterface>();
 
     Rml::SetSystemInterface(SystemInterface.get());
@@ -551,6 +379,11 @@ void ViniferaRmlUi::Shutdown()
     }
 
     Rml::Shutdown();
+    if (RenderInterface != nullptr) {
+        // The SDL_GPU render interface owns GPU pipelines, samplers, and buffers
+        // that must be released before the SDL_GPUDevice is destroyed.
+        RenderInterface->Shutdown();
+    }
     FileInterface.reset();
     RenderInterface.reset();
     SystemInterface.reset();
@@ -569,8 +402,8 @@ bool ViniferaRmlUi::Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, L
     switch (msg) {
     case WM_MOUSEMOVE:
         handled = Context->ProcessMouseMove(
-            static_cast<int>(Window_X_To_Logical(GET_X_LPARAM(lparam))),
-            static_cast<int>(Window_Y_To_Logical(GET_Y_LPARAM(lparam))),
+            GET_X_LPARAM(lparam),
+            GET_Y_LPARAM(lparam),
             Get_Key_Modifiers());
         break;
 
@@ -625,20 +458,25 @@ bool ViniferaRmlUi::Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, L
     return input_message ? true : handled;
 }
 
-void ViniferaRmlUi::Render()
+void ViniferaRmlUi::Render(SDL_GPUCommandBuffer* command_buffer, SDL_GPUTexture* swapchain_texture, unsigned width, unsigned height)
 {
     if (!Initialized || Context == nullptr || !Has_Documents() || RenderInterface == nullptr) {
         return;
     }
 
-    Context->SetDimensions(Rml::Vector2i(std::max(VideoWidth, 1), std::max(VideoHeight, 1)));
+    if (command_buffer == nullptr || swapchain_texture == nullptr || width == 0 || height == 0) {
+        return;
+    }
 
-    const float xscale = VideoWidth > 0 ? static_cast<float>(SDLWindowWidth) / static_cast<float>(VideoWidth) : 1.0f;
-    const float yscale = VideoHeight > 0 ? static_cast<float>(SDLWindowHeight) / static_cast<float>(VideoHeight) : 1.0f;
-    RenderInterface->Set_Output_Scale(xscale, yscale);
+    // The SDL_GPU backend works in window-pixel space, so the document is laid
+    // out at the swapchain resolution rather than the game's logical resolution.
+    // RmlUi will scale layout coordinates uniformly with the context dimensions.
+    Context->SetDimensions(Rml::Vector2i(static_cast<int>(width), static_cast<int>(height)));
 
+    RenderInterface->BeginFrame(command_buffer, swapchain_texture, width, height);
     Context->Update();
     Context->Render();
+    RenderInterface->EndFrame();
 }
 
 bool ViniferaRmlUi::Is_Initialized()

@@ -11,10 +11,10 @@
 
 #include "sdl_functions.h"
 
+#include "SDL3/SDL_gpu.h"
 #include "SDL3/SDL_hints.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_oldnames.h"
-#include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
 #include "cctooltip.h"
 #include "cdctrl.h"
@@ -43,21 +43,23 @@
 namespace
 {
     /**
-     *  Applies the SDL renderer driver hint for the selected backend.
+     *  Applies the SDL_GPU driver hint for the selected backend. The values
+     *  match SDL_GPU's bootstrap names ("direct3d12", "vulkan"). Auto leaves
+     *  the hint unset and lets SDL pick.
      *
      *  @author: ZivDero
      */
-    void SDL_Apply_Renderer_Driver_Hint()
+    void SDL_Apply_GPU_Driver_Hint()
     {
         const char* requested_driver_name = OptionsClassExtension::Get_Renderer_Driver_SDL_Name(OptionsExtension->RendererDriver);
         const char* requested_driver_config_name = OptionsClassExtension::Get_Renderer_Driver_Config_Name(OptionsExtension->RendererDriver);
 
-        DEBUG_INFO("Requested renderer driver: %s\n", requested_driver_config_name);
+        DEBUG_INFO("Requested GPU driver: %s\n", requested_driver_config_name);
 
         if (requested_driver_name != nullptr) {
-            SDL_SetHint(SDL_HINT_RENDER_DRIVER, requested_driver_name);
+            SDL_SetHint(SDL_HINT_GPU_DRIVER, requested_driver_name);
         } else {
-            SDL_ResetHint(SDL_HINT_RENDER_DRIVER);
+            SDL_ResetHint(SDL_HINT_GPU_DRIVER);
         }
     }
 
@@ -204,7 +206,7 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
 
 
 /**
- *  Initializes the SDL presentation layer.
+ *  Initializes the SDL_GPU presentation layer.
  *
  *  @author: ZivDero
  */
@@ -214,14 +216,15 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("SDLWindow is null!\n");
         return false;
     }
-    
+
     /**
      *  We need to delete the existing presentation layer first.
      */
     SDL_Reset_Video_Mode();
-    
+
     /**
-     *  Query the window's pixel format.
+     *  Query the window's pixel format. Used only for diagnostics under SDL_GPU,
+     *  the actual presentation format is the swapchain texture format.
      */
     SDL_PixelFormat pixel_format = SDL_GetWindowPixelFormat(SDLWindow);
     if (pixel_format == SDL_PIXELFORMAT_UNKNOWN || SDL_BITSPERPIXEL(pixel_format) < 16) {
@@ -232,44 +235,83 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     DEBUG_INFO("Pixel format: %s (%d bpp)\n", SDL_GetPixelFormatName(pixel_format), SDL_BITSPERPIXEL(pixel_format));
 
     /**
-     *  Apply the renderer backend selection before creating the renderer.
+     *  Apply the GPU driver selection before creating the device.
      */
-    SDL_Apply_Renderer_Driver_Hint();
+    SDL_Apply_GPU_Driver_Hint();
 
     /**
-     *  Create the renderer for window.
+     *  Create an SDL_GPU device. Request all formats the upstream RmlUi backend
+     *  can compile shaders into so the same code paths run on every supported
+     *  backend (D3D12 wants DXIL, Vulkan wants SPIR-V).
      */
-    SDLWindowRenderer = SDL_CreateRenderer(SDLWindow, nullptr);
-    if (SDLWindowRenderer == nullptr) {
-        DEBUG_ERROR("SDLWindowRenderer could not be created! SDL Error: %s\n", SDL_GetError());
+    const SDL_GPUShaderFormat shader_formats =
+        SDL_GPU_SHADERFORMAT_SPIRV |
+        SDL_GPU_SHADERFORMAT_DXIL |
+        SDL_GPU_SHADERFORMAT_MSL;
+
+    const bool debug_device =
+#ifdef _DEBUG
+        true;
+#else
+        false;
+#endif
+
+    SDLGPUDevice = SDL_CreateGPUDevice(shader_formats, debug_device, nullptr);
+    if (SDLGPUDevice == nullptr) {
+        DEBUG_ERROR("SDL_CreateGPUDevice failed! SDL Error: %s\n", SDL_GetError());
         return false;
     }
-    DEBUG_INFO("SDLWindowRenderer created.\n");
+    DEBUG_INFO("SDL_GPU device created. Driver: %s\n", SDL_GetGPUDeviceDriver(SDLGPUDevice));
 
-    const char* driver_name = SDL_GetRendererName(SDLWindowRenderer);
-    DEBUG_INFO("Renderer driver: %s\n", driver_name != nullptr ? driver_name : "<unknown>");
-
-    /**
-     *  Toggle VSync.
-     */
-    SDL_SetRenderVSync(SDLWindowRenderer, OptionsExtension->IsVSync ? 1 : 0);
-
-    /**
-     *  Set the scaling mode if specified.
-     */
-    if (OptionsExtension->ScaleMode != SDL_SCALEMODE_INVALID) {
-        SDL_SetDefaultTextureScaleMode(SDLWindowRenderer, OptionsExtension->ScaleMode);
-    }
-
-    /**
-     *  Create the window texture.
-     */
-    SDLWindowTexture = SDL_CreateTexture(SDLWindowRenderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, width, height);
-    if (SDLWindowTexture == nullptr) {
-        DEBUG_ERROR("SDLWindowTexture could not be created! SDL_Error: %s\n", SDL_GetError());
+    if (!SDL_ClaimWindowForGPUDevice(SDLGPUDevice, SDLWindow)) {
+        DEBUG_ERROR("SDL_ClaimWindowForGPUDevice failed! SDL Error: %s\n", SDL_GetError());
+        SDL_DestroyGPUDevice(SDLGPUDevice);
+        SDLGPUDevice = nullptr;
         return false;
     }
-    DEBUG_INFO("SDLWindowTexture created.\n");
+
+    /**
+     *  Configure swapchain composition (always SDR for now) and present mode
+     *  driven by the user's vsync preference. Mailbox is preferred for low
+     *  latency without tearing when supported, otherwise fall back to vsync
+     *  when on, immediate when off.
+     */
+    SDL_GPUPresentMode present_mode = SDL_GPU_PRESENTMODE_VSYNC;
+    if (!OptionsExtension->IsVSync &&
+        SDL_WindowSupportsGPUPresentMode(SDLGPUDevice, SDLWindow, SDL_GPU_PRESENTMODE_IMMEDIATE)) {
+        present_mode = SDL_GPU_PRESENTMODE_IMMEDIATE;
+    }
+    SDL_SetGPUSwapchainParameters(SDLGPUDevice, SDLWindow, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, present_mode);
+
+    SDL_GPUTextureFormat swapchain_format = SDL_GetGPUSwapchainTextureFormat(SDLGPUDevice, SDLWindow);
+    SDLSwapchainTextureFormat = static_cast<unsigned>(swapchain_format);
+    DEBUG_INFO("SDL_GPU swapchain format: %u\n", SDLSwapchainTextureFormat);
+
+    /**
+     *  Create the persistent GPU texture that mirrors the game's CPU-rendered
+     *  framebuffer. RGBA8 is used unconditionally because it is universally
+     *  supported by SDL_GPU backends as a sampler+blit source; the per-frame
+     *  cost of expanding RGB565 -> RGBA8 on the CPU is negligible at the
+     *  resolutions Vinifera targets.
+     */
+    SDL_GPUTextureCreateInfo tex_info = {};
+    tex_info.type = SDL_GPU_TEXTURETYPE_2D;
+    tex_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    tex_info.width = static_cast<Uint32>(width);
+    tex_info.height = static_cast<Uint32>(height);
+    tex_info.layer_count_or_depth = 1;
+    tex_info.num_levels = 1;
+    tex_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    SDLGameFrameTexture = SDL_CreateGPUTexture(SDLGPUDevice, &tex_info);
+    if (SDLGameFrameTexture == nullptr) {
+        DEBUG_ERROR("SDL_CreateGPUTexture (game frame) failed! SDL Error: %s\n", SDL_GetError());
+        SDL_ReleaseWindowFromGPUDevice(SDLGPUDevice, SDLWindow);
+        SDL_DestroyGPUDevice(SDLGPUDevice);
+        SDLGPUDevice = nullptr;
+        return false;
+    }
+    DEBUG_INFO("Game-frame GPU texture created (format=%d).\n", static_cast<int>(tex_info.format));
 
     /**
      *  Save video mode information.
@@ -278,11 +320,11 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     VideoHeight = height;
     VideoBitsPerPixel = bits_per_pixel;
 
-    if (!ViniferaImGui::Initialize(MainWindow, SDLWindowRenderer)) {
+    if (!ViniferaImGui::Initialize(MainWindow, SDLGPUDevice, swapchain_format)) {
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
     }
 
-    if (!ViniferaRmlUi::Initialize(MainWindow, SDLWindowRenderer)) {
+    if (!ViniferaRmlUi::Initialize(MainWindow, SDLWindow, SDLGPUDevice)) {
         DEBUG_ERROR("Vinifera RmlUi could not be initialized.\n");
     }
 
@@ -291,7 +333,7 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
 
 
 /**
- *  Resets video mode and deletes the SDL presentation layer.
+ *  Resets video mode and deletes the SDL_GPU presentation layer.
  *
  *  @author: ZivDero
  */
@@ -300,17 +342,22 @@ void SDL_Reset_Video_Mode()
     ViniferaRmlUi::Shutdown();
     ViniferaImGui::Shutdown();
 
-    /**
-     *  Destroy the renderer.
-     */
-    SDL_DestroyRenderer(SDLWindowRenderer);
-    SDLWindowRenderer = nullptr;
+    if (SDLGPUDevice != nullptr) {
+        // Make sure the GPU is idle before tearing down resources owned by the
+        // device, otherwise releases can race with in-flight command buffers.
+        SDL_WaitForGPUIdle(SDLGPUDevice);
 
-    /**
-     *  Deallocate the texture.
-     */
-    SDL_DestroyTexture(SDLWindowTexture);
-    SDLWindowTexture = nullptr;
+        if (SDLGameFrameTexture != nullptr) {
+            SDL_ReleaseGPUTexture(SDLGPUDevice, SDLGameFrameTexture);
+            SDLGameFrameTexture = nullptr;
+        }
+
+        SDL_ReleaseWindowFromGPUDevice(SDLGPUDevice, SDLWindow);
+        SDL_DestroyGPUDevice(SDLGPUDevice);
+        SDLGPUDevice = nullptr;
+    }
+
+    SDLSwapchainTextureFormat = 0;
 
     /**
      *  Clear video mode information.
@@ -585,16 +632,9 @@ bool SDL_Create_Main_Window(HINSTANCE instance, int width, int height)
     SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, Vinifera_Get_Window_Title(dwPid));
 
     /**
-     *  OpenGL and Vulkan renderers need a matching graphics-capable window from the start on Windows.
-     */
-    if (OptionsExtension->RendererDriver == OptionsClassExtension::RENDERER_DRIVER_OPENGL) {
-        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
-    } else if (OptionsExtension->RendererDriver == OptionsClassExtension::RENDERER_DRIVER_VULKAN) {
-        SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
-    }
-
-    /**
-     *  Create the window.
+     *  Create the window. SDL_ClaimWindowForGPUDevice (called later from
+     *  SDL_Set_Video_Mode) installs whichever window properties the chosen
+     *  GPU backend requires, so we don't pre-set OpenGL/Vulkan flags here.
      */
     SDLWindow = SDL_CreateWindowWithProperties(props);
     if (SDLWindow == nullptr) {
@@ -664,6 +704,90 @@ void SDL_Destroy_Main_Window()
 }
 
 
+namespace
+{
+    /**
+     *  Uploads the game's RGB565 software framebuffer into the persistent
+     *  SDLGameFrameTexture (RGBA8) by mapping a transfer buffer and recording
+     *  a copy pass. Returns false if any GPU resource could not be acquired.
+     */
+    bool SDL_Upload_Game_Frame(SDL_GPUCommandBuffer* command_buffer, Surface* surface)
+    {
+        const Uint32 width = static_cast<Uint32>(surface->Get_Width());
+        const Uint32 height = static_cast<Uint32>(surface->Get_Height());
+        const Uint32 pixel_count = width * height;
+        const Uint32 dst_size = pixel_count * 4u;
+
+        SDL_GPUTransferBufferCreateInfo transfer_info = {};
+        transfer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        transfer_info.size = dst_size;
+
+        SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(SDLGPUDevice, &transfer_info);
+        if (transfer == nullptr) {
+            DEBUG_WARNING("SDL_CreateGPUTransferBuffer failed in Upload_Game_Frame: %s\n", SDL_GetError());
+            return false;
+        }
+
+        Uint32* dst = static_cast<Uint32*>(SDL_MapGPUTransferBuffer(SDLGPUDevice, transfer, true));
+        if (dst == nullptr) {
+            SDL_ReleaseGPUTransferBuffer(SDLGPUDevice, transfer);
+            return false;
+        }
+
+        if (void* locked = surface->Lock()) {
+            const int stride_bytes = surface->Stride();
+            const Uint16* src_rows = static_cast<const Uint16*>(locked);
+
+            for (Uint32 y = 0; y < height; ++y) {
+                const Uint16* src = reinterpret_cast<const Uint16*>(reinterpret_cast<const Uint8*>(src_rows) + static_cast<size_t>(y) * stride_bytes);
+                Uint32* dst_row = dst + static_cast<size_t>(y) * width;
+
+                for (Uint32 x = 0; x < width; ++x) {
+                    const Uint16 pixel = src[x];
+                    // RGB565 -> RGBA8 with replicated low bits for proper full-range coverage.
+                    const Uint32 r = ((pixel >> 11) & 0x1Fu);
+                    const Uint32 g = ((pixel >> 5) & 0x3Fu);
+                    const Uint32 b = (pixel & 0x1Fu);
+                    const Uint32 r8 = (r << 3) | (r >> 2);
+                    const Uint32 g8 = (g << 2) | (g >> 4);
+                    const Uint32 b8 = (b << 3) | (b >> 2);
+                    dst_row[x] = r8 | (g8 << 8) | (b8 << 16) | (0xFFu << 24);
+                }
+            }
+
+            surface->Unlock();
+        }
+
+        SDL_UnmapGPUTransferBuffer(SDLGPUDevice, transfer);
+
+        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+        if (copy_pass == nullptr) {
+            SDL_ReleaseGPUTransferBuffer(SDLGPUDevice, transfer);
+            return false;
+        }
+
+        SDL_GPUTextureTransferInfo src_info = {};
+        src_info.transfer_buffer = transfer;
+        src_info.offset = 0;
+
+        SDL_GPUTextureRegion dst_region = {};
+        dst_region.texture = SDLGameFrameTexture;
+        dst_region.w = width;
+        dst_region.h = height;
+        dst_region.d = 1;
+
+        SDL_UploadToGPUTexture(copy_pass, &src_info, &dst_region, true);
+        SDL_EndGPUCopyPass(copy_pass);
+
+        // The transfer buffer can be released immediately; the upload command
+        // is now recorded into the in-flight command buffer and SDL will keep
+        // the underlying allocation alive until the buffer is submitted.
+        SDL_ReleaseGPUTransferBuffer(SDLGPUDevice, transfer);
+        return true;
+    }
+}
+
+
 /**
  *  Update the screen with any rendering performed since the previous call.
  *
@@ -671,59 +795,102 @@ void SDL_Destroy_Main_Window()
  */
 bool SDL_Update_Screen(Surface* surface)
 {
-    SDL_RenderClear(SDLWindowRenderer);
+    if (SDLGPUDevice == nullptr) {
+        return false;
+    }
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(SDLGPUDevice);
+    if (command_buffer == nullptr) {
+        DEBUG_WARNING("SDL_AcquireGPUCommandBuffer failed: %s\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GPUTexture* swapchain_texture = nullptr;
+    Uint32 swapchain_width = 0;
+    Uint32 swapchain_height = 0;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, SDLWindow, &swapchain_texture, &swapchain_width, &swapchain_height)) {
+        // Window minimized or otherwise unavailable; cancel the frame.
+        SDL_CancelGPUCommandBuffer(command_buffer);
+        return true;
+    }
+
+    if (swapchain_texture == nullptr) {
+        // SDL_WaitAndAcquireGPUSwapchainTexture can succeed but return null when
+        // the window is currently unrenderable (e.g. minimized). Submit anyway
+        // so any queued resource releases drain.
+        SDL_SubmitGPUCommandBuffer(command_buffer);
+        return true;
+    }
 
     /**
-     *  Blit game's surface to SDL's window surface.
+     *  Phase 1: blit the game framebuffer into the swapchain texture. The
+     *  upload pass handles RGB565 -> RGBA8 conversion; SDL_BlitGPUTexture
+     *  then handles RGBA8 -> swapchain format and any required scaling.
      */
-    if (surface) {
+    if (surface != nullptr) {
+        if (SDL_Upload_Game_Frame(command_buffer, surface)) {
+            SDL_GPUBlitInfo blit_info = {};
+            blit_info.source.texture = SDLGameFrameTexture;
+            blit_info.source.w = static_cast<Uint32>(surface->Get_Width());
+            blit_info.source.h = static_cast<Uint32>(surface->Get_Height());
 
-        /**
-         *  First, update the texture with the pixels from the game's surface.
-         */
-        if (void* pixels = surface->Lock()) {
-#if 0
-            void* tex_pixels;
-            int tex_pitch;
-            SDL_LockTexture(SDLWindowTexture, nullptr, &tex_pixels, &tex_pitch);
-            memcpy(tex_pixels, pixels, surface->Get_Height() * surface->Stride());
-            SDL_UnlockTexture(SDLWindowTexture);
-#else
-            SDL_UpdateTexture(SDLWindowTexture, nullptr, pixels, surface->Stride());
-#endif
-            surface->Unlock();
+            blit_info.destination.texture = swapchain_texture;
+            blit_info.destination.w = swapchain_width;
+            blit_info.destination.h = swapchain_height;
+
+            blit_info.load_op = SDL_GPU_LOADOP_DONT_CARE; // first write of the frame, no need to load.
+            blit_info.filter = (OptionsExtension->ScaleMode == SDL_SCALEMODE_LINEAR)
+                ? SDL_GPU_FILTER_LINEAR
+                : SDL_GPU_FILTER_NEAREST;
+            blit_info.cycle = false;
+
+            SDL_BlitGPUTexture(command_buffer, &blit_info);
         }
 
+        // Mouse cursor uses the same scaled-vs-not state machine as before.
         static bool scaled = SDL_Should_Scale();
-
-        /**
-         *  Then, copy the texture to the renderer.
-         */
-        if (!SDL_Should_Scale()) {
-            Rect src_rect = surface->Get_Rect();
-            SDL_FRect dst_rect = {static_cast<float>(src_rect.X), static_cast<float>(src_rect.Y), static_cast<float>(src_rect.Width), static_cast<float>(src_rect.Height)};
-            SDL_RenderTexture(SDLWindowRenderer, SDLWindowTexture, nullptr, &dst_rect);
-        } else {
-            SDL_RenderTexture(SDLWindowRenderer, SDLWindowTexture, nullptr, nullptr);
-        }
-
-        /**
-         *  If the scale has changed, recalculate the mouse cursor image.
-         */
         if (scaled != SDL_Should_Scale()) {
             scaled = SDL_Should_Scale();
             static_cast<SDLMouseClass*>(MouseCursor)->Recalc_Cursor_Image();
         }
+    } else {
+        // No game surface to blit. Clear the swapchain so we don't present
+        // garbage from a previous frame.
+        SDL_GPUColorTargetInfo color_info = {};
+        color_info.texture = swapchain_texture;
+        color_info.load_op = SDL_GPU_LOADOP_CLEAR;
+        color_info.store_op = SDL_GPU_STOREOP_STORE;
+        color_info.clear_color = { 0.0f, 0.0f, 0.0f, 1.0f };
+        SDL_GPURenderPass* clear_pass = SDL_BeginGPURenderPass(command_buffer, &color_info, 1, nullptr);
+        if (clear_pass != nullptr) {
+            SDL_EndGPURenderPass(clear_pass);
+        }
     }
 
     /**
-     *  Present the image to the window.
+     *  Phase 2: ImGui. Prepare uploads vertex/index buffers via its own copy
+     *  pass before we start a render pass for it.
      */
-    ViniferaImGui::Render();
-    ViniferaRmlUi::Render();
+    ViniferaImGui::Prepare(command_buffer);
+    {
+        SDL_GPUColorTargetInfo color_info = {};
+        color_info.texture = swapchain_texture;
+        color_info.load_op = SDL_GPU_LOADOP_LOAD;
+        color_info.store_op = SDL_GPU_STOREOP_STORE;
+        SDL_GPURenderPass* imgui_pass = SDL_BeginGPURenderPass(command_buffer, &color_info, 1, nullptr);
+        if (imgui_pass != nullptr) {
+            ViniferaImGui::Render(command_buffer, imgui_pass);
+            SDL_EndGPURenderPass(imgui_pass);
+        }
+    }
 
-    SDL_RenderPresent(SDLWindowRenderer);
+    /**
+     *  Phase 3: RmlUi. The backend manages its own copy/render passes
+     *  internally, drawing on top of the swapchain with LOAD_OP_LOAD.
+     */
+    ViniferaRmlUi::Render(command_buffer, swapchain_texture, swapchain_width, swapchain_height);
 
+    SDL_SubmitGPUCommandBuffer(command_buffer);
     return true;
 }
 

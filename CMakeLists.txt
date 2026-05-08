@@ -283,14 +283,24 @@ set(SDL_VIRTUAL_JOYSTICK OFF)
 set(SDL_HIDAPI_JOYSTICK OFF)
 
 set(SDL_VIDEO ON)
-set(SDL_RENDER ON)
-set(SDL_DIRECTX ON)
-set(SDL_RENDER_D3D ON)
-set(SDL_RENDER_D3D11 ON)
-set(SDL_RENDER_D3D12 ON)
-set(SDL_OPENGL ON)
-set(SDL_VULKAN ON)
-set(SDL_RENDER_VULKAN ON)
+# SDL_GPU is used directly for all on-screen rendering. The SDL_Renderer 2D API
+# and its per-driver backends are not used by Vinifera. SDL_RENDER stays ON only
+# because some SDL_test/utility code still references the API; SDL_RENDER_D3D*
+# and SDL_RENDER_VULKAN are explicitly off so SDL doesn't compile those drivers.
+set(SDL_RENDER ON CACHE BOOL "" FORCE)
+set(SDL_RENDER_D3D OFF CACHE BOOL "" FORCE)
+set(SDL_RENDER_D3D11 OFF CACHE BOOL "" FORCE)
+set(SDL_RENDER_D3D12 OFF CACHE BOOL "" FORCE)
+set(SDL_RENDER_VULKAN OFF CACHE BOOL "" FORCE)
+# DirectX (DXGI) and Vulkan headers/loaders are enabled because SDL_GPU's
+# D3D12 backend depends on DXGI and its Vulkan backend depends on SDL_VULKAN.
+set(SDL_DIRECTX ON CACHE BOOL "" FORCE)
+set(SDL_OPENGL OFF CACHE BOOL "" FORCE)
+set(SDL_VULKAN ON CACHE BOOL "" FORCE)
+# SDL_GPU is the presentation API used by the game framebuffer, ImGui, and
+# RmlUi. Force it on so it survives stale CMakeCache values from earlier
+# configurations that pre-date the migration.
+set(SDL_GPU ON CACHE BOOL "" FORCE)
 
 set(SDL_AVX512F OFF)
 add_subdirectory(${CMAKE_SOURCE_DIR}/SDL)

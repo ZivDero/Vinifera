@@ -16,7 +16,7 @@
 #include "vinifera_globals.h"
 
 #include <imgui.h>
-#include <imgui_impl_sdlrenderer3.h>
+#include <imgui_impl_sdlgpu3.h>
 #include <imgui_impl_win32.h>
 
 #ifndef WM_MOUSEHWHEEL
@@ -94,17 +94,17 @@ namespace
 }
 
 /**
- *  Initializes the main-window ImGui context and backends.
+ *  Initializes the main-window ImGui context and the SDL_GPU renderer backend.
  *
  *  @author: ZivDero
  */
-bool ViniferaImGui::Initialize(HWND hwnd, SDL_Renderer* renderer)
+bool ViniferaImGui::Initialize(HWND hwnd, SDL_GPUDevice* device, SDL_GPUTextureFormat color_target_format)
 {
     if (IsInitialized) {
         return true;
     }
 
-    if (hwnd == nullptr || renderer == nullptr) {
+    if (hwnd == nullptr || device == nullptr) {
         return false;
     }
 
@@ -124,7 +124,12 @@ bool ViniferaImGui::Initialize(HWND hwnd, SDL_Renderer* renderer)
         return false;
     }
 
-    if (!ImGui_ImplSDLRenderer3_Init(renderer)) {
+    ImGui_ImplSDLGPU3_InitInfo init_info = {};
+    init_info.Device = device;
+    init_info.ColorTargetFormat = color_target_format;
+    init_info.MSAASamples = SDL_GPU_SAMPLECOUNT_1;
+
+    if (!ImGui_ImplSDLGPU3_Init(&init_info)) {
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
         return false;
@@ -146,7 +151,7 @@ void ViniferaImGui::Shutdown()
         return;
     }
 
-    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDLGPU3_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 
@@ -200,17 +205,19 @@ bool ViniferaImGui::Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, L
 }
 
 /**
- *  Renders the main-window ImGui frame through the active SDL renderer.
+ *  Builds the ImGui frame and uploads its draw lists onto the supplied
+ *  command buffer. Must run BEFORE the render pass that ImGui will draw
+ *  into; this is a hard requirement of imgui_impl_sdlgpu3.
  *
  *  @author: ZivDero
  */
-void ViniferaImGui::Render()
+void ViniferaImGui::Prepare(SDL_GPUCommandBuffer* command_buffer)
 {
-    if (!IsInitialized || SDLWindowRenderer == nullptr) {
+    if (!IsInitialized || command_buffer == nullptr) {
         return;
     }
 
-    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDLGPU3_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
@@ -221,7 +228,27 @@ void ViniferaImGui::Render()
 #endif
 
     ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), SDLWindowRenderer);
+    ImGui_ImplSDLGPU3_PrepareDrawData(ImGui::GetDrawData(), command_buffer);
+}
+
+/**
+ *  Issues ImGui draw commands inside the supplied render pass. Must be
+ *  called between Prepare() and the end of the same render pass.
+ *
+ *  @author: ZivDero
+ */
+void ViniferaImGui::Render(SDL_GPUCommandBuffer* command_buffer, SDL_GPURenderPass* render_pass)
+{
+    if (!IsInitialized || command_buffer == nullptr || render_pass == nullptr) {
+        return;
+    }
+
+    ImDrawData* draw_data = ImGui::GetDrawData();
+    if (draw_data == nullptr) {
+        return;
+    }
+
+    ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
 }
 
 /**

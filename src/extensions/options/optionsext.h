@@ -25,10 +25,7 @@ public:
 
     enum RendererDriverType {
         RENDERER_DRIVER_AUTO = -1,
-        RENDERER_DRIVER_DIRECT3D,
-        RENDERER_DRIVER_DIRECT3D11,
         RENDERER_DRIVER_DIRECT3D12,
-        RENDERER_DRIVER_OPENGL,
         RENDERER_DRIVER_VULKAN
     };
 

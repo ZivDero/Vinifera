@@ -31,11 +31,28 @@ namespace
     };
 
     const RendererDriverInfo RendererDrivers[] = {
-        {"Direct3D", "direct3d", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D},
-        {"Direct3D11", "direct3d11", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D11},
         {"Direct3D12", "direct3d12", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D12},
-        {"OpenGL", "opengl", OptionsClassExtension::RENDERER_DRIVER_OPENGL},
         {"Vulkan", "vulkan", OptionsClassExtension::RENDERER_DRIVER_VULKAN}
+    };
+
+    /**
+     *  Legacy renderer driver names from the SDL_Renderer-based pipeline. Kept
+     *  for INI compatibility: rather than rejecting old configs we remap to the
+     *  closest supported SDL_GPU driver and warn.
+     */
+    struct LegacyRendererDriverAlias
+    {
+        const char* ConfigName;
+        OptionsClassExtension::RendererDriverType RemapTo;
+    };
+
+    const LegacyRendererDriverAlias LegacyRendererDriverAliases[] = {
+        {"Direct3D",   OptionsClassExtension::RENDERER_DRIVER_DIRECT3D12},
+        {"direct3d",   OptionsClassExtension::RENDERER_DRIVER_DIRECT3D12},
+        {"Direct3D11", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D12},
+        {"direct3d11", OptionsClassExtension::RENDERER_DRIVER_DIRECT3D12},
+        {"OpenGL",     OptionsClassExtension::RENDERER_DRIVER_AUTO},
+        {"opengl",     OptionsClassExtension::RENDERER_DRIVER_AUTO}
     };
 }
 
@@ -54,6 +71,14 @@ OptionsClassExtension::RendererDriverType OptionsClassExtension::Parse_Renderer_
     for (const RendererDriverInfo& driver : RendererDrivers) {
         if (stricmp(name, driver.ConfigName) == 0 || stricmp(name, driver.SDLName) == 0) {
             return driver.Type;
+        }
+    }
+
+    for (const LegacyRendererDriverAlias& alias : LegacyRendererDriverAliases) {
+        if (stricmp(name, alias.ConfigName) == 0) {
+            DEBUG_WARNING("Renderer driver \"%s\" is no longer supported; remapping to \"%s\".\n",
+                name, Get_Renderer_Driver_Config_Name(alias.RemapTo));
+            return alias.RemapTo;
         }
     }
 

@@ -11,7 +11,10 @@
 
 #include <Windows.h>
 
-struct SDL_Renderer;
+struct SDL_Window;
+struct SDL_GPUDevice;
+struct SDL_GPUTexture;
+struct SDL_GPUCommandBuffer;
 
 namespace Rml
 {
@@ -27,11 +30,17 @@ namespace ViniferaRmlUi
         Modal,
     };
 
-    bool Initialize(HWND hwnd, SDL_Renderer* renderer);
+    bool Initialize(HWND hwnd, SDL_Window* window, SDL_GPUDevice* device);
     void Shutdown();
 
     bool Process_Window_Message(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-    void Render();
+
+    /**
+     *  Records RmlUi draws onto the supplied command buffer, targeting the
+     *  given swapchain texture. The backend manages its own copy/render
+     *  passes internally; both must be off when entering this function.
+     */
+    void Render(SDL_GPUCommandBuffer* command_buffer, SDL_GPUTexture* swapchain_texture, unsigned width, unsigned height);
 
     bool Is_Initialized();
     bool Is_Dialog_Open();
