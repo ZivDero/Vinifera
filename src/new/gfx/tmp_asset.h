@@ -5,9 +5,9 @@
  *
  *          Reads the in-memory `IsoTileSet` produced by vanilla's TMP loader,
  *          walks the per-sub-tile `IsoTileRecord` array, and packs every
- *          sub-tile's diamond pixel data into a single R8_UINT atlas.
- *          Per-pixel `ZData` is read but unused in Stage 3.0 (deferred to a
- *          future stage that wires `SV_Depth` corrections).
+ *          sub-tile's diamond pixel data into a shared R8_UINT color atlas,
+ *          with matching per-pixel `ZData` in a parallel R8_UINT atlas for
+ *          the tile shader's `SV_Depth` corrections.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors

@@ -35,7 +35,8 @@ namespace Vinifera::Gfx
     struct TileEffectParams
     {
         float    AtlasSize[2];      // pixels — used for int2(uv * AtlasSize) -> Load
-        float    _Pad[2];
+        float    ZDataDepthScale;
+        float    _Pad;
     };
 
 

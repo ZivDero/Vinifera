@@ -100,6 +100,8 @@ namespace Vinifera::Gfx
         TileEffectParams params = {};
         params.AtlasSize[0] = (float)shared_atlas.Width();
         params.AtlasSize[1] = (float)shared_atlas.Height();
+        params.ZDataDepthScale = 1.0f / 16000.0f;
+        ID3D11ShaderResourceView* z_atlas_srv = TmpAtlas::Get().Get_Z_Texture().Get_SRV();
 
         size_t i = 0;
         while (i < Commands.size()) {
@@ -115,6 +117,7 @@ namespace Vinifera::Gfx
                         EDepthStencil::WriteLessEqual);
             TileEffectInstance.Bind_Palette(device, *head.Palette);
             TileEffectInstance.Set_Params(device, params);
+            device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
 
             for (size_t k = i; k < j; ++k) {
                 const TileDrawCmd& c = Commands[k];
@@ -131,7 +134,7 @@ namespace Vinifera::Gfx
                     src = { (float)st->AtlasX, (float)st->AtlasY,
                             (float)st->W,       (float)st->H };
                 }
-                Batch.Draw(&shared_atlas, c.Dst, &src, c.VertexTint, c.DstZ);
+                Batch.Draw(&shared_atlas, c.Dst, &src, c.VertexTint, c.DstZTop, c.DstZBottom);
             }
 
             Batch.End(device);
@@ -140,8 +143,8 @@ namespace Vinifera::Gfx
             i = j;
         }
 
-        ID3D11ShaderResourceView* null_srvs[2] = {};
-        device.Get_Context()->PSSetShaderResources(0, 2, null_srvs);
+        ID3D11ShaderResourceView* null_srvs[3] = {};
+        device.Get_Context()->PSSetShaderResources(0, 3, null_srvs);
 
         Commands.clear();
     }

@@ -129,6 +129,13 @@ namespace Vinifera::Gfx
 
     void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z)
     {
+        Draw(texture, dst, src, color, z, z);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           uint32_t color, float z_top, float z_bottom)
+    {
         if (!BatchOpen || texture == nullptr || !dst.Is_Valid()) {
             return;
         }
@@ -146,10 +153,10 @@ namespace Vinifera::Gfx
         PendingSprite s = {};
         s.Tex = texture;
 
-        s.V[0] = { { dst.X,         dst.Y,         z }, { u0, v0 }, color };
-        s.V[1] = { { dst.X + dst.W, dst.Y,         z }, { u1, v0 }, color };
-        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z }, { u1, v1 }, color };
-        s.V[3] = { { dst.X,         dst.Y + dst.H, z }, { u0, v1 }, color };
+        s.V[0] = { { dst.X,         dst.Y,         z_top }, { u0, v0 }, color };
+        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top }, { u1, v0 }, color };
+        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, color };
+        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, color };
 
         Pending.push_back(s);
     }

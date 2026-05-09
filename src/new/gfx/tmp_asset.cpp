@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 
 namespace Vinifera::Gfx
@@ -146,7 +147,11 @@ namespace Vinifera::Gfx
              *  The shader's `idx == 0` discard produces the diamond shape.
              */
             const uint8_t* src = reinterpret_cast<const uint8_t*>(record) + sizeof(IsoTileRecord);
+            const uint8_t* zsrc = (s.HasZData && record->ZDataOffset > 0)
+                ? reinterpret_cast<const uint8_t*>(record) + record->ZDataOffset
+                : nullptr;
             uint8_t unpacked[kDiamondW * kDiamondH] = {};
+            uint8_t unpacked_z[kDiamondW * kDiamondH] = {};
             int src_off = 0;
             for (int y = 0; y < kDiamondH; ++y) {
                 int width;
@@ -160,6 +165,9 @@ namespace Vinifera::Gfx
                 if (width == 0) continue;
                 const int x_start = (kDiamondW - width) / 2;
                 memcpy(&unpacked[y * kDiamondW + x_start], &src[src_off], (size_t)width);
+                if (zsrc != nullptr) {
+                    memcpy(&unpacked_z[y * kDiamondW + x_start], &zsrc[src_off], (size_t)width);
+                }
                 src_off += width;
             }
 
@@ -169,6 +177,7 @@ namespace Vinifera::Gfx
                 continue;
             }
             atlas.Upload_Region(s.AtlasX, s.AtlasY, s.W, s.H, unpacked, s.W);
+            atlas.Upload_Z_Region(s.AtlasX, s.AtlasY, s.W, s.H, unpacked_z, s.W);
 
             /**
              *  Optional extra graphics (cliffs / walls / ramp bodies).
@@ -190,6 +199,14 @@ namespace Vinifera::Gfx
                     if (atlas.Allocate_Region(s.ExtraW, s.ExtraH, s.ExtraAtlasX, s.ExtraAtlasY)) {
                         atlas.Upload_Region(s.ExtraAtlasX, s.ExtraAtlasY,
                                             s.ExtraW, s.ExtraH, extra, s.ExtraW);
+                        std::vector<uint8_t> extra_z((size_t)s.ExtraW * (size_t)s.ExtraH);
+                        if (s.HasZData && record->ExtraZOffset > 0) {
+                            const uint8_t* extra_z_src =
+                                reinterpret_cast<const uint8_t*>(record) + record->ExtraZOffset;
+                            memcpy(extra_z.data(), extra_z_src, extra_z.size());
+                        }
+                        atlas.Upload_Z_Region(s.ExtraAtlasX, s.ExtraAtlasY,
+                                              s.ExtraW, s.ExtraH, extra_z.data(), s.ExtraW);
                         extra_uploaded = true;
                     }
                 }

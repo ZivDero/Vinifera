@@ -52,6 +52,18 @@ typedef void (__thiscall *VanillaDrawTileFn)(IsometricTileTypeClass*,
 static const VanillaDrawTileFn Vanilla_Draw_Tile =
     reinterpret_cast<VanillaDrawTileFn>(0x004F6630);
 
+static float Tile_Base_Depth_From_Visual_Y(int y_off, int cell_level, int tile_height)
+{
+    const float kMaxScreenY = 16000.0f;
+    const int level_draw_pixels = (LEVEL_PIXEL_H_1 > 0) ? LEVEL_PIXEL_H_1 : 12;
+    const float depth_y = (float)(y_off + tile_height + cell_level * level_draw_pixels);
+
+    float dz = 1.0f - (depth_y / kMaxScreenY);
+    if (dz < 0.001f) dz = 0.001f;
+    if (dz > 0.999f) dz = 0.999f;
+    return dz;
+}
+
 
 /**
  *  Fake extension class so we can declare a member function with __thiscall
@@ -150,17 +162,14 @@ void IsoTileTypeClassExt::_Draw_Tile(
     const float yscale = (VideoHeight > 0) ? (float)device.Get_Backbuffer_Height() / (float)VideoHeight : 1.0f;
 
     /**
-     *  Cell-screen depth: mirrors the sprite proxy's screen-Y normalization,
-     *  with epsilon=0 (tiles are the depth floor). Cell elevation is already
-     *  baked into y_off by CellClass::Draw_It.
+     *  Vanilla seeds one base Z value per tile from the visually-raised
+     *  y_off, then subtracts another half-cell-height per cell_level. Since
+     *  CellClass::Draw_It already raised y_off by LEVEL_PIXEL_H_1 * level,
+     *  those terms cancel back to the unraised cell plane. Per-pixel terrain
+     *  shape comes from TMP ZData / ExtraZOffset, not from a whole-cell level
+     *  band or a synthetic vertex gradient.
      */
-    float dz;
-    {
-        const float kMaxScreenY = 16000.0f;
-        dz = 1.0f - ((float)y_off / kMaxScreenY);
-        if (dz < 0.001f) dz = 0.001f;
-        if (dz > 0.999f) dz = 0.999f;
-    }
+    const float dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
 
     /**
      *  Per-cell brightness modulate. cell_color is 1..256-ish in vanilla's
@@ -189,7 +198,8 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.Dst.Y        = (float)y_off * yscale;
     cmd.Dst.W        = (float)st->W * xscale;
     cmd.Dst.H        = (float)st->H * yscale;
-    cmd.DstZ         = dz;
+    cmd.DstZTop      = dz;
+    cmd.DstZBottom   = dz;
     cmd.VertexTint   = tint;
     cmd.DrawExtra    = false;
 
@@ -199,8 +209,8 @@ void IsoTileTypeClassExt::_Draw_Tile(
      *  Cliffs / walls / ramp bodies live in the per-record extra rect.
      *  vanilla blits this on top of the base diamond at offset
      *  (record->ExtraX, record->ExtraY) — typically negative Y for cliffs
-     *  that extend upward. Render as a separate quad with the same palette
-     *  + slightly closer Z (so it sits on top of the base ground).
+     *  that extend upward. Render as a separate quad with the same base Z;
+     *  ExtraZOffset supplies the per-pixel cliff/body depth.
      */
     if (st->HasExtraData && st->ExtraW > 0 && st->ExtraH > 0) {
         TileDrawCmd extra_cmd = cmd;
@@ -213,9 +223,9 @@ void IsoTileTypeClassExt::_Draw_Tile(
          *  Cliffs draw on top of the base ground at the same cell — bias Z
          *  slightly closer than the base so depth-test resolves correctly.
          */
-        const float kExtraEpsilon = 1e-4f;
-        extra_cmd.DstZ      = dz - kExtraEpsilon;
-        if (extra_cmd.DstZ < 0.001f) extra_cmd.DstZ = 0.001f;
+        const float extra_dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
+        extra_cmd.DstZTop = extra_dz;
+        extra_cmd.DstZBottom = extra_dz;
 
         TileQueue::Get().Submit(extra_cmd);
     }
@@ -225,7 +235,6 @@ void IsoTileTypeClassExt::_Draw_Tile(
     (void)b1; (void)b2; (void)b3;
     (void)grey_shift;
     (void)cliprect;
-    (void)cell_level;
 }
 
 

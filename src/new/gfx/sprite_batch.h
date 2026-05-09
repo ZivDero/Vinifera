@@ -90,6 +90,14 @@ namespace Vinifera::Gfx
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z = 0.0f);
 
         /**
+         *  Draw with vertical depth interpolation. Useful for terrain/cliff
+         *  quads where the artwork spans multiple screen rows and must write
+         *  a depth gradient instead of one constant depth.
+         */
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  uint32_t color, float z_top, float z_bottom);
+
+        /**
          *  Convenience: draw at (x, y) with the texture's natural size.
          */
         void Draw(Texture2D* texture, float x, float y, uint32_t color = 0xFFFFFFFFu, float z = 0.0f);

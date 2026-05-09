@@ -4,10 +4,10 @@
  *  @brief  Shared mega-atlas for all TMP tilesets.
  *
  *          Every TmpAsset allocates regions inside this single R8_UINT
- *          texture instead of owning its own atlas. Result: all tile draws
- *          can share one SRV, so TileQueue::Flush groups by palette only —
- *          the per-(asset,palette) fragmentation collapses into a handful
- *          of batches.
+ *          texture pair instead of owning its own atlas. Result: all tile
+ *          draws can share one color SRV and one Z SRV, so TileQueue::Flush
+ *          groups by palette only — the per-(asset,palette) fragmentation
+ *          collapses into a handful of batches.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -54,11 +54,15 @@ namespace Vinifera::Gfx
          */
         bool Upload_Region(int x, int y, int w, int h,
                            const uint8_t* pixels, int pitch_bytes);
+        bool Upload_Z_Region(int x, int y, int w, int h,
+                             const uint8_t* pixels, int pitch_bytes);
 
         Texture2D& Get_Texture() { return Atlas; }
         const Texture2D& Get_Texture() const { return Atlas; }
+        Texture2D& Get_Z_Texture() { return ZAtlas; }
+        const Texture2D& Get_Z_Texture() const { return ZAtlas; }
 
-        bool Is_Initialized() const { return Atlas.Get_SRV() != nullptr; }
+        bool Is_Initialized() const { return Atlas.Get_SRV() != nullptr && ZAtlas.Get_SRV() != nullptr; }
 
         /* Telemetry. */
         int  Cursor_X() const { return CursorX; }
@@ -71,6 +75,7 @@ namespace Vinifera::Gfx
         TmpAtlas() = default;
 
         Texture2D Atlas;
+        Texture2D ZAtlas;
         int CursorX = 0;
         int CursorY = 0;
         int RowH    = 0;

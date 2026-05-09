@@ -35,7 +35,8 @@ namespace Vinifera::Gfx
         PaletteLUT*  Palette;
         int          SubTileIndex;
         RectF        Dst;             // backbuffer-pixel space
-        float        DstZ;             // depth value [0,1]; 0 = near plane
+        float        DstZTop;          // depth value [0,1]; 0 = near plane
+        float        DstZBottom;
         uint32_t     VertexTint;      // per-cell brightness modulate
         bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
     };

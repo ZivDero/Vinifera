@@ -33,7 +33,8 @@ namespace Vinifera::Gfx
             "};\n"
             "cbuffer EffectCB : register(b1) {\n"
             "    float2 AtlasSize;\n"
-            "    float2 _pad;\n"
+            "    float ZDataDepthScale;\n"
+            "    float _pad;\n"
             "};\n"
             "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
             "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
@@ -47,7 +48,9 @@ namespace Vinifera::Gfx
             "}\n"
             "Texture2D<uint>   Atlas   : register(t0);\n"
             "Texture2D<float4> Palette : register(t1);\n"
-            "float4 PSMain(VSOut v) : SV_Target {\n"
+            "Texture2D<uint>   ZAtlas  : register(t2);\n"
+            "struct PSOut { float4 color : SV_Target; float depth : SV_Depth; };\n"
+            "PSOut PSMain(VSOut v) {\n"
             "    int2 px = int2(v.uv * AtlasSize);\n"
             "    uint idx = Atlas.Load(int3(px, 0));\n"
             "    if (idx == 0) discard;\n"
@@ -55,7 +58,11 @@ namespace Vinifera::Gfx
             "    c.rgb *= v.col.rgb;\n"
             "    /* Tiles are opaque; alpha not used downstream, but write 1 to be safe. */\n"
             "    c.a = 1.0;\n"
-            "    return c;\n"
+            "    uint z = ZAtlas.Load(int3(px, 0));\n"
+            "    PSOut o;\n"
+            "    o.color = c;\n"
+            "    o.depth = saturate(v.pos.z + (float)z * ZDataDepthScale);\n"
+            "    return o;\n"
             "}\n";
     }
 

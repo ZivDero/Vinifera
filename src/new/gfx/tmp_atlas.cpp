@@ -29,22 +29,30 @@ namespace Vinifera::Gfx
 
     bool TmpAtlas::Initialize(GraphicsDevice& device, int width, int height)
     {
-        if (Atlas.Get_SRV() != nullptr) {
+        if (Is_Initialized()) {
             return true;
         }
         if (!Atlas.Initialize(device, width, height, DXGI_FORMAT_R8_UINT,
                               D3D11_USAGE_DEFAULT, nullptr, 0)) {
             DEBUG_ERROR("TmpAtlas: failed to create %dx%d atlas.\n", width, height);
+            Shutdown();
+            return false;
+        }
+        if (!ZAtlas.Initialize(device, width, height, DXGI_FORMAT_R8_UINT,
+                               D3D11_USAGE_DEFAULT, nullptr, 0)) {
+            DEBUG_ERROR("TmpAtlas: failed to create %dx%d Z atlas.\n", width, height);
+            Shutdown();
             return false;
         }
         Reset();
-        DEBUG_INFO("TmpAtlas: %dx%d atlas ready.\n", width, height);
+        DEBUG_INFO("TmpAtlas: %dx%d color+Z atlas ready.\n", width, height);
         return true;
     }
 
 
     void TmpAtlas::Shutdown()
     {
+        ZAtlas.Shutdown();
         Atlas.Shutdown();
         CursorX = CursorY = RowH = 0;
     }
@@ -60,7 +68,7 @@ namespace Vinifera::Gfx
 
     bool TmpAtlas::Allocate_Region(int w, int h, int& out_x, int& out_y)
     {
-        if (w <= 0 || h <= 0 || Atlas.Get_SRV() == nullptr) {
+        if (w <= 0 || h <= 0 || !Is_Initialized()) {
             return false;
         }
         const int aw = Atlas.Width();
@@ -92,9 +100,16 @@ namespace Vinifera::Gfx
     }
 
 
+    bool TmpAtlas::Upload_Z_Region(int x, int y, int w, int h,
+                                   const uint8_t* pixels, int pitch_bytes)
+    {
+        return ZAtlas.Set_Sub_Data(x, y, w, h, pixels, pitch_bytes);
+    }
+
+
     long long TmpAtlas::Used_Pixels() const
     {
-        if (Atlas.Get_SRV() == nullptr) return 0;
+        if (!Is_Initialized()) return 0;
         /**
          *  Approximation: completed rows take their full row width × row
          *  height, plus the current row's used portion. Treats the gap from
@@ -107,7 +122,7 @@ namespace Vinifera::Gfx
 
     long long TmpAtlas::Total_Pixels() const
     {
-        if (Atlas.Get_SRV() == nullptr) return 0;
+        if (!Is_Initialized()) return 0;
         return (long long)Atlas.Width() * (long long)Atlas.Height();
     }
 }
