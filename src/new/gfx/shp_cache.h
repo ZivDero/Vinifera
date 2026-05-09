@@ -47,6 +47,8 @@ namespace Vinifera::Gfx
 
         void Clear();
 
+        int Size() const { return (int)Map.size(); }
+
     private:
         ShpCache() = default;
         std::unordered_map<const ShapeSet*, std::unique_ptr<ShpAsset>> Map;
@@ -68,6 +70,8 @@ namespace Vinifera::Gfx
 
         void Clear();
 
+        int Size() const { return (int)Map.size(); }
+
     private:
         PaletteCache() = default;
         std::unordered_map<const ConvertClass*, std::unique_ptr<PaletteLUT>> Map;
@@ -87,6 +91,8 @@ namespace Vinifera::Gfx
         TmpAsset* Get_Or_Load(GraphicsDevice& device, const void* iso_tileset);
 
         void Clear();
+
+        int Size() const { return (int)Map.size(); }
 
     private:
         TmpCache() = default;

@@ -21,6 +21,8 @@ bool Vinifera_AudioDebug = false;
 
 bool Vinifera_ShpViewer = false;
 
+bool Vinifera_PerfWindow = true;
+
 bool Vinifera_PerformingLoad = false;
 
 bool Vinifera_PrintFileErrors = true;

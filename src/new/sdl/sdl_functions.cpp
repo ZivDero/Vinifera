@@ -19,6 +19,7 @@
 #include "command.h"
 #include "convert.h"
 #include "graphics_device.h"
+#include "perf_monitor.h"
 #include "shp_cache.h"
 #include "shp_viewer.h"
 #include "sprite_queue.h"
@@ -660,6 +661,12 @@ bool SDL_Update_Screen(Surface* surface)
         return false;
     }
 
+    Vinifera::Gfx::PerfMonitor::Get().Begin_Frame();
+    Vinifera::Gfx::PerfMonitor::Get().Set_Cache_Sizes(
+        Vinifera::Gfx::ShpCache::Get().Size(),
+        Vinifera::Gfx::TmpCache::Get().Size(),
+        Vinifera::Gfx::PaletteCache::Get().Size());
+
     Vinifera::Gfx::Device->Set_VSync(OptionsExtension->IsVSync);
     Vinifera::Gfx::Device->Begin_Frame();
 
@@ -714,6 +721,7 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     Vinifera::Gfx::Device->End_Frame();
+    Vinifera::Gfx::PerfMonitor::Get().End_Frame();
 
     return true;
 }

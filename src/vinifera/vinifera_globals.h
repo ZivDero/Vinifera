@@ -35,6 +35,8 @@ extern bool Vinifera_AudioDebug;
 
 extern bool Vinifera_ShpViewer;
 
+extern bool Vinifera_PerfWindow;
+
 extern bool Vinifera_PerformingLoad;
 
 extern bool Vinifera_PrintFileErrors;

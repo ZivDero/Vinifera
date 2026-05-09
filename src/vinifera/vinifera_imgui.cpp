@@ -13,6 +13,7 @@
 
 #include "audio_manager.h"
 #include "debughandler.h"
+#include "perf_monitor.h"
 #include "shp_viewer.h"
 #include "vinifera_globals.h"
 
@@ -224,6 +225,8 @@ void ViniferaImGui::Render()
     if (Vinifera::Gfx::g_ShpViewer != nullptr) {
         Vinifera::Gfx::g_ShpViewer->Build_UI();
     }
+
+    Vinifera::Gfx::PerfMonitor::Get().Build_UI();
 
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());

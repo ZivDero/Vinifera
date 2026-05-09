@@ -13,6 +13,7 @@
 
 #include "debughandler.h"
 #include "graphics_device.h"
+#include "perf_monitor.h"
 
 #include <cstring>
 
@@ -59,6 +60,7 @@ namespace Vinifera::Gfx
             return;
         }
         Commands.push_back(cmd);
+        PerfMonitor::Get().Note_Sprite_Submit();
     }
 
 
@@ -143,6 +145,8 @@ namespace Vinifera::Gfx
             }
 
             Batch.End(device);
+            PerfMonitor::Get().Note_Sprite_Batch();
+            PerfMonitor::Get().Note_Sprite_Draw_Call();
             i = j;
         }
 
