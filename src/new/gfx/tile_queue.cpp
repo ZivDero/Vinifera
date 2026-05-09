@@ -15,6 +15,8 @@
 #include "graphics_device.h"
 #include "perf_monitor.h"
 
+#include <algorithm>
+
 
 namespace Vinifera::Gfx
 {
@@ -81,10 +83,23 @@ namespace Vinifera::Gfx
         device.Bind_Backbuffer();
 
         /**
-         *  Walk the queue in submission order, grouping contiguous commands
-         *  that share (Asset, Palette). One TileEffect::Set_Params per
-         *  asset (atlas size constant within a batch). Depth-write enabled
-         *  so sprites can test against the resulting terrain depth.
+         *  Sort by (Asset, Palette) so contiguous runs are maximised. Safe
+         *  for tiles because they depth-test+depth-write — visibility is
+         *  determined by Z, not draw order. With per-cell LightConvertClass
+         *  fragmenting the queue, this collapses thousands of tiny batches
+         *  into a handful.
+         */
+        std::sort(Commands.begin(), Commands.end(),
+            [](const TileDrawCmd& a, const TileDrawCmd& b) {
+                if (a.Asset != b.Asset) return a.Asset < b.Asset;
+                return a.Palette < b.Palette;
+            });
+
+        /**
+         *  Group consecutive commands sharing (Asset, Palette). One
+         *  TileEffect::Set_Params per asset (atlas size constant within a
+         *  batch). Depth-write enabled so sprites can test against the
+         *  resulting terrain depth.
          */
         size_t i = 0;
         while (i < Commands.size()) {
