@@ -30,6 +30,7 @@ namespace Vinifera::Gfx
     class GraphicsDevice;
     class PaletteLUT;
     class ShpAsset;
+    class TmpAsset;
 
 
     class ShpCache
@@ -70,5 +71,25 @@ namespace Vinifera::Gfx
     private:
         PaletteCache() = default;
         std::unordered_map<const ConvertClass*, std::unique_ptr<PaletteLUT>> Map;
+    };
+
+
+    class TmpCache
+    {
+    public:
+        static TmpCache& Get();
+
+        /**
+         *  Look up the atlas for `iso_tileset` (vanilla's `IsoTileSet*`,
+         *  passed in as void* since the layout is mirrored locally inside
+         *  TmpAsset). Lazy-builds on first hit. Returns nullptr on failure.
+         */
+        TmpAsset* Get_Or_Load(GraphicsDevice& device, const void* iso_tileset);
+
+        void Clear();
+
+    private:
+        TmpCache() = default;
+        std::unordered_map<const void*, std::unique_ptr<TmpAsset>> Map;
     };
 }

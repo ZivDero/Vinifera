@@ -22,6 +22,7 @@
 #include "shp_cache.h"
 #include "shp_viewer.h"
 #include "sprite_queue.h"
+#include "tile_queue.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -256,6 +257,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera SpriteQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::TileQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera TileQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -268,11 +273,13 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
 void SDL_Reset_Video_Mode()
 {
     /**
-     *  Asset caches and the sprite queue hold textures bound to the
+     *  Asset caches and the sprite/tile queues hold textures bound to the
      *  GraphicsDevice — release them before the device tears down, since
      *  re-initializing on a new device requires fresh resources anyway.
      */
+    Vinifera::Gfx::TileQueue::Get().Shutdown();
     Vinifera::Gfx::SpriteQueue::Get().Shutdown();
+    Vinifera::Gfx::TmpCache::Get().Clear();
     Vinifera::Gfx::ShpCache::Get().Clear();
     Vinifera::Gfx::PaletteCache::Get().Clear();
 
@@ -690,12 +697,11 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     /**
-     *  Flush the GPU sprite queue — patched Draw_Shape callsites populated it
-     *  during the game's render pass earlier this frame (Tactical::Render,
-     *  Layer::Draw, etc.). Drawing here puts them on top of the CompositeSurface
-     *  present output, preserving submission order as the layering mechanism
-     *  (until Stage 3 introduces a depth buffer).
+     *  Flush GPU queues populated by patched Draw_Tile / Draw_Shape callsites
+     *  during the game's render pass. Tiles go first with depth-write
+     *  enabled, then sprites depth-test against the resulting terrain depth.
      */
+    Vinifera::Gfx::TileQueue::Get().Flush(*Vinifera::Gfx::Device);
     Vinifera::Gfx::SpriteQueue::Get().Flush(*Vinifera::Gfx::Device);
 
     /**

@@ -34,6 +34,7 @@ namespace Vinifera::Gfx
         PaletteLUT*  Palette;
         int          FrameIndex;
         RectF        Dst;             // backbuffer-pixel space
+        float        DstZ;             // depth value [0,1]; 0 = near plane
         uint32_t     EffectFlags;     // SEF_* from sprite_effect.h
         uint32_t     VertexTint;      // RGBA8, derived from `intensity`
         bool         UseRemap;

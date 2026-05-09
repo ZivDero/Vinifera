@@ -50,7 +50,9 @@ namespace Vinifera::Gfx
 
     enum class EDepthStencil
     {
-        None,               // depth & stencil off (default for 2D)
+        None,                   // depth & stencil off (default for 2D)
+        WriteLessEqual,         // depth-test LessEqual + depth-write enabled (terrain tiles)
+        TestLessEqual_NoWrite,  // depth-test LessEqual, depth-write disabled (sprites)
 
         Count
     };

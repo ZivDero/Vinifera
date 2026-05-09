@@ -182,6 +182,25 @@ void Draw_Shape_Proxy_DX11(
     cmd.VertexTint  = Tint_From_Intensity(intensity);
 
     /**
+     *  Depth: WAE-style screen-Y normalization. Larger screen Y means the
+     *  object is closer to the camera (front of the isometric view), so it
+     *  gets a smaller depth value. Map (0..16000) → (1.0..0.0); subtract a
+     *  per-class epsilon so identical-Y sprites of different categories
+     *  tiebreak deterministically (unit-vs-overlay, projectile-vs-unit, etc).
+     *  Tiles use the same scale (with epsilon=0), so sprites depth-test
+     *  correctly against terrain.
+     */
+    {
+        const float kMaxScreenY = 16000.0f;
+        const float kSpriteEpsilon = 5e-5f;     // SEF_*-derived adjustments could refine this later
+        float dz = 1.0f - ((float)y / kMaxScreenY);
+        if (dz < 0.001f) dz = 0.001f;
+        if (dz > 0.999f) dz = 0.999f;
+        dz -= kSpriteEpsilon;
+        cmd.DstZ = dz;
+    }
+
+    /**
      *  House-color remap. Vanilla's `remap` is a 256-byte LUT but only the
      *  16-entry slot for indices 16..31 ever differs in practice. Our
      *  PaletteLUT::Update_Remap consumes 16 bytes; copy from offset 16 of the

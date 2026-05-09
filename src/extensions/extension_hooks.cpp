@@ -89,6 +89,7 @@
 #include "smudgeext_hooks.h"
 #include "smudgetypeext_hooks.h"
 #include "draw_shapeext_hooks.h"
+#include "draw_tileext_hooks.h"
 #include "spawnmanager_hooks.h"
 #include "storageext_hooks.h"
 #include "superext_hooks.h"
@@ -268,6 +269,7 @@ void Extension_Hooks()
      */
     SkirmishDialog_Hooks();
     DrawShape_Hooks();
+    DrawTile_Hooks();
 
     /**
      *  Miscellaneous hooks

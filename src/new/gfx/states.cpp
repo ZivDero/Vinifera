@@ -176,6 +176,18 @@ namespace Vinifera::Gfx
             dsd.DepthEnable = FALSE;
             dsd.StencilEnable = FALSE;
             break;
+        case EDepthStencil::WriteLessEqual:
+            dsd.DepthEnable = TRUE;
+            dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+            dsd.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+            dsd.StencilEnable = FALSE;
+            break;
+        case EDepthStencil::TestLessEqual_NoWrite:
+            dsd.DepthEnable = TRUE;
+            dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            dsd.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+            dsd.StencilEnable = FALSE;
+            break;
         default: return nullptr;
         }
 

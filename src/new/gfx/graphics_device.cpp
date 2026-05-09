@@ -69,6 +69,10 @@ namespace Vinifera::Gfx
             Shutdown();
             return false;
         }
+        if (!Create_Depth_Buffer(backbuffer_width, backbuffer_height)) {
+            Shutdown();
+            return false;
+        }
 
         StateCacheInstance.Initialize(Device);
 
@@ -88,6 +92,7 @@ namespace Vinifera::Gfx
         Release_Surface_Texture();
         Release_Present_Pipeline();
         StateCacheInstance.Shutdown();
+        Release_Depth_Buffer();
         Release_Backbuffer_RTV();
         Safe_Release(SwapChain);
         Safe_Release(DxgiFactory);
@@ -200,6 +205,37 @@ namespace Vinifera::Gfx
     }
 
 
+    bool GraphicsDevice::Create_Depth_Buffer(int width, int height)
+    {
+        D3D11_TEXTURE2D_DESC td = {};
+        td.Width = width;
+        td.Height = height;
+        td.MipLevels = 1;
+        td.ArraySize = 1;
+        td.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_DEFAULT;
+        td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        if (FAILED(Device->CreateTexture2D(&td, nullptr, &DepthTex))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: depth texture creation failed.\n");
+            return false;
+        }
+        if (FAILED(Device->CreateDepthStencilView(DepthTex, nullptr, &DepthDSV))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: DSV creation failed.\n");
+            Release_Depth_Buffer();
+            return false;
+        }
+        return true;
+    }
+
+
+    void GraphicsDevice::Release_Depth_Buffer()
+    {
+        Safe_Release(DepthDSV);
+        Safe_Release(DepthTex);
+    }
+
+
     bool GraphicsDevice::Create_Present_Pipeline()
     {
         ID3DBlob* vs_blob = nullptr;
@@ -248,6 +284,7 @@ namespace Vinifera::Gfx
 
         Context->OMSetRenderTargets(0, nullptr, nullptr);
         Release_Backbuffer_RTV();
+        Release_Depth_Buffer();
 
         UINT flags = TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
         if (FAILED(SwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, flags))) {
@@ -255,7 +292,9 @@ namespace Vinifera::Gfx
         }
         BackbufferWidth = width;
         BackbufferHeight = height;
-        return Create_Backbuffer_RTV();
+        if (!Create_Backbuffer_RTV()) return false;
+        if (!Create_Depth_Buffer(width, height)) return false;
+        return true;
     }
 
 
@@ -323,8 +362,11 @@ namespace Vinifera::Gfx
             return;
         }
         const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-        Context->OMSetRenderTargets(1, &BackbufferRTV, nullptr);
+        Context->OMSetRenderTargets(1, &BackbufferRTV, DepthDSV);
         Context->ClearRenderTargetView(BackbufferRTV, clear_color);
+        if (DepthDSV != nullptr) {
+            Context->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        }
 
         D3D11_VIEWPORT vp = {};
         vp.Width  = (float)BackbufferWidth;
@@ -341,7 +383,13 @@ namespace Vinifera::Gfx
             return;
         }
         ID3D11RenderTargetView* rtv = (target != nullptr) ? target->Get_RTV() : BackbufferRTV;
-        Context->OMSetRenderTargets(1, &rtv, nullptr);
+        /**
+         *  Custom render targets don't get the back-buffer's depth buffer —
+         *  they have to bring their own DSV (or none). The backbuffer path
+         *  always uses our shared depth buffer.
+         */
+        ID3D11DepthStencilView* dsv = (target != nullptr) ? nullptr : DepthDSV;
+        Context->OMSetRenderTargets(1, &rtv, dsv);
 
         D3D11_VIEWPORT vp = {};
         if (target != nullptr) {

@@ -121,7 +121,14 @@ namespace Vinifera::Gfx
                 ? EBlend::DestMultiplyHalf
                 : EBlend::Premultiplied;
 
-            Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, bb_w, bb_h);
+            /**
+             *  Sprites depth-test against the shared depth buffer (which the
+             *  tile pass populated) but don't write depth — preserves
+             *  occlusion by terrain without sprites occluding each other in
+             *  ways that conflict with vanilla's submission order.
+             */
+            Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, bb_w, bb_h,
+                        EDepthStencil::TestLessEqual_NoWrite);
             PalEffect.Bind_Palette(device, *head.Palette);
             PalEffect.Set_Params(device, params);
 
@@ -132,7 +139,7 @@ namespace Vinifera::Gfx
                     continue;
                 }
                 const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
-                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint);
+                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint, c.DstZ);
             }
 
             Batch.End(device);

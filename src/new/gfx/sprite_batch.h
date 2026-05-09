@@ -36,9 +36,9 @@ namespace Vinifera::Gfx
 
     struct SpriteVertex
     {
-        float    Pos[2];
+        float    Pos[3];        // x, y, z (z = 0 lands at the near plane)
         float    UV[2];
-        uint32_t Color;     // RGBA8 (R in low byte)
+        uint32_t Color;         // RGBA8 (R in low byte)
     };
 
 
@@ -77,19 +77,22 @@ namespace Vinifera::Gfx
                    EBlend blend = EBlend::Premultiplied,
                    ESampler sampler = ESampler::PointClamp,
                    Effect* effect = nullptr,
-                   int target_w = 0, int target_h = 0);
+                   int target_w = 0, int target_h = 0,
+                   EDepthStencil depth = EDepthStencil::None);
 
         /**
          *  Draw `texture` at backbuffer-pixel rect `dst`. `src` is in pixels
          *  within the texture; nullptr means "the whole texture". `color` is
-         *  RGBA8 modulate.
+         *  RGBA8 modulate. `z` is the depth value (0 = near, 1 = far) used
+         *  by the shared depth buffer; default is 0 so that callers without
+         *  a depth scheme draw at the near plane.
          */
-        void Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color);
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z = 0.0f);
 
         /**
          *  Convenience: draw at (x, y) with the texture's natural size.
          */
-        void Draw(Texture2D* texture, float x, float y, uint32_t color = 0xFFFFFFFFu);
+        void Draw(Texture2D* texture, float x, float y, uint32_t color = 0xFFFFFFFFu, float z = 0.0f);
 
         void End(GraphicsDevice& device);
 
@@ -108,6 +111,7 @@ namespace Vinifera::Gfx
         Effect*                           ActiveEffect = nullptr;
         EBlend                            ActiveBlend = EBlend::Premultiplied;
         ESampler                          ActiveSampler = ESampler::PointClamp;
+        EDepthStencil                     ActiveDepth = EDepthStencil::None;
         int                               TargetWidth = 0;
         int                               TargetHeight = 0;
         int                               MaxQuads = 0;

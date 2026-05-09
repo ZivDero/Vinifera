@@ -17,6 +17,7 @@
 #include "palette_lut.h"
 #include "shapeset.h"
 #include "shp_asset.h"
+#include "tmp_asset.h"
 
 #include <cstdio>
 #include <cstring>
@@ -130,6 +131,42 @@ namespace Vinifera::Gfx
 
 
     void PaletteCache::Clear()
+    {
+        Map.clear();
+    }
+
+
+    TmpCache& TmpCache::Get()
+    {
+        static TmpCache instance;
+        return instance;
+    }
+
+
+    TmpAsset* TmpCache::Get_Or_Load(GraphicsDevice& device, const void* iso_tileset)
+    {
+        if (iso_tileset == nullptr) {
+            return nullptr;
+        }
+        auto it = Map.find(iso_tileset);
+        if (it != Map.end()) {
+            return it->second.get();
+        }
+
+        auto asset = std::make_unique<TmpAsset>();
+        char dbg[64];
+        std::snprintf(dbg, sizeof(dbg), "IsoTileSet@%p", iso_tileset);
+        if (!asset->Load_From_Memory(device, iso_tileset, dbg)) {
+            Map.emplace(iso_tileset, nullptr);
+            return nullptr;
+        }
+        TmpAsset* raw = asset.get();
+        Map.emplace(iso_tileset, std::move(asset));
+        return raw;
+    }
+
+
+    void TmpCache::Clear()
     {
         Map.clear();
     }

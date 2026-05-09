@@ -63,6 +63,7 @@ namespace Vinifera::Gfx
         ID3D11DeviceContext*    Get_Context() const { return Context; }
         IDXGISwapChain1*        Get_Swap_Chain() const { return SwapChain; }
         ID3D11RenderTargetView* Get_Backbuffer_RTV() const { return BackbufferRTV; }
+        ID3D11DepthStencilView* Get_Depth_DSV() const { return DepthDSV; }
         int                     Get_Backbuffer_Width() const { return BackbufferWidth; }
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
 
@@ -73,6 +74,9 @@ namespace Vinifera::Gfx
         bool Create_Swap_Chain(HWND hwnd, int width, int height);
         bool Create_Backbuffer_RTV();
         void Release_Backbuffer_RTV();
+
+        bool Create_Depth_Buffer(int width, int height);
+        void Release_Depth_Buffer();
 
         bool Create_Present_Pipeline();
         void Release_Present_Pipeline();
@@ -86,6 +90,8 @@ namespace Vinifera::Gfx
         IDXGIFactory2*           DxgiFactory = nullptr;
         IDXGISwapChain1*         SwapChain = nullptr;
         ID3D11RenderTargetView*  BackbufferRTV = nullptr;
+        ID3D11Texture2D*         DepthTex = nullptr;
+        ID3D11DepthStencilView*  DepthDSV = nullptr;
 
         int                      BackbufferWidth = 0;
         int                      BackbufferHeight = 0;

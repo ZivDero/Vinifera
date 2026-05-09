@@ -23,11 +23,12 @@ namespace Vinifera::Gfx
     {
         const char DefaultSpriteShaderHLSL[] =
             "cbuffer SpriteCB : register(b0) { float4x4 ProjMtx; };\n"
-            "struct VSIn  { float2 pos : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
+            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
             "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
             "VSOut VSMain(VSIn i) {\n"
             "    VSOut o;\n"
-            "    o.pos = mul(ProjMtx, float4(i.pos, 0, 1));\n"
+            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
+            "    o.pos = float4(p.x, p.y, i.pos.z, 1);\n"
             "    o.uv  = i.uv;\n"
             "    o.col = i.col;\n"
             "    return o;\n"
@@ -37,9 +38,9 @@ namespace Vinifera::Gfx
             "float4 PSMain(VSOut v) : SV_Target { return Tex.Sample(Smp, v.uv) * v.col; }\n";
 
         const D3D11_INPUT_ELEMENT_DESC SpriteIL[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 8,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
     }
 
@@ -113,11 +114,12 @@ namespace Vinifera::Gfx
 
 
     void SpriteBatch::Begin(GraphicsDevice& device, EBlend blend, ESampler sampler,
-                            Effect* effect, int target_w, int target_h)
+                            Effect* effect, int target_w, int target_h, EDepthStencil depth)
     {
         ActiveEffect = (effect != nullptr) ? effect : &DefaultEffect;
         ActiveBlend = blend;
         ActiveSampler = sampler;
+        ActiveDepth = depth;
         TargetWidth  = target_w  > 0 ? target_w  : device.Get_Backbuffer_Width();
         TargetHeight = target_h > 0 ? target_h : device.Get_Backbuffer_Height();
         Pending.clear();
@@ -125,7 +127,7 @@ namespace Vinifera::Gfx
     }
 
 
-    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color)
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z)
     {
         if (!BatchOpen || texture == nullptr || !dst.Is_Valid()) {
             return;
@@ -144,22 +146,22 @@ namespace Vinifera::Gfx
         PendingSprite s = {};
         s.Tex = texture;
 
-        s.V[0] = { { dst.X,         dst.Y         }, { u0, v0 }, color };
-        s.V[1] = { { dst.X + dst.W, dst.Y         }, { u1, v0 }, color };
-        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H }, { u1, v1 }, color };
-        s.V[3] = { { dst.X,         dst.Y + dst.H }, { u0, v1 }, color };
+        s.V[0] = { { dst.X,         dst.Y,         z }, { u0, v0 }, color };
+        s.V[1] = { { dst.X + dst.W, dst.Y,         z }, { u1, v0 }, color };
+        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z }, { u1, v1 }, color };
+        s.V[3] = { { dst.X,         dst.Y + dst.H, z }, { u0, v1 }, color };
 
         Pending.push_back(s);
     }
 
 
-    void SpriteBatch::Draw(Texture2D* texture, float x, float y, uint32_t color)
+    void SpriteBatch::Draw(Texture2D* texture, float x, float y, uint32_t color, float z)
     {
         if (texture == nullptr) {
             return;
         }
         RectF dst = { x, y, (float)texture->Width(), (float)texture->Height() };
-        Draw(texture, dst, nullptr, color);
+        Draw(texture, dst, nullptr, color, z);
     }
 
 
@@ -211,7 +213,7 @@ namespace Vinifera::Gfx
             blend_factor[0] = blend_factor[1] = blend_factor[2] = blend_factor[3] = 0.5f;
         }
         ctx->OMSetBlendState(device.States().Get(ActiveBlend), blend_factor, 0xFFFFFFFFu);
-        ctx->OMSetDepthStencilState(device.States().Get(EDepthStencil::None), 0);
+        ctx->OMSetDepthStencilState(device.States().Get(ActiveDepth), 0);
         ctx->RSSetState(device.States().Get(ERasterizer::CullNone));
 
         /**
