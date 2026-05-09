@@ -27,6 +27,7 @@
 #include "cell.h"
 #include "convert.h"
 #include "debughandler.h"
+#include "draw_shapeext_hooks.h"
 #include "drawshape.h"
 #include "event.h"
 #include "extension.h"
@@ -1499,7 +1500,7 @@ DEFINE_HOOK(0x00428AD3, _BuildingClass_Draw_Spied_Cameo_Palette_Patch, 0)
          *  Original code used NormalDrawer, which is the old Red Alert shape
          *  drawer, so we need to use CameoDrawer here for the correct palette.
          */
-        Draw_Shape(*LogicalSurface, *CameoDrawer, cameo_shape, 0, *pos_xy, *window_rect, SHAPE_CENTER|SHAPE_WIN_REL|SHAPE_ALPHA|SHAPE_NORMAL);
+        Draw_Shape_Proxy_DX11(*LogicalSurface, *CameoDrawer, cameo_shape, 0, *pos_xy, *window_rect, SHAPE_CENTER|SHAPE_WIN_REL|SHAPE_ALPHA|SHAPE_NORMAL);
     }
 
     return 0x00428B13;

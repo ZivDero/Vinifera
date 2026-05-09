@@ -21,6 +21,7 @@
 #include "combat.h"
 #include "coord.h"
 #include "drawshape.h"
+#include "draw_shapeext_hooks.h"
 #include "extension.h"
 #include "hooker.h"
 #include "mouse.h"
@@ -729,7 +730,7 @@ void Draw_Shape_Proxy(
     int z_shapenum = 0,
     Point2D z_off = Point2D(0, 0))
 {
-    Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags, remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
+    Draw_Shape_Proxy_DX11(surface, convert, shapefile, shapenum, point, window, flags, remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
 
     /**
      *  Make sure that we have a valid animation saved just in case.
@@ -751,7 +752,7 @@ void Draw_Shape_Proxy(
             ShapeFlags_Type shadow_flags = flags & ~SHAPE_FLAT;
             shadow_flags = (shadow_flags & ~SHAPE_TRANS75) | (SHAPE_DARKEN | SHAPE_CENTER | SHAPE_WIN_REL);
 
-            Draw_Shape(surface, convert, shapefile, shadow_shapenum, shadow_point, window, shadow_flags, nullptr, shadow_height_offset);
+            Draw_Shape_Proxy_DX11(surface, convert, shapefile, shadow_shapenum, shadow_point, window, shadow_flags, nullptr, shadow_height_offset);
         }
 
         /**

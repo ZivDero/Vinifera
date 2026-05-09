@@ -83,14 +83,14 @@ void Draw_Shape_Proxy_DX11(
     int shapenum,
     const Point2D& point,
     const Rect& window,
-    ShapeFlags_Type flags = SHAPE_NORMAL,
-    const char* remap = nullptr,
-    int height_offset = 0,
-    ZGradientType zgrad = ZGRAD_GROUND,
-    int intensity = 1000,
-    const ShapeSet* z_shapefile = nullptr,
-    int z_shapenum = 0,
-    Point2D z_off = Point2D(0, 0))
+    ShapeFlags_Type flags,
+    const char* remap,
+    int height_offset,
+    ZGradientType zgrad,
+    int intensity,
+    const ShapeSet* z_shapefile,
+    int z_shapenum,
+    Point2D z_off)
 {
     /**
      *  Fall-through cases that always run vanilla CPU code:
@@ -220,7 +220,7 @@ void Draw_Shape_Proxy_DX11(
 /**
  *  Hook installer. Each Patch_Call rewrites a `CALL 0x0047C780` instruction
  *  inside the original binary to land in our proxy. Addresses come from
- *  cross-referencing 0x0047C780 in IDA / Ghidra; below is the curated set.
+ *  cross-referencing 0x0047C780 in IDA.
  *
  *  Note: animext_hooks.cpp:775 already installs `Patch_Call(0x00414BA9, ...)`
  *  for shadow rendering and depends on the original being called inside its
@@ -237,7 +237,7 @@ void DrawShape_Hooks()
      */
 
     /**
-     *  Curated callsite table. Each entry is the address of a single
+     *  Callsite table. Each entry is the address of a single
      *  `CALL 0x0047C780` instruction inside the original TS binary,
      *  discovered via IDA xrefs to Draw_Shape's entry.
      *
@@ -260,5 +260,98 @@ void DrawShape_Hooks()
     Patch_Call(0x0063538D, &Draw_Shape_Proxy_DX11);  // TechnoClass::Techno_Draw_Object (2/3)
     Patch_Call(0x006354A8, &Draw_Shape_Proxy_DX11);  // TechnoClass::Techno_Draw_Object (3/3)
 
-    DEBUG_INFO("DrawShape_Hooks: installed 13 Draw_Shape callsite intercepts.\n");
+    Patch_Call(0x00428920, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00428A0A, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00428B0D, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00454E48, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004555CF, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004557AB, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00455B21, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00484DC2, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00485D05, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004861FF, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004863FC, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004865E9, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0049EB24, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0049EE60, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0049EEDD, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0049EF2A, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0049F0E9, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0049F21C, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004EC8C6, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x004F5C9F, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056B091, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056B38D, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056B6A4, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056B9BF, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056BBCD, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056BC72, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056BE3A, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0056BEC4, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00572622, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00572772, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0058C83D, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0058D38C, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005AB545, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005AB5A5, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005AB5F9, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005AB655, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005AB6B1, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005ADEB1, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005B8E57, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005B8F14, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005B8F97, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005B9639, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005BC8C4, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005BCCD6, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E375C, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E39B7, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E3C77, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E3EC3, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E3F1C, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E448A, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E44E7, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E6C70, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E6D8E, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E7045, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005E7094, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F1743, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F367A, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F371F, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F3777, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F37BF, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F52EE, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F533E, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005F5527, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x005FB5A5, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0060E4E8, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0060E562, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0060E6DC, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0060E758, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0060E91D, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00612510, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x006127AC, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00612AB0, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0061718B, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0062BE85, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0062C556, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0062C5D0, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0062C6B7, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0062C947, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0062C9F7, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x006376A4, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00637880, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0063796A, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00637A58, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00637B36, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00637BCD, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00637CAC, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0063FBEB, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0063FD25, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x0063FD6B, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00653282, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00653E96, &Draw_Shape_Proxy_DX11);
+    Patch_Call(0x00661B64, &Draw_Shape_Proxy_DX11);
+
+    DEBUG_INFO("DrawShape_Hooks: installed 105 Draw_Shape callsite intercepts.\n");
 }
