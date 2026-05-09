@@ -113,8 +113,8 @@ namespace Vinifera::Gfx
          *    row 23 is implicitly empty
          *  The bounding box is 48×24 (NOT 48×23) — the empty 24th row is
          *  required for adjacent cells to stack without 1-pixel seams in
-         *  multi-subtile tiles. Cell rect is 60×30 (or whatever the tileset
-         *  header declares); diamond is positioned inside via record->X/Y.
+         *  multi-subtile tiles. TS terrain cells are 48×24; record->X/Y are
+         *  only for composing all sub-tiles into a full multi-cell TMP image.
          */
         constexpr int kDiamondW = 48;
         constexpr int kDiamondH = 24;

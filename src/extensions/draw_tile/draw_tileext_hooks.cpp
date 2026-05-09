@@ -179,8 +179,14 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.Asset        = asset;
     cmd.Palette      = palette;
     cmd.SubTileIndex = sub_index;
-    cmd.Dst.X        = (float)(x_off + st->X) * xscale;
-    cmd.Dst.Y        = (float)(y_off + st->Y) * yscale;
+    /*
+     * Vanilla draws the base 48x24 diamond at the cell drawpoint. The TMP
+     * record X/Y fields describe where this sub-tile sits when composing the
+     * whole multi-cell TMP; applying them again here shifts occupied cells
+     * away from their map positions and opens gaps between sub-tiles.
+     */
+    cmd.Dst.X        = (float)x_off * xscale;
+    cmd.Dst.Y        = (float)y_off * yscale;
     cmd.Dst.W        = (float)st->W * xscale;
     cmd.Dst.H        = (float)st->H * yscale;
     cmd.DstZ         = dz;
@@ -198,8 +204,8 @@ void IsoTileTypeClassExt::_Draw_Tile(
      */
     if (st->HasExtraData && st->ExtraW > 0 && st->ExtraH > 0) {
         TileDrawCmd extra_cmd = cmd;
-        extra_cmd.Dst.X     = (float)(x_off + st->ExtraX) * xscale;
-        extra_cmd.Dst.Y     = (float)(y_off + st->ExtraY) * yscale;
+        extra_cmd.Dst.X     = (float)(x_off + st->ExtraX - st->X) * xscale;
+        extra_cmd.Dst.Y     = (float)(y_off + st->ExtraY - st->Y) * yscale;
         extra_cmd.Dst.W     = (float)st->ExtraW * xscale;
         extra_cmd.Dst.H     = (float)st->ExtraH * yscale;
         extra_cmd.DrawExtra = true;

@@ -28,8 +28,8 @@ namespace Vinifera::Gfx
 
     struct TmpSubTileInfo
     {
-        int  X = 0;             // logical pixel X origin within the cell diamond
-        int  Y = 0;             // logical pixel Y origin within the cell diamond
+        int  X = 0;             // pixel origin within the full multi-cell TMP
+        int  Y = 0;             // pixel origin within the full multi-cell TMP
         int  W = 0;             // diamond width (pixels)
         int  H = 0;             // diamond height (pixels)
         int  AtlasX = 0;        // global mega-atlas pixel offset
