@@ -37,6 +37,7 @@ namespace Vinifera::Gfx
         RectF        Dst;             // backbuffer-pixel space
         float        DstZ;             // depth value [0,1]; 0 = near plane
         uint32_t     VertexTint;      // per-cell brightness modulate
+        bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
     };
 
 

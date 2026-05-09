@@ -119,11 +119,18 @@ namespace Vinifera::Gfx
             for (size_t k = i; k < j; ++k) {
                 const TileDrawCmd& c = Commands[k];
                 const TmpSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
-                if (st == nullptr || st->W <= 0 || st->H <= 0) {
-                    continue;
+                if (st == nullptr) continue;
+
+                RectF src;
+                if (c.DrawExtra) {
+                    if (!st->HasExtraData || st->ExtraW <= 0 || st->ExtraH <= 0) continue;
+                    src = { (float)st->ExtraAtlasX, (float)st->ExtraAtlasY,
+                            (float)st->ExtraW,       (float)st->ExtraH };
+                } else {
+                    if (st->W <= 0 || st->H <= 0) continue;
+                    src = { (float)st->AtlasX, (float)st->AtlasY,
+                            (float)st->W,       (float)st->H };
                 }
-                const RectF src = { (float)st->AtlasX, (float)st->AtlasY,
-                                    (float)st->W,      (float)st->H };
                 Batch.Draw(&shared_atlas, c.Dst, &src, c.VertexTint, c.DstZ);
             }
 

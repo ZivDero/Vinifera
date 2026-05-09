@@ -185,8 +185,34 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.Dst.H        = (float)st->H * yscale;
     cmd.DstZ         = dz;
     cmd.VertexTint   = tint;
+    cmd.DrawExtra    = false;
 
     TileQueue::Get().Submit(cmd);
+
+    /**
+     *  Cliffs / walls / ramp bodies live in the per-record extra rect.
+     *  vanilla blits this on top of the base diamond at offset
+     *  (record->ExtraX, record->ExtraY) — typically negative Y for cliffs
+     *  that extend upward. Render as a separate quad with the same palette
+     *  + slightly closer Z (so it sits on top of the base ground).
+     */
+    if (st->HasExtraData && st->ExtraW > 0 && st->ExtraH > 0) {
+        TileDrawCmd extra_cmd = cmd;
+        extra_cmd.Dst.X     = (float)(x_off + st->ExtraX) * xscale;
+        extra_cmd.Dst.Y     = (float)(y_off + st->ExtraY) * yscale;
+        extra_cmd.Dst.W     = (float)st->ExtraW * xscale;
+        extra_cmd.Dst.H     = (float)st->ExtraH * yscale;
+        extra_cmd.DrawExtra = true;
+        /**
+         *  Cliffs draw on top of the base ground at the same cell — bias Z
+         *  slightly closer than the base so depth-test resolves correctly.
+         */
+        const float kExtraEpsilon = 1e-4f;
+        extra_cmd.DstZ      = dz - kExtraEpsilon;
+        if (extra_cmd.DstZ < 0.001f) extra_cmd.DstZ = 0.001f;
+
+        TileQueue::Get().Submit(extra_cmd);
+    }
 
     (void)use_z;
     (void)cell_variation;

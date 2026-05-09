@@ -105,17 +105,23 @@ namespace Vinifera::Gfx
             DEBUG_ERROR("TmpAsset: '%s' has bad sub-tile count %d.\n", debug_name, sub_count);
             return false;
         }
-        TilePixelWidth  = set->Width;
-        TilePixelHeight = set->Height;
-        if (TilePixelWidth <= 0 || TilePixelHeight <= 0) {
-            DEBUG_ERROR("TmpAsset: '%s' has bad tile pixel dims %dx%d.\n",
-                debug_name, TilePixelWidth, TilePixelHeight);
-            return false;
-        }
+
+        /**
+         *  TS tiles are stored as a packed asymmetric diamond:
+         *  rows 0..11 widths 4, 8, ..., 48 (sum 312 bytes)
+         *  rows 12..22 widths 44, 40, ..., 4 (sum 264 bytes)
+         *  Total: 576 bytes per tile, fitting within a 48×23 bounding box
+         *  with zero-padded corners. The tileset header's Width/Height
+         *  (typically 60/30) describes the cell *rect* — the diamond is
+         *  positioned inside it via record->X/Y.
+         */
+        constexpr int kDiamondW = 48;
+        constexpr int kDiamondH = 23;
+        constexpr int kDiamondBytes = 576;
+        TilePixelWidth  = kDiamondW;
+        TilePixelHeight = kDiamondH;
 
         SubTiles.resize(sub_count);
-
-        const int diamond_bytes = TilePixelWidth * TilePixelHeight;
 
         for (int i = 0; i < sub_count; ++i) {
             const IsoTileRecord* record = set->Tiles[i];
@@ -127,27 +133,47 @@ namespace Vinifera::Gfx
 
             s.X = record->X;
             s.Y = record->Y;
-            s.W = TilePixelWidth;
-            s.H = TilePixelHeight;
+            s.W = kDiamondW;
+            s.H = kDiamondH;
             s.Height = record->Height;
             s.RampType = record->RampType;
             s.HasZData = (record->Flags & FLAG_HAS_Z_DATA) != 0;
             s.HasExtraData = (record->Flags & FLAG_HAS_EXTRA_DATA) != 0;
 
             /**
-             *  Allocate + upload base diamond.
+             *  Unpack 576 bytes of packed-diamond pixel data into a 48x23
+             *  grid with zero-padded corners. The unpacked grid is what we
+             *  upload to the atlas; the shader's `idx == 0` discard then
+             *  produces the diamond shape on screen.
              */
-            const uint8_t* base_pixels =
-                reinterpret_cast<const uint8_t*>(record) + sizeof(IsoTileRecord);
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(record) + sizeof(IsoTileRecord);
+            uint8_t unpacked[kDiamondW * kDiamondH] = {};
+            int src_off = 0;
+            for (int y = 0; y < kDiamondH; ++y) {
+                int width;
+                if (y < 12) {
+                    width = 4 + 4 * y;            // 4, 8, ..., 48
+                } else {
+                    width = 4 * (kDiamondH - y);  // 44, 40, ..., 4
+                }
+                const int x_start = (kDiamondW - width) / 2;
+                memcpy(&unpacked[y * kDiamondW + x_start], &src[src_off], (size_t)width);
+                src_off += width;
+            }
+            (void)kDiamondBytes;
+
             if (!atlas.Allocate_Region(s.W, s.H, s.AtlasX, s.AtlasY)) {
                 DEBUG_ERROR("TmpAsset: '%s' atlas full at sub-tile %d.\n", debug_name, i);
                 s.W = s.H = 0;
                 continue;
             }
-            atlas.Upload_Region(s.AtlasX, s.AtlasY, s.W, s.H, base_pixels, s.W);
+            atlas.Upload_Region(s.AtlasX, s.AtlasY, s.W, s.H, unpacked, s.W);
 
             /**
-             *  Optional extra graphics (cliffs etc.).
+             *  Optional extra graphics (cliffs / walls / ramp bodies).
+             *  Stored as a flat ExtraWidth × ExtraHeight rect (no diamond
+             *  packing) at record + ExtraOffset. Followed by ExtraZData
+             *  which we ignore for Stage 3.0.
              */
             if (s.HasExtraData) {
                 s.ExtraX = record->ExtraX;
