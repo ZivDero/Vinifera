@@ -107,17 +107,17 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  TS tiles are stored as a packed asymmetric diamond:
-         *  rows 0..11 widths 4, 8, ..., 48 (sum 312 bytes)
-         *  rows 12..22 widths 44, 40, ..., 4 (sum 264 bytes)
-         *  Total: 576 bytes per tile, fitting within a 48×23 bounding box
-         *  with zero-padded corners. The tileset header's Width/Height
-         *  (typically 60/30) describes the cell *rect* — the diamond is
-         *  positioned inside it via record->X/Y.
+         *  TS tiles are stored as a packed asymmetric diamond, 576 bytes:
+         *    rows 0..11 widths  4, 8, ..., 48 (sum 312)
+         *    rows 12..22 widths 44, 40, ..., 4 (sum 264)
+         *    row 23 is implicitly empty
+         *  The bounding box is 48×24 (NOT 48×23) — the empty 24th row is
+         *  required for adjacent cells to stack without 1-pixel seams in
+         *  multi-subtile tiles. Cell rect is 60×30 (or whatever the tileset
+         *  header declares); diamond is positioned inside via record->X/Y.
          */
         constexpr int kDiamondW = 48;
-        constexpr int kDiamondH = 23;
-        constexpr int kDiamondBytes = 576;
+        constexpr int kDiamondH = 24;
         TilePixelWidth  = kDiamondW;
         TilePixelHeight = kDiamondH;
 
@@ -141,10 +141,9 @@ namespace Vinifera::Gfx
             s.HasExtraData = (record->Flags & FLAG_HAS_EXTRA_DATA) != 0;
 
             /**
-             *  Unpack 576 bytes of packed-diamond pixel data into a 48x23
-             *  grid with zero-padded corners. The unpacked grid is what we
-             *  upload to the atlas; the shader's `idx == 0` discard then
-             *  produces the diamond shape on screen.
+             *  Unpack 576 bytes of packed-diamond pixel data into a 48x24
+             *  grid with zero-padded corners (24th row stays all zero).
+             *  The shader's `idx == 0` discard produces the diamond shape.
              */
             const uint8_t* src = reinterpret_cast<const uint8_t*>(record) + sizeof(IsoTileRecord);
             uint8_t unpacked[kDiamondW * kDiamondH] = {};
@@ -152,15 +151,17 @@ namespace Vinifera::Gfx
             for (int y = 0; y < kDiamondH; ++y) {
                 int width;
                 if (y < 12) {
-                    width = 4 + 4 * y;            // 4, 8, ..., 48
+                    width = 4 + 4 * y;                 // 4, 8, ..., 48
+                } else if (y < 23) {
+                    width = 4 * (23 - y);              // 44, 40, ..., 4
                 } else {
-                    width = 4 * (kDiamondH - y);  // 44, 40, ..., 4
+                    width = 0;                          // row 23 is empty
                 }
+                if (width == 0) continue;
                 const int x_start = (kDiamondW - width) / 2;
                 memcpy(&unpacked[y * kDiamondW + x_start], &src[src_off], (size_t)width);
                 src_off += width;
             }
-            (void)kDiamondBytes;
 
             if (!atlas.Allocate_Region(s.W, s.H, s.AtlasX, s.AtlasY)) {
                 DEBUG_ERROR("TmpAsset: '%s' atlas full at sub-tile %d.\n", debug_name, i);
@@ -173,8 +174,11 @@ namespace Vinifera::Gfx
              *  Optional extra graphics (cliffs / walls / ramp bodies).
              *  Stored as a flat ExtraWidth × ExtraHeight rect (no diamond
              *  packing) at record + ExtraOffset. Followed by ExtraZData
-             *  which we ignore for Stage 3.0.
+             *  which we ignore for Stage 3.0. Only set HasExtraData=true
+             *  if we actually upload — otherwise the renderer would point
+             *  to a stale atlas slot.
              */
+            bool extra_uploaded = false;
             if (s.HasExtraData) {
                 s.ExtraX = record->ExtraX;
                 s.ExtraY = record->ExtraY;
@@ -186,11 +190,11 @@ namespace Vinifera::Gfx
                     if (atlas.Allocate_Region(s.ExtraW, s.ExtraH, s.ExtraAtlasX, s.ExtraAtlasY)) {
                         atlas.Upload_Region(s.ExtraAtlasX, s.ExtraAtlasY,
                                             s.ExtraW, s.ExtraH, extra, s.ExtraW);
-                    } else {
-                        s.HasExtraData = false;
+                        extra_uploaded = true;
                     }
                 }
             }
+            s.HasExtraData = extra_uploaded;
         }
 
         DEBUG_INFO("TmpAsset: '%s' loaded — %d sub-tiles into shared atlas.\n",
