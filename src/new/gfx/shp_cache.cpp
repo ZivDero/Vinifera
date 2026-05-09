@@ -18,6 +18,7 @@
 #include "shapeset.h"
 #include "shp_asset.h"
 #include "tmp_asset.h"
+#include "tmp_atlas.h"
 
 #include <cstdio>
 #include <cstring>
@@ -169,5 +170,7 @@ namespace Vinifera::Gfx
     void TmpCache::Clear()
     {
         Map.clear();
+        /* Reset shelf-pack cursor too — re-loaded assets will repopulate. */
+        TmpAtlas::Get().Reset();
     }
 }

@@ -134,4 +134,30 @@ namespace Vinifera::Gfx
         ParentContext->UpdateSubresource(Texture, 0, nullptr, pixels, (UINT)pitch_bytes, 0);
         return true;
     }
+
+
+    bool Texture2D::Set_Sub_Data(int x, int y, int w, int h, const void* pixels, int pitch_bytes)
+    {
+        if (Texture == nullptr || ParentContext == nullptr || pixels == nullptr) {
+            return false;
+        }
+        if (TextureUsage != D3D11_USAGE_DEFAULT) {
+            return false;
+        }
+        if (x < 0 || y < 0 || w <= 0 || h <= 0
+            || x + w > TextureWidth || y + h > TextureHeight) {
+            return false;
+        }
+
+        D3D11_BOX box = {};
+        box.left   = (UINT)x;
+        box.top    = (UINT)y;
+        box.front  = 0;
+        box.right  = (UINT)(x + w);
+        box.bottom = (UINT)(y + h);
+        box.back   = 1;
+
+        ParentContext->UpdateSubresource(Texture, 0, &box, pixels, (UINT)pitch_bytes, 0);
+        return true;
+    }
 }

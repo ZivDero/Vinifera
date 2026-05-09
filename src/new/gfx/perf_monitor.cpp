@@ -11,6 +11,7 @@
 
 #include "perf_monitor.h"
 
+#include "tmp_atlas.h"
 #include "vinifera_globals.h"
 
 #include <algorithm>
@@ -117,6 +118,19 @@ namespace Vinifera::Gfx
             ImGui::Text("  ShpCache    : %d entries", Stats.ShpCacheSize);
             ImGui::Text("  TmpCache    : %d entries", Stats.TmpCacheSize);
             ImGui::Text("  PaletteCache: %d entries", Stats.PaletteCacheSize);
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("TmpAtlas:");
+            const TmpAtlas& atlas = TmpAtlas::Get();
+            const long long used = atlas.Used_Pixels();
+            const long long total = atlas.Total_Pixels();
+            const double pct = total > 0 ? 100.0 * (double)used / (double)total : 0.0;
+            ImGui::Text("  size : %dx%d (%.1f MB R8)",
+                atlas.Get_Texture().Width(), atlas.Get_Texture().Height(),
+                (double)total / (1024.0 * 1024.0));
+            ImGui::Text("  fill : %.2f%% (%lld / %lld px)", pct, used, total);
+            ImGui::Text("  pack : cursor=(%d, %d), row_h=%d",
+                atlas.Cursor_X(), atlas.Cursor_Y(), atlas.Row_Height());
         }
         ImGui::End();
     }

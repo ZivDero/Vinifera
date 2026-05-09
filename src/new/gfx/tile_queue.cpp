@@ -14,6 +14,7 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
+#include "tmp_atlas.h"
 
 #include <algorithm>
 
@@ -83,38 +84,31 @@ namespace Vinifera::Gfx
         device.Bind_Backbuffer();
 
         /**
-         *  Sort by (Asset, Palette) so contiguous runs are maximised. Safe
-         *  for tiles because they depth-test+depth-write — visibility is
-         *  determined by Z, not draw order. With per-cell LightConvertClass
-         *  fragmenting the queue, this collapses thousands of tiny batches
-         *  into a handful.
+         *  All TmpAssets share the global TmpAtlas, so the only batch
+         *  boundary is Palette. Sort by Palette so contiguous runs collapse
+         *  into one DrawIndexed per distinct palette. Safe to reorder
+         *  because tiles depth-test+depth-write — visibility is determined
+         *  by Z, not draw order.
          */
         std::sort(Commands.begin(), Commands.end(),
             [](const TileDrawCmd& a, const TileDrawCmd& b) {
-                if (a.Asset != b.Asset) return a.Asset < b.Asset;
                 return a.Palette < b.Palette;
             });
 
-        /**
-         *  Group consecutive commands sharing (Asset, Palette). One
-         *  TileEffect::Set_Params per asset (atlas size constant within a
-         *  batch). Depth-write enabled so sprites can test against the
-         *  resulting terrain depth.
-         */
+        Texture2D& shared_atlas = TmpAtlas::Get().Get_Texture();
+
+        TileEffectParams params = {};
+        params.AtlasSize[0] = (float)shared_atlas.Width();
+        params.AtlasSize[1] = (float)shared_atlas.Height();
+
         size_t i = 0;
         while (i < Commands.size()) {
             size_t j = i + 1;
-            while (j < Commands.size()
-                && Commands[j].Asset == Commands[i].Asset
-                && Commands[j].Palette == Commands[i].Palette) {
+            while (j < Commands.size() && Commands[j].Palette == Commands[i].Palette) {
                 ++j;
             }
 
             const TileDrawCmd& head = Commands[i];
-
-            TileEffectParams params = {};
-            params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
-            params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
 
             Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
                         &TileEffectInstance, bb_w, bb_h,
@@ -130,7 +124,7 @@ namespace Vinifera::Gfx
                 }
                 const RectF src = { (float)st->AtlasX, (float)st->AtlasY,
                                     (float)st->W,      (float)st->H };
-                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint, c.DstZ);
+                Batch.Draw(&shared_atlas, c.Dst, &src, c.VertexTint, c.DstZ);
             }
 
             Batch.End(device);

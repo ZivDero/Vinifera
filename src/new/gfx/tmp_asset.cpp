@@ -13,6 +13,7 @@
 
 #include "debughandler.h"
 #include "graphics_device.h"
+#include "tmp_atlas.h"
 
 #include <algorithm>
 #include <cstring>
@@ -71,8 +72,6 @@ namespace Vinifera::Gfx
         constexpr uint32_t FLAG_HAS_EXTRA_DATA = 1u << 0;
         constexpr uint32_t FLAG_HAS_Z_DATA     = 1u << 1;
 
-        constexpr int kAtlasMaxWidth = 4096;
-        constexpr int kAtlasPad      = 1;
     }
 
 
@@ -95,6 +94,11 @@ namespace Vinifera::Gfx
         if (debug_name == nullptr) debug_name = "<memory>";
         SourceName = debug_name;
 
+        TmpAtlas& atlas = TmpAtlas::Get();
+        if (!atlas.Initialize(device)) {
+            return false;
+        }
+
         const IsoTileSet* set = static_cast<const IsoTileSet*>(iso_tileset);
         const int sub_count = set->MapWidth * set->MapHeight;
         if (sub_count <= 0 || sub_count > 8192) {
@@ -111,18 +115,6 @@ namespace Vinifera::Gfx
 
         SubTiles.resize(sub_count);
 
-        /**
-         *  Pass 1: walk records, decompress (no-op since TMP is uncompressed)
-         *  per-sub-tile pixel data, allocate atlas slots via shelf packing.
-         */
-        std::vector<std::vector<uint8_t>> sub_pixels(sub_count);
-        std::vector<std::vector<uint8_t>> extra_pixels(sub_count);
-
-        int atlas_x = 0;
-        int atlas_y = 0;
-        int row_h = 0;
-        int atlas_w = 0;
-
         const int diamond_bytes = TilePixelWidth * TilePixelHeight;
 
         for (int i = 0; i < sub_count; ++i) {
@@ -130,7 +122,6 @@ namespace Vinifera::Gfx
             TmpSubTileInfo& s = SubTiles[i];
 
             if (record == nullptr) {
-                /* Empty slot — leave SubTiles[i] zero-sized. */
                 continue;
             }
 
@@ -144,11 +135,16 @@ namespace Vinifera::Gfx
             s.HasExtraData = (record->Flags & FLAG_HAS_EXTRA_DATA) != 0;
 
             /**
-             *  Base pixel data lives at `record + sizeof(IsoTileRecord)`.
+             *  Allocate + upload base diamond.
              */
             const uint8_t* base_pixels =
                 reinterpret_cast<const uint8_t*>(record) + sizeof(IsoTileRecord);
-            sub_pixels[i].assign(base_pixels, base_pixels + diamond_bytes);
+            if (!atlas.Allocate_Region(s.W, s.H, s.AtlasX, s.AtlasY)) {
+                DEBUG_ERROR("TmpAsset: '%s' atlas full at sub-tile %d.\n", debug_name, i);
+                s.W = s.H = 0;
+                continue;
+            }
+            atlas.Upload_Region(s.AtlasX, s.AtlasY, s.W, s.H, base_pixels, s.W);
 
             /**
              *  Optional extra graphics (cliffs etc.).
@@ -161,87 +157,28 @@ namespace Vinifera::Gfx
                 if (s.ExtraW > 0 && s.ExtraH > 0 && record->ExtraOffset > 0) {
                     const uint8_t* extra =
                         reinterpret_cast<const uint8_t*>(record) + record->ExtraOffset;
-                    extra_pixels[i].assign(extra, extra + (size_t)s.ExtraW * (size_t)s.ExtraH);
-                }
-            }
-
-            /**
-             *  Atlas placement: base diamond, then extras alongside.
-             */
-            const int placed_w = s.W + (s.HasExtraData && s.ExtraW > 0 ? s.ExtraW + kAtlasPad : 0) + kAtlasPad;
-            const int placed_h = std::max(s.H, s.HasExtraData ? s.ExtraH : 0);
-
-            if (atlas_x + placed_w > kAtlasMaxWidth && atlas_x > 0) {
-                atlas_x = 0;
-                atlas_y += row_h + kAtlasPad;
-                row_h = 0;
-            }
-
-            s.AtlasX = atlas_x;
-            s.AtlasY = atlas_y;
-            int cursor = atlas_x + s.W + kAtlasPad;
-            if (s.HasExtraData && s.ExtraW > 0) {
-                s.ExtraAtlasX = cursor;
-                s.ExtraAtlasY = atlas_y;
-                cursor += s.ExtraW + kAtlasPad;
-            }
-            atlas_x = cursor;
-            if (placed_h > row_h) row_h = placed_h;
-            if (atlas_x > atlas_w) atlas_w = atlas_x;
-        }
-
-        const int atlas_h = atlas_y + row_h;
-        if (atlas_w <= 0 || atlas_h <= 0) {
-            DEBUG_ERROR("TmpAsset: '%s' yielded an empty atlas.\n", debug_name);
-            return false;
-        }
-
-        /**
-         *  Pass 2: assemble the atlas pixel buffer.
-         */
-        std::vector<uint8_t> atlas_pixels((size_t)atlas_w * (size_t)atlas_h, 0);
-        for (int i = 0; i < sub_count; ++i) {
-            const TmpSubTileInfo& s = SubTiles[i];
-            if (s.W <= 0 || s.H <= 0) continue;
-
-            const std::vector<uint8_t>& base = sub_pixels[i];
-            for (int y = 0; y < s.H; ++y) {
-                memcpy(&atlas_pixels[(s.AtlasY + y) * atlas_w + s.AtlasX],
-                       &base[y * s.W],
-                       (size_t)s.W);
-            }
-
-            if (s.HasExtraData && s.ExtraW > 0 && s.ExtraH > 0) {
-                const std::vector<uint8_t>& extra = extra_pixels[i];
-                if (!extra.empty()) {
-                    for (int y = 0; y < s.ExtraH; ++y) {
-                        memcpy(&atlas_pixels[(s.ExtraAtlasY + y) * atlas_w + s.ExtraAtlasX],
-                               &extra[y * s.ExtraW],
-                               (size_t)s.ExtraW);
+                    if (atlas.Allocate_Region(s.ExtraW, s.ExtraH, s.ExtraAtlasX, s.ExtraAtlasY)) {
+                        atlas.Upload_Region(s.ExtraAtlasX, s.ExtraAtlasY,
+                                            s.ExtraW, s.ExtraH, extra, s.ExtraW);
+                    } else {
+                        s.HasExtraData = false;
                     }
                 }
             }
         }
 
-        if (!Atlas.Initialize(device, atlas_w, atlas_h, DXGI_FORMAT_R8_UINT,
-                              D3D11_USAGE_DEFAULT, atlas_pixels.data(), atlas_w)) {
-            DEBUG_ERROR("TmpAsset: '%s' failed to create atlas texture (%dx%d).\n",
-                debug_name, atlas_w, atlas_h);
-            return false;
-        }
-
-        DEBUG_INFO("TmpAsset: '%s' loaded — %d sub-tiles, atlas %dx%d.\n",
-            debug_name, sub_count, atlas_w, atlas_h);
+        DEBUG_INFO("TmpAsset: '%s' loaded — %d sub-tiles into shared atlas.\n",
+            debug_name, sub_count);
         return true;
     }
 
 
     void TmpAsset::Unload()
     {
-        Atlas.Shutdown();
         SubTiles.clear();
         TilePixelWidth = 0;
         TilePixelHeight = 0;
         SourceName.clear();
+        /* The shared atlas is not freed here — TmpCache::Clear handles it. */
     }
 }

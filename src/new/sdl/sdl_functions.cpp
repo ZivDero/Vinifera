@@ -24,6 +24,7 @@
 #include "shp_viewer.h"
 #include "sprite_queue.h"
 #include "tile_queue.h"
+#include "tmp_atlas.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -281,6 +282,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::TileQueue::Get().Shutdown();
     Vinifera::Gfx::SpriteQueue::Get().Shutdown();
     Vinifera::Gfx::TmpCache::Get().Clear();
+    Vinifera::Gfx::TmpAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
     Vinifera::Gfx::PaletteCache::Get().Clear();
 

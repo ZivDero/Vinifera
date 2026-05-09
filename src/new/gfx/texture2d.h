@@ -47,6 +47,14 @@ namespace Vinifera::Gfx
          */
         bool Set_Data(const void* pixels, int pitch_bytes);
 
+        /**
+         *  Upload pixel data into a sub-rectangle of the texture. DEFAULT
+         *  usage only. Used by atlas packers that fill the texture in many
+         *  small uploads. (x, y, w, h) is in the destination texture's
+         *  pixel space.
+         */
+        bool Set_Sub_Data(int x, int y, int w, int h, const void* pixels, int pitch_bytes);
+
         ID3D11Texture2D*           Get_Texture() const { return Texture; }
         ID3D11ShaderResourceView*  Get_SRV() const { return SRV; }
         int                        Width() const { return TextureWidth; }

@@ -19,12 +19,11 @@
 #include <string>
 #include <vector>
 
-#include "texture2d.h"
-
 
 namespace Vinifera::Gfx
 {
     class GraphicsDevice;
+    class Texture2D;
 
 
     struct TmpSubTileInfo
@@ -33,7 +32,7 @@ namespace Vinifera::Gfx
         int  Y = 0;             // logical pixel Y origin within the cell diamond
         int  W = 0;             // diamond width (pixels)
         int  H = 0;             // diamond height (pixels)
-        int  AtlasX = 0;        // atlas pixel offset
+        int  AtlasX = 0;        // global mega-atlas pixel offset
         int  AtlasY = 0;
         int  Height = 0;        // cell elevation (level units, 0 = flat)
         int  RampType = 0;      // -1 / 0..4 ramp orientation
@@ -42,8 +41,7 @@ namespace Vinifera::Gfx
 
         /**
          *  Optional extra-graphics rect (cliffs / tall tiles). When
-         *  HasExtraData is true, the atlas slot extends beyond W/H to
-         *  include the extra rect; ExtraAtlasX/Y point to that region.
+         *  HasExtraData is true, ExtraAtlasX/Y points to its mega-atlas slot.
          */
         int  ExtraX = 0;
         int  ExtraY = 0;
@@ -64,27 +62,24 @@ namespace Vinifera::Gfx
         TmpAsset& operator=(const TmpAsset&) = delete;
 
         /**
-         *  Build the atlas from the in-memory IsoTileSet pointer that vanilla
-         *  produced. The pointer's lifetime is owned by the engine; we copy
-         *  pixel data into a GPU texture.
+         *  Decompress every sub-tile from the in-memory IsoTileSet into the
+         *  shared `TmpAtlas` (allocates one region per sub-tile + extras).
+         *  All TmpAssets share the same atlas SRV — only sub-tile UV rects
+         *  differ between assets.
          */
         bool Load_From_Memory(GraphicsDevice& device, const void* iso_tileset,
                               const char* debug_name = "<memory>");
 
         void Unload();
 
-        bool Is_Loaded() const { return Atlas.Get_SRV() != nullptr; }
+        bool Is_Loaded() const { return !SubTiles.empty(); }
 
         int                       Sub_Tile_Count() const { return (int)SubTiles.size(); }
         int                       Tile_Pixel_Width() const { return TilePixelWidth; }
         int                       Tile_Pixel_Height() const { return TilePixelHeight; }
         const TmpSubTileInfo*     Get_Sub_Tile(int index) const;
 
-        Texture2D&                Get_Atlas() { return Atlas; }
-        const Texture2D&          Get_Atlas() const { return Atlas; }
-
     private:
-        Texture2D                   Atlas;
         std::vector<TmpSubTileInfo> SubTiles;
         int                         TilePixelWidth = 0;
         int                         TilePixelHeight = 0;
