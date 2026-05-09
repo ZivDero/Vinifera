@@ -66,6 +66,15 @@ namespace
         if (flags & SHAPE_TRANS75)       out |= SEF_TRANSLUCENT75;
         return out;
     }
+
+    inline float Depth_From_Screen_Y(float y)
+    {
+        const float kMaxScreenY = 16000.0f;
+        float dz = 1.0f - (y / kMaxScreenY);
+        if (dz < 0.001f) dz = 0.001f;
+        if (dz > 0.999f) dz = 0.999f;
+        return dz;
+    }
 }
 
 
@@ -139,9 +148,8 @@ void Draw_Shape_Proxy_DX11(
      *  Z-test bias only and never applies it to the destination Y. The
      *  visual effect of altitude (bullets in flight, raised animations) is
      *  already baked into `point.Y` by the caller's screen-coord math, so
-     *  applying it here would double-shift bullets vertically.
+     *  only the depth calculation below consumes it.
      */
-    (void)height_offset;
     const int logical_w = shapefile->Get_Width();
     const int logical_h = shapefile->Get_Height();
     int x = point.X;
@@ -191,13 +199,17 @@ void Draw_Shape_Proxy_DX11(
      *  correctly against terrain.
      */
     {
-        const float kMaxScreenY = 16000.0f;
-        const float kSpriteEpsilon = 5e-5f;     // SEF_*-derived adjustments could refine this later
-        float dz = 1.0f - ((float)y / kMaxScreenY);
-        if (dz < 0.001f) dz = 0.001f;
-        if (dz > 0.999f) dz = 0.999f;
-        dz -= kSpriteEpsilon;
-        cmd.DstZ = dz;
+        const float kSpriteEpsilon = 5e-5f;     // keeps equal-depth object pixels just in front of terrain
+        const float depth_bias_y = (float)-height_offset;
+        const float bottom_y = (float)(y + fi->H) + depth_bias_y;
+        float top_y = bottom_y;
+
+        if ((flags & SHAPE_FLAT) && zgrad != ZGRAD_GROUND && zgrad != ZGRAD_NONE) {
+            top_y = bottom_y + (float)fi->H;
+        }
+
+        cmd.DstZTop = Depth_From_Screen_Y(top_y) - kSpriteEpsilon;
+        cmd.DstZBottom = Depth_From_Screen_Y(bottom_y) - kSpriteEpsilon;
     }
 
     /**

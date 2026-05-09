@@ -112,6 +112,9 @@ namespace Vinifera::Gfx
             params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
             params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
             params.Flags = head.EffectFlags;
+            if (head.UseRemap) {
+                params.Flags |= SEF_USE_REMAP;
+            }
 
             /**
              *  SHAPE_DARKEN is a destination-multiply-by-0.5 op masked by the
@@ -141,7 +144,7 @@ namespace Vinifera::Gfx
                     continue;
                 }
                 const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
-                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint, c.DstZ);
+                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint, c.DstZTop, c.DstZBottom);
             }
 
             Batch.End(device);
