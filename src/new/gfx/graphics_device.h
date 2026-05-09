@@ -64,10 +64,17 @@ namespace Vinifera::Gfx
         IDXGISwapChain1*        Get_Swap_Chain() const { return SwapChain; }
         ID3D11RenderTargetView* Get_Backbuffer_RTV() const { return BackbufferRTV; }
         ID3D11DepthStencilView* Get_Depth_DSV() const { return DepthDSV; }
+        ID3D11ShaderResourceView* Get_Depth_SRV() const { return DepthSRV; }
         int                     Get_Backbuffer_Width() const { return BackbufferWidth; }
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
 
         StateCache&             States() { return StateCacheInstance; }
+
+        /**
+         *  Bind the backbuffer without a DSV. Useful for debug/UI passes that
+         *  sample the backbuffer depth texture as an SRV.
+         */
+        void Bind_Backbuffer_Color_Only();
 
     private:
         bool Create_Device();
@@ -92,6 +99,7 @@ namespace Vinifera::Gfx
         ID3D11RenderTargetView*  BackbufferRTV = nullptr;
         ID3D11Texture2D*         DepthTex = nullptr;
         ID3D11DepthStencilView*  DepthDSV = nullptr;
+        ID3D11ShaderResourceView*DepthSRV = nullptr;
 
         int                      BackbufferWidth = 0;
         int                      BackbufferHeight = 0;

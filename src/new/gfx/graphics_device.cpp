@@ -212,16 +212,32 @@ namespace Vinifera::Gfx
         td.Height = height;
         td.MipLevels = 1;
         td.ArraySize = 1;
-        td.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        td.Format = DXGI_FORMAT_R24G8_TYPELESS;
         td.SampleDesc.Count = 1;
         td.Usage = D3D11_USAGE_DEFAULT;
-        td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        td.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
         if (FAILED(Device->CreateTexture2D(&td, nullptr, &DepthTex))) {
             DEBUG_ERROR("Gfx::GraphicsDevice: depth texture creation failed.\n");
             return false;
         }
-        if (FAILED(Device->CreateDepthStencilView(DepthTex, nullptr, &DepthDSV))) {
+
+        D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc = {};
+        dsv_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        dsv_desc.Texture2D.MipSlice = 0;
+        if (FAILED(Device->CreateDepthStencilView(DepthTex, &dsv_desc, &DepthDSV))) {
             DEBUG_ERROR("Gfx::GraphicsDevice: DSV creation failed.\n");
+            Release_Depth_Buffer();
+            return false;
+        }
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+        srv_desc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srv_desc.Texture2D.MostDetailedMip = 0;
+        srv_desc.Texture2D.MipLevels = 1;
+        if (FAILED(Device->CreateShaderResourceView(DepthTex, &srv_desc, &DepthSRV))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: depth SRV creation failed.\n");
             Release_Depth_Buffer();
             return false;
         }
@@ -231,6 +247,7 @@ namespace Vinifera::Gfx
 
     void GraphicsDevice::Release_Depth_Buffer()
     {
+        Safe_Release(DepthSRV);
         Safe_Release(DepthDSV);
         Safe_Release(DepthTex);
     }
@@ -399,6 +416,23 @@ namespace Vinifera::Gfx
             vp.Width  = (float)BackbufferWidth;
             vp.Height = (float)BackbufferHeight;
         }
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        Context->RSSetViewports(1, &vp);
+    }
+
+
+    void GraphicsDevice::Bind_Backbuffer_Color_Only()
+    {
+        if (Context == nullptr || BackbufferRTV == nullptr) {
+            return;
+        }
+
+        Context->OMSetRenderTargets(1, &BackbufferRTV, nullptr);
+
+        D3D11_VIEWPORT vp = {};
+        vp.Width = (float)BackbufferWidth;
+        vp.Height = (float)BackbufferHeight;
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
         Context->RSSetViewports(1, &vp);
