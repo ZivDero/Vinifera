@@ -65,6 +65,33 @@ static float Tile_Base_Depth_From_Visual_Y(int y_off, int cell_level, int tile_h
 }
 
 
+static IsometricTileTypeClass* Resolve_Tile_Variation(IsometricTileTypeClass* isotype, int cell_variation)
+{
+    if (isotype == nullptr || cell_variation == 0) {
+        return isotype;
+    }
+
+    const int sequence_count = isotype->TilesInSequence;
+    if (sequence_count <= 1) {
+        return isotype;
+    }
+
+    if (cell_variation > sequence_count - 1) {
+        cell_variation %= sequence_count;
+    }
+    if (cell_variation == 0) {
+        return isotype;
+    }
+
+    IsometricTileTypeClass* varied_type = isotype;
+    while (cell_variation-- > 0 && varied_type != nullptr) {
+        varied_type = varied_type->NextTileTypeInSet;
+    }
+
+    return (varied_type != nullptr) ? varied_type : isotype;
+}
+
+
 /**
  *  Fake extension class so we can declare a member function with __thiscall
  *  semantics. Patch_Call extracts the code-pointer half of the member-pointer.
@@ -130,7 +157,8 @@ void IsoTileTypeClassExt::_Draw_Tile(
      *  a ConvertClass subclass so PaletteCache is keyed on its address.
      */
     GraphicsDevice& device = *Vinifera::Gfx::Device;
-    const void* iso_tileset = static_cast<const void*>(this->Get_Tile_Data());
+    IsometricTileTypeClass* draw_type = Resolve_Tile_Variation(this, cell_variation);
+    const void* iso_tileset = static_cast<const void*>(draw_type->Get_Tile_Data());
     TmpAsset* asset = TmpCache::Get().Get_Or_Load(device, iso_tileset);
     PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(device, drawer);
     if (asset == nullptr || palette == nullptr) {
@@ -231,7 +259,6 @@ void IsoTileTypeClassExt::_Draw_Tile(
     }
 
     (void)use_z;
-    (void)cell_variation;
     (void)b1; (void)b2; (void)b3;
     (void)grey_shift;
     (void)cliprect;
