@@ -94,6 +94,7 @@ namespace Vinifera::Gfx
             if (a.Palette != b.Palette) return false;
             if (a.EffectFlags != b.EffectFlags) return false;
             if (a.UseRemap != b.UseRemap) return false;
+            if (a.WriteDepth != b.WriteDepth) return false;
             if (a.UseRemap && memcmp(a.RemapTable, b.RemapTable, 16) != 0) return false;
             return true;
         };
@@ -128,12 +129,16 @@ namespace Vinifera::Gfx
 
             /**
              *  Sprites depth-test against the shared depth buffer (which the
-             *  tile pass populated) but don't write depth — preserves
-             *  occlusion by terrain without sprites occluding each other in
-             *  ways that conflict with vanilla's submission order.
+             *  tile pass populated). Most sprites don't write depth — preserves
+             *  vanilla's submission-order layering for inter-sprite cases.
+             *  Buildings (vanilla SHAPE_Z_READ_WRITE) write depth so units
+             *  drawn afterwards behind them are correctly occluded.
              */
+            const EDepthStencil depth_state = head.WriteDepth
+                ? EDepthStencil::WriteLessEqual
+                : EDepthStencil::TestLessEqual_NoWrite;
             Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, bb_w, bb_h,
-                        EDepthStencil::TestLessEqual_NoWrite);
+                        depth_state);
             PalEffect.Bind_Palette(device, *head.Palette);
             PalEffect.Set_Params(device, params);
 

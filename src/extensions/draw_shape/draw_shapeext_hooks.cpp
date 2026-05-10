@@ -104,14 +104,22 @@ void Draw_Shape_Proxy_DX11(
     /**
      *  Fall-through cases that always run vanilla CPU code:
      *    - LegacyRenderer flag set (developer A/B switch).
-     *    - Target surface is not CompositeSurface — sidebar / hidden / etc.
+     *    - Target surface isn't one of the tactical buffers — sidebar /
+     *      hidden / cameo / etc. The `CompositeSurface` and `TileSurface`
+     *      globals get swapped during the tile pass (tactical.cpp:806-810),
+     *      so we accept whichever is the in-flight target. Buildings, trees,
+     *      and cell shadows render with `LogicalSurface = TileSurface` during
+     *      the tile pass; units / anims / particles render post-tile with
+     *      `LogicalSurface = CompositeSurface`. Both must reach the GPU
+     *      pipeline, otherwise the GPU tile pass overwrites their CPU pixels.
      *    - GraphicsDevice not initialized yet (pre-video-mode boot path).
      *    - Bad inputs (defensive).
      */
     const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
+    const bool tactical_surface = (&surface == CompositeSurface) || (&surface == TileSurface);
     if (legacy
         || Vinifera::Gfx::Device == nullptr
-        || &surface != CompositeSurface
+        || !tactical_surface
         || shapefile == nullptr
         || shapenum < 0)
     {
@@ -197,6 +205,21 @@ void Draw_Shape_Proxy_DX11(
      *  tiebreak deterministically (unit-vs-overlay, projectile-vs-unit, etc).
      *  Tiles use the same scale (with epsilon=0), so sprites depth-test
      *  correctly against terrain.
+     *
+     *  `height_offset` in vanilla is a Z-test bias on the cell side of the
+     *  per-pixel comparison — a *negative* value (e.g. for an aircraft at
+     *  altitude) effectively pulls the shape forward of the cell. Mirror
+     *  that here by adding `-height_offset` to bottom_y: larger screen Y →
+     *  smaller dz → closer to the camera.
+     *
+     *  Per-vertex Z gradient (DstZTop vs DstZBottom):
+     *    - SHAPE_FLAT (a.k.a. SHAPE_ZGRAD) + ZGRAD_GROUND  → full gradient.
+     *      Top pixel maps to a cell one sprite-height further back; smaller
+     *      screen Y → larger dz at the top vertex.
+     *    - SHAPE_FLAT + ZGRAD_45DEG → half gradient (cliff/ramp face).
+     *    - SHAPE_FLAT + ZGRAD_90DEG → no gradient (vertical structure;
+     *      every pixel sits at the cell-foot's depth — buildings, units).
+     *    - SHAPE_FLAT off, or ZGRAD_NONE → no gradient.
      */
     {
         const float kSpriteEpsilon = 5e-5f;     // keeps equal-depth object pixels just in front of terrain
@@ -204,13 +227,26 @@ void Draw_Shape_Proxy_DX11(
         const float bottom_y = (float)(y + fi->H) + depth_bias_y;
         float top_y = bottom_y;
 
-        if ((flags & SHAPE_FLAT) && zgrad != ZGRAD_GROUND && zgrad != ZGRAD_NONE) {
-            top_y = bottom_y + (float)fi->H;
+        if (flags & SHAPE_FLAT) {
+            if (zgrad == ZGRAD_GROUND) {
+                top_y = bottom_y - (float)fi->H;
+            } else if (zgrad == ZGRAD_45DEG) {
+                top_y = bottom_y - (float)fi->H * 0.5f;
+            }
+            /* ZGRAD_90DEG / ZGRAD_NONE: keep top_y = bottom_y. */
         }
 
         cmd.DstZTop = Depth_From_Screen_Y(top_y) - kSpriteEpsilon;
         cmd.DstZBottom = Depth_From_Screen_Y(bottom_y) - kSpriteEpsilon;
     }
+
+    /**
+     *  SHAPE_Z_READ_WRITE means vanilla's blitter writes per-pixel Z as it
+     *  draws (used by buildings and similar large vertical structures so
+     *  things drawn afterwards behind them are correctly occluded). Mark
+     *  this command so SpriteQueue::Flush picks the depth-write state.
+     */
+    cmd.WriteDepth = (flags & SHAPE_Z_READ_WRITE) != 0;
 
     /**
      *  House-color remap. Vanilla's `remap` is a 256-byte LUT but only the
