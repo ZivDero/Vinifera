@@ -212,6 +212,8 @@ void Draw_Shape_Proxy_DX11(
     cmd.Pass        = Current_Render_Pass();
     cmd.EffectFlags = Effect_Flags_From_Shape(flags);
     cmd.VertexTint  = Tint_From_Intensity(intensity);
+    const bool z_active = (flags & SHAPE_ZREAD) || (flags & SHAPE_ZGRAD) || (flags & SHAPE_ZREADWRITE);
+    const bool z_write = (flags & SHAPE_ZREADWRITE);
     if (z_asset != nullptr && z_fi != nullptr) {
         /**
          *  Mirror vanilla Draw_Shape's z-shape sampling origin:
@@ -253,14 +255,18 @@ void Draw_Shape_Proxy_DX11(
      *  that here by adding `-height_offset` to bottom_y: larger screen Y →
      *  smaller dz → closer to the camera.
      *
-     *  Per-vertex Z gradient (DstZTop vs DstZBottom):
-     *    - SHAPE_ZGRAD + ZGRAD_GROUND → full gradient. Top pixel maps to a
-     *      cell one sprite-height further back; smaller screen Y → larger
-     *      dz at the top vertex.
-     *    - SHAPE_ZGRAD + ZGRAD_45DEG → half gradient (cliff/ramp face).
-     *    - SHAPE_ZGRAD + ZGRAD_90DEG → no gradient (vertical structure;
-     *      every pixel sits at the cell-foot's depth — buildings, units).
-     *    - SHAPE_ZGRAD off, or ZGRAD_NONE → no gradient.
+     *  Per-vertex Z gradient (DstZTop vs DstZBottom) is gated on SHAPE_ZGRAD
+     *  specifically — this flag is what tells the vanilla blitter to drive
+     *  per-pixel z from the screen-Y gradient. SHAPE_ZREAD / SHAPE_ZREADWRITE
+     *  without SHAPE_ZGRAD use a single constant z (used by overlays such as
+     *  low bridges, walls, tiberium):
+     *    - SHAPE_ZGRAD + ZGRAD_GROUND: full gradient. Top pixel maps to a
+     *      cell one sprite-height further back; smaller screen Y means
+     *      larger dz at the top vertex.
+     *    - SHAPE_ZGRAD + ZGRAD_45DEG: half gradient (cliff/ramp face).
+     *    - SHAPE_ZGRAD + ZGRAD_90DEG: no gradient (vertical structure;
+     *      every pixel sits at the cell-foot's depth).
+     *    - SHAPE_ZGRAD off, or ZGRAD_NONE: no gradient.
      */
     {
         const float kSpriteEpsilon = 5e-5f;     // keeps equal-depth object pixels just in front of terrain
@@ -287,22 +293,23 @@ void Draw_Shape_Proxy_DX11(
      *  things drawn afterwards behind them are correctly occluded). Mark
      *  this command so SpriteQueue::Flush picks the depth-write state.
      */
-    cmd.WriteDepth = (flags & SHAPE_ZREADWRITE) != 0;
+    cmd.WriteDepth = z_write;
 
     /**
-     *  Vanilla never z-tests Draw_Shape calls that lack SHAPE_ZGRAD
+     *  Vanilla never z-tests Draw_Shape calls that select a non-z blitter
      *  (selection brackets, transport / ammo / health pips, build-state
      *  overlays, cameos). They're 2D UI laid over the tactical view; their
      *  quads extend down into screen rows belonging to the next-front cell,
      *  whose tile depth is closer than the sprite's foot-derived depth, so
      *  hardware depth-test would clip them at the bottom. Submission order
-     *  handles inter-overlay layering.
+     *  handles inter-overlay layering. SHAPE_ZREAD, SHAPE_ZGRAD, and
+     *  SHAPE_ZREADWRITE all select vanilla z blitters.
      */
-    cmd.OverlayMode = (flags & SHAPE_ZGRAD) == 0;
+    cmd.DisableDepth = !z_active;
     if (Is_Cell_Shadow_Pass(cmd.Pass)) {
-        cmd.OverlayMode = false;
+        cmd.DisableDepth = false;
     }
-    if (cmd.OverlayMode) {
+    if (cmd.DisableDepth) {
         cmd.WriteDepth = false;
     }
 
