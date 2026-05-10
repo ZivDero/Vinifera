@@ -138,6 +138,14 @@ namespace Vinifera::Gfx
             TileEffectInstance.Set_Params(device, params);
             device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
 
+            /**
+             *  Alpha buffer at PS slot 3. Populated for the frame by
+             *  `SpriteQueue::Flush_Alpha_Lights`, sampled per-pixel by the
+             *  tile shader to modulate brightness for alpha lights.
+             */
+            ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
+            device.Get_Context()->PSSetShaderResources(3, 1, &alpha_srv);
+
             for (size_t k = i; k < j; ++k) {
                 const TileDrawCmd& c = pass_commands[k];
                 const TmpSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
@@ -162,7 +170,7 @@ namespace Vinifera::Gfx
             i = j;
         }
 
-        ID3D11ShaderResourceView* null_srvs[3] = {};
-        device.Get_Context()->PSSetShaderResources(0, 3, null_srvs);
+        ID3D11ShaderResourceView* null_srvs[4] = {};
+        device.Get_Context()->PSSetShaderResources(0, 4, null_srvs);
     }
 }

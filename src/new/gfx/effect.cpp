@@ -27,7 +27,9 @@ namespace Vinifera::Gfx
     bool Effect::Initialize(GraphicsDevice& device, const char* hlsl_source, size_t source_size,
                             const char* debug_name,
                             const D3D11_INPUT_ELEMENT_DESC* input_elements, UINT input_element_count,
-                            size_t constant_buffer_size)
+                            size_t constant_buffer_size,
+                            const char* vs_profile,
+                            const char* ps_profile)
     {
         ID3D11Device* d3d_device = device.Get_Device();
         if (d3d_device == nullptr || hlsl_source == nullptr || source_size == 0) {
@@ -36,10 +38,10 @@ namespace Vinifera::Gfx
 
         ID3DBlob* vs_blob = nullptr;
         ID3DBlob* ps_blob = nullptr;
-        if (!Compile_HLSL(hlsl_source, source_size, debug_name, "VSMain", "vs_4_0", &vs_blob)) {
+        if (!Compile_HLSL(hlsl_source, source_size, debug_name, "VSMain", vs_profile, &vs_blob)) {
             return false;
         }
-        if (!Compile_HLSL(hlsl_source, source_size, debug_name, "PSMain", "ps_4_0", &ps_blob)) {
+        if (!Compile_HLSL(hlsl_source, source_size, debug_name, "PSMain", ps_profile, &ps_blob)) {
             vs_blob->Release();
             return false;
         }

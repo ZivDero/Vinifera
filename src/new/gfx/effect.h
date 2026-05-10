@@ -32,12 +32,16 @@ namespace Vinifera::Gfx
 
         /**
          *  Compile from a single HLSL source string with VS entry "VSMain" and
-         *  PS entry "PSMain" (4_0 profile).
+         *  PS entry "PSMain". Profiles default to vs_4_0/ps_4_0; pass
+         *  ps_5_0/vs_5_0 for shader features that need it (UAV writes from
+         *  pixel shader, etc.).
          */
         bool Initialize(GraphicsDevice& device, const char* hlsl_source, size_t source_size,
                         const char* debug_name,
                         const D3D11_INPUT_ELEMENT_DESC* input_elements, UINT input_element_count,
-                        size_t constant_buffer_size = 0);
+                        size_t constant_buffer_size = 0,
+                        const char* vs_profile = "vs_4_0",
+                        const char* ps_profile = "ps_4_0");
 
         void Shutdown();
 

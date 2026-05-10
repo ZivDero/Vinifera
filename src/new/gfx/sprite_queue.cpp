@@ -11,9 +11,14 @@
 
 #include "sprite_queue.h"
 
+#include "shapeset.h"      // ShapeSet — must come before alphashape.h
+#include "alphashape.h"
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
+#include "shp_cache.h"
+#include "tactical.h"
+#include "tibsun_globals.h"
 
 #include <cstring>
 
@@ -39,6 +44,11 @@ namespace Vinifera::Gfx
             Batch.Shutdown();
             return false;
         }
+        if (!AlphaEffect.Initialize(device)) {
+            PalEffect.Shutdown();
+            Batch.Shutdown();
+            return false;
+        }
         Commands.reserve(2048);
         Initialized = true;
         return true;
@@ -47,6 +57,7 @@ namespace Vinifera::Gfx
 
     void SpriteQueue::Shutdown()
     {
+        AlphaEffect.Shutdown();
         PalEffect.Shutdown();
         Batch.Shutdown();
         Commands.clear();
@@ -76,6 +87,109 @@ namespace Vinifera::Gfx
             Flush_Pass(device, (RenderPass)pass);
         }
         Commands.clear();
+    }
+
+
+    void SpriteQueue::Flush_Alpha_Lights(GraphicsDevice& device)
+    {
+        if (!Initialized) {
+            return;
+        }
+
+        ID3D11UnorderedAccessView* uav = device.Get_Alpha_UAV();
+        if (uav == nullptr) {
+            return;
+        }
+        if (AlphaShapes.Count() == 0) {
+            return;
+        }
+        if (TacticalMap == nullptr) {
+            return;
+        }
+
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        const int bb_w = device.Get_Backbuffer_Width();
+        const int bb_h = device.Get_Backbuffer_Height();
+        const float xscale = (VideoWidth > 0) ? (float)bb_w / (float)VideoWidth  : 1.0f;
+        const float yscale = (VideoHeight > 0) ? (float)bb_h / (float)VideoHeight : 1.0f;
+
+        /**
+         *  TacPixelX/TacPixelY live at offset 0x5C/0x60 in `Tactical` (verified
+         *  via the disasm of `Get_Relative_Tactical_Position` at 0x00612D70).
+         *  The TSpp wrapper exposes the slot as `field_5C` (an IsoCoordinate /
+         *  Point2D); .X is TacPixelX, .Y is TacPixelY.
+         */
+        const int tac_pixel_x = TacticalMap->field_5C.X;
+        const int tac_pixel_y = TacticalMap->field_5C.Y;
+
+        /**
+         *  Bind AlphaUAV (no RTV / DSV). Detach AlphaSRV first in case a
+         *  previous frame left it bound somewhere — D3D enforces "no SRV+UAV
+         *  on the same resource simultaneously".
+         */
+        ID3D11ShaderResourceView* null_srvs[4] = {};
+        ctx->PSSetShaderResources(0, 4, null_srvs);
+        ctx->OMSetRenderTargetsAndUnorderedAccessViews(
+            0, nullptr, nullptr, 0, 1, &uav, nullptr);
+
+        int submitted = 0;
+        for (int i = 0; i < AlphaShapes.Count(); ++i) {
+            AlphaShapeClass* s = AlphaShapes[i];
+            if (s == nullptr || s->field_2C) continue;
+
+            ShapeSet* image = s->Image;
+            if (image == nullptr) continue;
+
+            /**
+             *  AlphaShape's stored DrawRect (Size) is in vanilla's
+             *  TacPixel-relative absolute pixel space (see object.cpp:1408).
+             *  Convert to current-frame screen coords by replaying vanilla's
+             *  Draw_In_Area math, then scale to backbuffer pixels.
+             */
+            const int screen_x = TacticalRect.X + s->Size.X - tac_pixel_x;
+            const int screen_y = TacticalRect.Y + s->Size.Y - tac_pixel_y;
+
+            ShpAsset* asset = ShpCache::Get().Get_Or_Load(device, image);
+            if (asset == nullptr) continue;
+            const ShpFrameInfo* fi = asset->Get_Frame(0);
+            if (fi == nullptr || fi->W <= 0 || fi->H <= 0) continue;
+
+            RectF dst;
+            dst.X = (float)(screen_x + fi->X) * xscale;
+            dst.Y = (float)(screen_y + fi->Y) * yscale;
+            dst.W = (float)fi->W * xscale;
+            dst.H = (float)fi->H * yscale;
+            const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY,
+                                 (float)fi->W,      (float)fi->H };
+
+            /**
+             *  One Begin/End per shape so each batch can carry its own
+             *  AtlasSize uniform. Typical scenes have very few alpha shapes
+             *  (<50) so the per-shape state-set overhead is negligible.
+             */
+            Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
+                        &AlphaEffect, bb_w, bb_h, EDepthStencil::None);
+
+            AlphaWriteEffectParams params = {};
+            params.AtlasSize[0] = (float)asset->Get_Atlas().Width();
+            params.AtlasSize[1] = (float)asset->Get_Atlas().Height();
+            AlphaEffect.Set_Params(device, params);
+
+            const float identity_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            Batch.Draw(&asset->Get_Atlas(), dst, &src, identity_tint, 0.0f, 0.0f);
+            Batch.End(device);
+            ++submitted;
+        }
+
+        /**
+         *  Detach UAV so subsequent passes can bind AlphaSRV / RTV without
+         *  conflict. D3D errors if same resource is bound as both.
+         */
+        ID3D11UnorderedAccessView* null_uav = nullptr;
+        ctx->OMSetRenderTargetsAndUnorderedAccessViews(
+            0, nullptr, nullptr, 0, 1, &null_uav, nullptr);
+
+        PerfMonitor::Get().Set_Alpha_Lights(submitted);
     }
 
 
@@ -203,6 +317,15 @@ namespace Vinifera::Gfx
                 : nullptr;
             device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
 
+            /**
+             *  Alpha buffer at PS slot 4. Populated for the frame by
+             *  `Flush_Alpha_Lights`, sampled per-pixel by the sprite shader so
+             *  buildings / units inside an alpha-light cone brighten the same
+             *  way tiles do.
+             */
+            ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
+            device.Get_Context()->PSSetShaderResources(4, 1, &alpha_srv);
+
             for (size_t k = i; k < j; ++k) {
                 const SpriteDrawCmd& c = pass_commands[k];
                 const ShpFrameInfo* fi = c.Asset->Get_Frame(c.FrameIndex);
@@ -222,9 +345,9 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Unbind palette/remap SRVs to keep subsequent passes clean.
+         *  Unbind palette/remap/z-shape/alpha SRVs to keep subsequent passes clean.
          */
-        ID3D11ShaderResourceView* null_srvs[4] = {};
-        device.Get_Context()->PSSetShaderResources(0, 4, null_srvs);
+        ID3D11ShaderResourceView* null_srvs[5] = {};
+        device.Get_Context()->PSSetShaderResources(0, 5, null_srvs);
     }
 }

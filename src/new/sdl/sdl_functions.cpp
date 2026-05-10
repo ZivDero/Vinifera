@@ -707,6 +707,14 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     /**
+     *  Replay vanilla's `AlphaShapeClass::Draw_In_Area` blits onto the GPU
+     *  alpha buffer (the CPU paths were no-op'd by `AlphaShape_Hooks`). Runs
+     *  once before the pass loop so every subsequent tile/sprite shader
+     *  samples the up-to-date alpha state.
+     */
+    Vinifera::Gfx::SpriteQueue::Get().Flush_Alpha_Lights(*Vinifera::Gfx::Device);
+
+    /**
      *  Flush GPU queues populated by patched Draw_Tile / Draw_Shape callsites
      *  during the game's render pass. Replay them in vanilla Tactical::Render
      *  pass order so overlays, cell shadows, buildings, units, and UI keep

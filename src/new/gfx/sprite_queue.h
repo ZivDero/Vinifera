@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "alpha_write_effect.h"
 #include "palette_lut.h"
 #include "render_pass.h"
 #include "shp_asset.h"
@@ -88,6 +89,16 @@ namespace Vinifera::Gfx
         void Flush(GraphicsDevice& device);
         void Flush_Pass(GraphicsDevice& device, RenderPass pass);
 
+        /**
+         *  GPU port of vanilla's `AlphaShapeClass::Draw_In_Area` /
+         *  `Draw_All` blits. Runs once per frame (not per pass) before any
+         *  pass binds the alpha SRV for reading. Iterates the global
+         *  `AlphaShapes` vector and submits one alpha-write quad per active
+         *  shape; the shader applies vanilla's BrightnessTable formula
+         *  multiplicatively to the AlphaUAV.
+         */
+        void Flush_Alpha_Lights(GraphicsDevice& device);
+
         void Clear();
 
     private:
@@ -95,6 +106,7 @@ namespace Vinifera::Gfx
 
         SpriteBatch                Batch;
         SpriteEffect               PalEffect;
+        AlphaWriteEffect           AlphaEffect;
         std::vector<SpriteDrawCmd> Commands;
         bool                       Initialized = false;
     };

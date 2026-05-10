@@ -31,6 +31,7 @@ namespace Vinifera::Gfx
         int  TileCmds         = 0;
         int  TileBatches      = 0;
         int  TileDrawCalls    = 0;
+        int  AlphaLights      = 0;     // alpha-light shapes submitted this frame
 
         /* Cache size snapshot (refreshed each frame). */
         int  ShpCacheSize     = 0;
@@ -69,6 +70,7 @@ namespace Vinifera::Gfx
         void Note_Tile_Submit()       { ++Stats.TileCmds; }
         void Note_Tile_Batch()        { ++Stats.TileBatches; }
         void Note_Tile_Draw_Call()    { ++Stats.TileDrawCalls; }
+        void Set_Alpha_Lights(int n)  { Stats.AlphaLights = n; }
 
         /* Cache snapshots — called by Begin_Frame; queues update separately. */
         void Set_Cache_Sizes(int shp, int tmp, int pal);

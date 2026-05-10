@@ -115,6 +115,10 @@ namespace Vinifera::Gfx
             ImGui::Text("  draws  : %d", Stats.TileDrawCalls);
 
             ImGui::Separator();
+            ImGui::TextUnformatted("AlphaLights:");
+            ImGui::Text("  shapes : %d submitted", Stats.AlphaLights);
+
+            ImGui::Separator();
             ImGui::TextUnformatted("Caches:");
             ImGui::Text("  ShpCache    : %d entries", Stats.ShpCacheSize);
             ImGui::Text("  TmpCache    : %d entries", Stats.TmpCacheSize);

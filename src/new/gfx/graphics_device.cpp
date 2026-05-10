@@ -268,7 +268,9 @@ namespace Vinifera::Gfx
         td.Format = DXGI_FORMAT_R8_UNORM;
         td.SampleDesc.Count = 1;
         td.Usage = D3D11_USAGE_DEFAULT;
-        td.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        td.BindFlags = D3D11_BIND_RENDER_TARGET
+                     | D3D11_BIND_SHADER_RESOURCE
+                     | D3D11_BIND_UNORDERED_ACCESS;
         if (FAILED(Device->CreateTexture2D(&td, nullptr, &AlphaTex))) {
             DEBUG_ERROR("Gfx::GraphicsDevice: alpha texture creation failed.\n");
             return false;
@@ -285,12 +287,23 @@ namespace Vinifera::Gfx
             Release_Alpha_Buffer();
             return false;
         }
+
+        D3D11_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
+        uav_desc.Format = DXGI_FORMAT_R8_UNORM;
+        uav_desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+        uav_desc.Texture2D.MipSlice = 0;
+        if (FAILED(Device->CreateUnorderedAccessView(AlphaTex, &uav_desc, &AlphaUAV))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: alpha UAV creation failed.\n");
+            Release_Alpha_Buffer();
+            return false;
+        }
         return true;
     }
 
 
     void GraphicsDevice::Release_Alpha_Buffer()
     {
+        Safe_Release(AlphaUAV);
         Safe_Release(AlphaSRV);
         Safe_Release(AlphaRTV);
         Safe_Release(AlphaTex);
