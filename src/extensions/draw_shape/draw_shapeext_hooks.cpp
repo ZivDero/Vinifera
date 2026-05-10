@@ -315,6 +315,25 @@ void Draw_Shape_Proxy_DX11(
     }
 
     /**
+     *  Alpha-buffer write modes. SHAPE_WRITE_ALPHA / SHAPE_WRITE_ALPHA_MULT
+     *  redirect the draw away from the backbuffer and into the alpha buffer
+     *  (vanilla's alpha-light path — vehicle headlights, muzzle flashes,
+     *  building searchlight cones). The shape doesn't output color and
+     *  doesn't interact with depth.
+     */
+    if (flags & SHAPE_WRITE_ALPHA) {
+        cmd.Mode = SpriteDrawMode::AlphaWriteAdd;
+        cmd.DisableDepth = true;
+        cmd.WriteDepth = false;
+    } else if (flags & SHAPE_WRITE_ALPHA_MULT) {
+        cmd.Mode = SpriteDrawMode::AlphaWriteMult;
+        cmd.DisableDepth = true;
+        cmd.WriteDepth = false;
+    } else {
+        cmd.Mode = SpriteDrawMode::Color;
+    }
+
+    /**
      *  House-color remap. Vanilla's `remap` is a 256-byte LUT but only the
      *  16-entry slot for indices 16..31 ever differs in practice. Our
      *  PaletteLUT::Update_Remap consumes 16 bytes; copy from offset 16 of the

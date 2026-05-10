@@ -87,7 +87,7 @@ namespace Vinifera::Gfx
 
         bool has_pass_commands = false;
         for (const SpriteDrawCmd& cmd : Commands) {
-            if (cmd.Pass == pass) {
+            if (cmd.Pass == pass && cmd.Mode == SpriteDrawMode::Color) {
                 has_pass_commands = true;
                 break;
             }
@@ -123,7 +123,15 @@ namespace Vinifera::Gfx
         std::vector<SpriteDrawCmd> pass_commands;
         pass_commands.reserve(Commands.size());
         for (const SpriteDrawCmd& cmd : Commands) {
-            if (cmd.Pass == pass) {
+            /**
+             *  Phase 4.1 Chunk A: only render `Color` mode commands. Alpha
+             *  -buffer write modes (AlphaWriteAdd / AlphaWriteMult) require
+             *  binding `AlphaRTV` instead of the backbuffer and a different
+             *  blend formula — not yet implemented; a follow-up chunk hooks
+             *  vanilla's `AlphaShapeClass` system and routes those commands
+             *  through a dedicated alpha-write path.
+             */
+            if (cmd.Pass == pass && cmd.Mode == SpriteDrawMode::Color) {
                 pass_commands.push_back(cmd);
             }
         }

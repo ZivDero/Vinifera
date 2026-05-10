@@ -65,6 +65,8 @@ namespace Vinifera::Gfx
         ID3D11RenderTargetView* Get_Backbuffer_RTV() const { return BackbufferRTV; }
         ID3D11DepthStencilView* Get_Depth_DSV() const { return DepthDSV; }
         ID3D11ShaderResourceView* Get_Depth_SRV() const { return DepthSRV; }
+        ID3D11RenderTargetView* Get_Alpha_RTV() const { return AlphaRTV; }
+        ID3D11ShaderResourceView* Get_Alpha_SRV() const { return AlphaSRV; }
         int                     Get_Backbuffer_Width() const { return BackbufferWidth; }
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
 
@@ -85,6 +87,9 @@ namespace Vinifera::Gfx
         bool Create_Depth_Buffer(int width, int height);
         void Release_Depth_Buffer();
 
+        bool Create_Alpha_Buffer(int width, int height);
+        void Release_Alpha_Buffer();
+
         bool Create_Present_Pipeline();
         void Release_Present_Pipeline();
 
@@ -100,6 +105,16 @@ namespace Vinifera::Gfx
         ID3D11Texture2D*         DepthTex = nullptr;
         ID3D11DepthStencilView*  DepthDSV = nullptr;
         ID3D11ShaderResourceView*DepthSRV = nullptr;
+
+        /**
+         *  Alpha buffer mirrors vanilla's `AlphaBuffer` (a 16-bit-per-pixel
+         *  surface seeded to mid-gray each frame and modulated by alpha
+         *  lights / shroud). We use R8_UNORM since the upper byte of vanilla's
+         *  buffer was effectively unused intensity scaling.
+         */
+        ID3D11Texture2D*         AlphaTex = nullptr;
+        ID3D11RenderTargetView*  AlphaRTV = nullptr;
+        ID3D11ShaderResourceView*AlphaSRV = nullptr;
 
         int                      BackbufferWidth = 0;
         int                      BackbufferHeight = 0;

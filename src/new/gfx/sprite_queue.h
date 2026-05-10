@@ -29,6 +29,22 @@ namespace Vinifera::Gfx
     class GraphicsDevice;
 
 
+    /**
+     *  Mirrors vanilla's blitter selection for shapes interacting with the
+     *  alpha buffer. `Color` is the normal palette draw to the backbuffer
+     *  (the only mode that existed before Phase 4.1). `AlphaWriteAdd` and
+     *  `AlphaWriteMult` write alpha intensity into the AlphaBuffer instead
+     *  of color, matching `SHAPE_WRITE_ALPHA` (1<<15) and
+     *  `SHAPE_WRITE_ALPHA_MULT` (1<<8) respectively.
+     */
+    enum class SpriteDrawMode : uint8_t
+    {
+        Color = 0,
+        AlphaWriteAdd,
+        AlphaWriteMult,
+    };
+
+
     struct SpriteDrawCmd
     {
         ShpAsset*    Asset;
@@ -45,6 +61,7 @@ namespace Vinifera::Gfx
         bool         UseRemap;
         bool         WriteDepth;      // SHAPE_ZREADWRITE: occlude later sprites
         bool         DisableDepth;    // Non-z UI sprites (pips, select brackets, cameos)
+        SpriteDrawMode Mode;          // Color | AlphaWriteAdd | AlphaWriteMult
         uint8_t      RemapTable[16];  // copy of caller's `remap` arg
     };
 

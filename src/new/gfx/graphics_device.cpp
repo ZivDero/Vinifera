@@ -73,6 +73,10 @@ namespace Vinifera::Gfx
             Shutdown();
             return false;
         }
+        if (!Create_Alpha_Buffer(backbuffer_width, backbuffer_height)) {
+            Shutdown();
+            return false;
+        }
 
         StateCacheInstance.Initialize(Device);
 
@@ -92,6 +96,7 @@ namespace Vinifera::Gfx
         Release_Surface_Texture();
         Release_Present_Pipeline();
         StateCacheInstance.Shutdown();
+        Release_Alpha_Buffer();
         Release_Depth_Buffer();
         Release_Backbuffer_RTV();
         Safe_Release(SwapChain);
@@ -253,6 +258,45 @@ namespace Vinifera::Gfx
     }
 
 
+    bool GraphicsDevice::Create_Alpha_Buffer(int width, int height)
+    {
+        D3D11_TEXTURE2D_DESC td = {};
+        td.Width = width;
+        td.Height = height;
+        td.MipLevels = 1;
+        td.ArraySize = 1;
+        td.Format = DXGI_FORMAT_R8_UNORM;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_DEFAULT;
+        td.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        if (FAILED(Device->CreateTexture2D(&td, nullptr, &AlphaTex))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: alpha texture creation failed.\n");
+            return false;
+        }
+
+        if (FAILED(Device->CreateRenderTargetView(AlphaTex, nullptr, &AlphaRTV))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: alpha RTV creation failed.\n");
+            Release_Alpha_Buffer();
+            return false;
+        }
+
+        if (FAILED(Device->CreateShaderResourceView(AlphaTex, nullptr, &AlphaSRV))) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: alpha SRV creation failed.\n");
+            Release_Alpha_Buffer();
+            return false;
+        }
+        return true;
+    }
+
+
+    void GraphicsDevice::Release_Alpha_Buffer()
+    {
+        Safe_Release(AlphaSRV);
+        Safe_Release(AlphaRTV);
+        Safe_Release(AlphaTex);
+    }
+
+
     bool GraphicsDevice::Create_Present_Pipeline()
     {
         ID3DBlob* vs_blob = nullptr;
@@ -302,6 +346,7 @@ namespace Vinifera::Gfx
         Context->OMSetRenderTargets(0, nullptr, nullptr);
         Release_Backbuffer_RTV();
         Release_Depth_Buffer();
+        Release_Alpha_Buffer();
 
         UINT flags = TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
         if (FAILED(SwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, flags))) {
@@ -311,6 +356,7 @@ namespace Vinifera::Gfx
         BackbufferHeight = height;
         if (!Create_Backbuffer_RTV()) return false;
         if (!Create_Depth_Buffer(width, height)) return false;
+        if (!Create_Alpha_Buffer(width, height)) return false;
         return true;
     }
 
@@ -383,6 +429,16 @@ namespace Vinifera::Gfx
         Context->ClearRenderTargetView(BackbufferRTV, clear_color);
         if (DepthDSV != nullptr) {
             Context->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        }
+        if (AlphaRTV != nullptr) {
+            /**
+             *  Vanilla seeds AlphaBuffer to 127 each frame ("neutral mid-gray")
+             *  per `map.cpp:448`. Alpha-write shapes accumulate from there;
+             *  alpha-sample shapes read this baseline when nothing has lit
+             *  the pixel.
+             */
+            const float alpha_clear[4] = { 127.0f / 255.0f, 0.0f, 0.0f, 0.0f };
+            Context->ClearRenderTargetView(AlphaRTV, alpha_clear);
         }
 
         D3D11_VIEWPORT vp = {};

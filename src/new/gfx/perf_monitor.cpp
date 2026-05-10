@@ -11,6 +11,7 @@
 
 #include "perf_monitor.h"
 
+#include "graphics_device.h"
 #include "tmp_atlas.h"
 #include "vinifera_globals.h"
 
@@ -131,6 +132,25 @@ namespace Vinifera::Gfx
             ImGui::Text("  fill : %.2f%% (%lld / %lld px)", pct, used, total);
             ImGui::Text("  pack : cursor=(%d, %d), row_h=%d",
                 atlas.Cursor_X(), atlas.Cursor_Y(), atlas.Row_Height());
+
+            if (Vinifera::Gfx::Device != nullptr) {
+                if (auto* alpha_srv = Vinifera::Gfx::Device->Get_Alpha_SRV()) {
+                    ImGui::Separator();
+                    ImGui::TextUnformatted("AlphaBuffer:");
+                    /**
+                     *  Single-channel R8_UNORM cleared to 127/255 each frame
+                     *  (vanilla mid-gray seed). When the AlphaShape system is
+                     *  routed through the GPU, this preview shows light/dark
+                     *  spots populated by alpha-write commands.
+                     */
+                    const float aspect = Vinifera::Gfx::Device->Get_Backbuffer_Height() > 0
+                        ? (float)Vinifera::Gfx::Device->Get_Backbuffer_Width() / (float)Vinifera::Gfx::Device->Get_Backbuffer_Height()
+                        : 16.0f / 9.0f;
+                    const float preview_w = 320.0f;
+                    const float preview_h = preview_w / (aspect > 0.0f ? aspect : 1.0f);
+                    ImGui::Image((ImTextureID)(uintptr_t)alpha_srv, ImVec2(preview_w, preview_h));
+                }
+            }
         }
         ImGui::End();
     }
