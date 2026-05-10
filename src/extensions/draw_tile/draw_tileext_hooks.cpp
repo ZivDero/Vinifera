@@ -111,7 +111,9 @@ public:
         int cell_color,
         bool use_z,
         int cell_variation,
-        bool b1, bool b2, bool b3,
+        bool solid_mask,
+        bool z_clear_only,
+        bool fog_mask,
         signed int grey_shift);
 };
 
@@ -126,7 +128,9 @@ void IsoTileTypeClassExt::_Draw_Tile(
     int cell_color,
     bool use_z,
     int cell_variation,
-    bool b1, bool b2, bool b3,
+    bool solid_mask,
+    bool z_clear_only,
+    bool fog_mask,
     signed int grey_shift)
 {
     /**
@@ -147,7 +151,31 @@ void IsoTileTypeClassExt::_Draw_Tile(
     {
         Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
                           cell_level, cell_color, use_z, cell_variation,
-                          b1, b2, b3, grey_shift);
+                          solid_mask, z_clear_only, fog_mask, grey_shift);
+        return;
+    }
+
+    /**
+     *  Vanilla uses these booleans for non-standard tile blits:
+     *    solid_mask:   solid grey/masked footprint + z write
+     *    z_clear_only: z-buffer footprint clear only (CellClass::Draw_Clear_Tile)
+     *    fog_mask:     fog/shroud-style grey/checker mask
+     *
+     *  The normal terrain pass is all-false. For z_clear_only, there is no color draw
+     *  to preserve, and the DX11 depth buffer starts clear each frame, so the
+     *  correct Stage-3 behavior is to avoid submitting a visible tile. Keep
+     *  the visible special modes on vanilla until they have a GPU equivalent.
+     */
+    if (z_clear_only && !solid_mask && !fog_mask) {
+        (void)use_z;
+        (void)grey_shift;
+        (void)cliprect;
+        return;
+    }
+    if (solid_mask || fog_mask) {
+        Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
+                          cell_level, cell_color, use_z, cell_variation,
+                          solid_mask, z_clear_only, fog_mask, grey_shift);
         return;
     }
 
@@ -164,7 +192,7 @@ void IsoTileTypeClassExt::_Draw_Tile(
     if (asset == nullptr || palette == nullptr) {
         Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
                           cell_level, cell_color, use_z, cell_variation,
-                          b1, b2, b3, grey_shift);
+                          solid_mask, z_clear_only, fog_mask, grey_shift);
         return;
     }
 
@@ -259,7 +287,6 @@ void IsoTileTypeClassExt::_Draw_Tile(
     }
 
     (void)use_z;
-    (void)b1; (void)b2; (void)b3;
     (void)grey_shift;
     (void)cliprect;
 }
