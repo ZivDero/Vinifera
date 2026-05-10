@@ -202,7 +202,7 @@ namespace Vinifera::Gfx
                     continue;
                 }
                 const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
-                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint,
+                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.Tint,
                            c.DstZTop, c.DstZBottom,
                            c.ZAsset != nullptr ? &c.ZSrcUV : nullptr);
             }

@@ -18,6 +18,7 @@
 
 #include "draw_shapeext_hooks.h"
 
+#include "brightness.h"
 #include "convert.h"
 #include "debughandler.h"
 #include "drawshape.h"
@@ -41,21 +42,21 @@ using namespace Vinifera::Gfx;
 
 namespace
 {
-    inline uint32_t Tint_From_Intensity(int intensity)
+    inline void Tint_From_Intensity(int intensity, float out[4])
     {
         /**
-         *  Vanilla `intensity` ranges 0..2000 with 1000 == 100%. Map to a
-         *  per-vertex RGB modulate; alpha stays 0xFF (translucency comes from
-         *  EffectFlags). Values >1000 (overbright) clamp to 1.0 since the
-         *  shader works in linear modulate; the lighting/overbright cases
-         *  vanilla TS uses are rare enough that clamping is acceptable for
-         *  the first-cut.
+         *  Vanilla `intensity` ranges 0..2000 with 1000 == 100% (full normal)
+         *  and 2000 == 2x overbright. Brightness_To_Tint maps that linearly
+         *  into a [0, 2] RGB multiplier; the float vertex tint preserves
+         *  values above 1.0 through to the shader (the RT format saturates
+         *  on store, but the math composes correctly in HLSL).
+         *  Translucency lives on EffectFlags; alpha stays 1.0 here.
          */
-        int channel = intensity * 255 / 1000;
-        if (channel < 0) channel = 0;
-        if (channel > 255) channel = 255;
-        const uint32_t c = (uint32_t)channel;
-        return (0xFFu << 24) | (c << 16) | (c << 8) | c;
+        const float t = Brightness_To_Tint(intensity);
+        out[0] = t;
+        out[1] = t;
+        out[2] = t;
+        out[3] = 1.0f;
     }
 
     inline uint32_t Effect_Flags_From_Shape(ShapeFlags_Type flags)
@@ -211,7 +212,7 @@ void Draw_Shape_Proxy_DX11(
     cmd.Dst.H       = fi->H * yscale;
     cmd.Pass        = Current_Render_Pass();
     cmd.EffectFlags = Effect_Flags_From_Shape(flags);
-    cmd.VertexTint  = Tint_From_Intensity(intensity);
+    Tint_From_Intensity(intensity, cmd.Tint);
     const bool z_active = (flags & SHAPE_ZREAD) || (flags & SHAPE_ZGRAD) || (flags & SHAPE_ZREADWRITE);
     const bool z_write = (flags & SHAPE_ZREADWRITE);
     if (z_asset != nullptr && z_fi != nullptr) {

@@ -153,7 +153,7 @@ namespace Vinifera::Gfx
                     src = { (float)st->AtlasX, (float)st->AtlasY,
                             (float)st->W,       (float)st->H };
                 }
-                Batch.Draw(&shared_atlas, c.Dst, &src, c.VertexTint, c.DstZTop, c.DstZBottom);
+                Batch.Draw(&shared_atlas, c.Dst, &src, c.Tint, c.DstZTop, c.DstZBottom);
             }
 
             Batch.End(device);

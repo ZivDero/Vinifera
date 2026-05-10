@@ -39,7 +39,7 @@ namespace Vinifera::Gfx
         float    Pos[3];        // x, y, z (z = 0 lands at the near plane)
         float    UV[2];
         float    ZUV[2];        // normalized UV into optional z-shape atlas
-        uint32_t Color;         // RGBA8 (R in low byte)
+        float    Tint[4];       // RGBA float, 1.0 = neutral, >1.0 = overbright
     };
 
 
@@ -84,9 +84,9 @@ namespace Vinifera::Gfx
         /**
          *  Draw `texture` at backbuffer-pixel rect `dst`. `src` is in pixels
          *  within the texture; nullptr means "the whole texture". `color` is
-         *  RGBA8 modulate. `z` is the depth value (0 = near, 1 = far) used
-         *  by the shared depth buffer; default is 0 so that callers without
-         *  a depth scheme draw at the near plane.
+         *  RGBA8 modulate (unpacked to floats internally). `z` is the depth
+         *  value (0 = near, 1 = far) used by the shared depth buffer; default
+         *  is 0 so callers without a depth scheme draw at the near plane.
          */
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z = 0.0f);
 
@@ -105,6 +105,17 @@ namespace Vinifera::Gfx
          */
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                   uint32_t color, float z_top, float z_bottom, const RectF* z_uv);
+
+        /**
+         *  Float-tint variants. RGBA components in the [0, ~2.0] range; used
+         *  by the brightness pipeline (vanilla 0..2000 brightness → 0..2.0
+         *  RGB multiplier) so overbright values can pass through the vertex
+         *  shader before the RT format saturates.
+         */
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  const float tint[4], float z_top, float z_bottom);
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  const float tint[4], float z_top, float z_bottom, const RectF* z_uv);
 
         /**
          *  Convenience: draw at (x, y) with the texture's natural size.

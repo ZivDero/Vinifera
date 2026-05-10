@@ -19,6 +19,7 @@
 
 #include "draw_tileext_hooks.h"
 
+#include "brightness.h"
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "hooker.h"
@@ -229,17 +230,13 @@ void IsoTileTypeClassExt::_Draw_Tile(
     const float dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
 
     /**
-     *  Per-cell brightness modulate. cell_color is 1..256-ish in vanilla's
-     *  scheme; passes through as a per-vertex multiplier on the palette
-     *  output. Approximation: linear scale to [0..1].
+     *  Per-cell brightness modulate. Vanilla `cell_color` (mis-named — it's
+     *  the cell's TileBrightness) is in the 0..2000 range with 1000 = full
+     *  normal and 2000 = max overbright. Brightness_To_Tint converts that
+     *  to a [0, 2] linear RGB multiplier; the float vertex tint preserves
+     *  values above 1.0 through to the shader.
      */
-    int tint_v = cell_color;
-    if (tint_v < 0) tint_v = 0;
-    if (tint_v > 255) tint_v = 255;
-    const uint32_t tint = (0xFFu << 24)
-                        | ((uint32_t)tint_v << 16)
-                        | ((uint32_t)tint_v << 8)
-                        |  (uint32_t)tint_v;
+    const float tint_rgb = Brightness_To_Tint(cell_color);
 
     TileDrawCmd cmd = {};
     cmd.Asset        = asset;
@@ -258,7 +255,10 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.DstZTop      = dz;
     cmd.DstZBottom   = dz;
     cmd.Pass         = Current_Render_Pass();
-    cmd.VertexTint   = tint;
+    cmd.Tint[0]      = tint_rgb;
+    cmd.Tint[1]      = tint_rgb;
+    cmd.Tint[2]      = tint_rgb;
+    cmd.Tint[3]      = 1.0f;
     cmd.DrawExtra    = false;
 
     TileQueue::Get().Submit(cmd);

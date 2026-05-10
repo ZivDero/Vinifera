@@ -38,7 +38,7 @@ namespace Vinifera::Gfx
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
         RenderPass   Pass;
-        uint32_t     VertexTint;      // per-cell brightness modulate
+        float        Tint[4];         // per-cell brightness modulate (1.0 = neutral, 2.0 = max overbright)
         bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
     };
 

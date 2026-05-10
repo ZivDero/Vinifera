@@ -38,10 +38,10 @@ namespace Vinifera::Gfx
             "float4 PSMain(VSOut v) : SV_Target { return Tex.Sample(Smp, v.uv) * v.col; }\n";
 
         const D3D11_INPUT_ELEMENT_DESC SpriteIL[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,    0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,       0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
     }
 
@@ -128,6 +128,18 @@ namespace Vinifera::Gfx
     }
 
 
+    namespace
+    {
+        inline void Unpack_Color_To_Tint(uint32_t color, float out[4])
+        {
+            out[0] = (float)((color >>  0) & 0xFFu) / 255.0f;
+            out[1] = (float)((color >>  8) & 0xFFu) / 255.0f;
+            out[2] = (float)((color >> 16) & 0xFFu) / 255.0f;
+            out[3] = (float)((color >> 24) & 0xFFu) / 255.0f;
+        }
+    }
+
+
     void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z)
     {
         Draw(texture, dst, src, color, z, z);
@@ -143,6 +155,22 @@ namespace Vinifera::Gfx
 
     void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                            uint32_t color, float z_top, float z_bottom, const RectF* z_uv)
+    {
+        float tint[4];
+        Unpack_Color_To_Tint(color, tint);
+        Draw(texture, dst, src, tint, z_top, z_bottom, z_uv);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           const float tint[4], float z_top, float z_bottom)
+    {
+        Draw(texture, dst, src, tint, z_top, z_bottom, nullptr);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           const float tint[4], float z_top, float z_bottom, const RectF* z_uv)
     {
         if (!BatchOpen || texture == nullptr || !dst.Is_Valid()) {
             return;
@@ -169,10 +197,12 @@ namespace Vinifera::Gfx
         PendingSprite s = {};
         s.Tex = texture;
 
-        s.V[0] = { { dst.X,         dst.Y,         z_top }, { u0, v0 }, { zu0, zv0 }, color };
-        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top }, { u1, v0 }, { zu1, zv0 }, color };
-        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, { zu1, zv1 }, color };
-        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, { zu0, zv1 }, color };
+        const float t[4] = { tint[0], tint[1], tint[2], tint[3] };
+
+        s.V[0] = { { dst.X,         dst.Y,         z_top    }, { u0, v0 }, { zu0, zv0 }, { t[0], t[1], t[2], t[3] } };
+        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top    }, { u1, v0 }, { zu1, zv0 }, { t[0], t[1], t[2], t[3] } };
+        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, { zu1, zv1 }, { t[0], t[1], t[2], t[3] } };
+        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, { zu0, zv1 }, { t[0], t[1], t[2], t[3] } };
 
         Pending.push_back(s);
     }
