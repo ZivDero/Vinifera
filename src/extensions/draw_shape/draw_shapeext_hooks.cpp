@@ -25,6 +25,7 @@
 #include "hooker.h"
 #include "optionsext.h"
 #include "palette_lut.h"
+#include "render_pass.h"
 #include "shapeset.h"
 #include "shp_asset.h"
 #include "shp_cache.h"
@@ -194,6 +195,7 @@ void Draw_Shape_Proxy_DX11(
     cmd.Dst.Y       = y * yscale;
     cmd.Dst.W       = fi->W * xscale;
     cmd.Dst.H       = fi->H * yscale;
+    cmd.Pass        = Current_Render_Pass();
     cmd.EffectFlags = Effect_Flags_From_Shape(flags);
     cmd.VertexTint  = Tint_From_Intensity(intensity);
 
@@ -258,6 +260,9 @@ void Draw_Shape_Proxy_DX11(
      *  handles inter-overlay layering.
      */
     cmd.OverlayMode = (flags & SHAPE_ZGRAD) == 0;
+    if (Is_Cell_Shadow_Pass(cmd.Pass)) {
+        cmd.OverlayMode = false;
+    }
     if (cmd.OverlayMode) {
         cmd.WriteDepth = false;
     }

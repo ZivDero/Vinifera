@@ -72,8 +72,27 @@ namespace Vinifera::Gfx
 
     void SpriteQueue::Flush(GraphicsDevice& device)
     {
+        for (int pass = 0; pass < (int)RenderPass::Count; ++pass) {
+            Flush_Pass(device, (RenderPass)pass);
+        }
+        Commands.clear();
+    }
+
+
+    void SpriteQueue::Flush_Pass(GraphicsDevice& device, RenderPass pass)
+    {
         if (!Initialized || Commands.empty()) {
-            Commands.clear();
+            return;
+        }
+
+        bool has_pass_commands = false;
+        for (const SpriteDrawCmd& cmd : Commands) {
+            if (cmd.Pass == pass) {
+                has_pass_commands = true;
+                break;
+            }
+        }
+        if (!has_pass_commands) {
             return;
         }
 
@@ -100,14 +119,22 @@ namespace Vinifera::Gfx
             return true;
         };
 
+        std::vector<SpriteDrawCmd> pass_commands;
+        pass_commands.reserve(Commands.size());
+        for (const SpriteDrawCmd& cmd : Commands) {
+            if (cmd.Pass == pass) {
+                pass_commands.push_back(cmd);
+            }
+        }
+
         size_t i = 0;
-        while (i < Commands.size()) {
+        while (i < pass_commands.size()) {
             size_t j = i + 1;
-            while (j < Commands.size() && state_eq(Commands[i], Commands[j])) {
+            while (j < pass_commands.size() && state_eq(pass_commands[i], pass_commands[j])) {
                 ++j;
             }
 
-            const SpriteDrawCmd& head = Commands[i];
+            const SpriteDrawCmd& head = pass_commands[i];
             head.Palette->Update_Remap(head.UseRemap ? head.RemapTable : nullptr);
 
             SpriteEffectParams params = {};
@@ -145,7 +172,8 @@ namespace Vinifera::Gfx
              *  without SHAPE_ZGRAD), so we mirror that by disabling depth
              *  here and relying on submission order for layering.
              */
-            const EDepthStencil depth_state = head.OverlayMode
+            const bool disable_depth = head.OverlayMode && !Is_Cell_Shadow_Pass(head.Pass);
+            const EDepthStencil depth_state = disable_depth
                 ? EDepthStencil::None
                 : (head.WriteDepth
                     ? EDepthStencil::WriteLessEqual
@@ -156,7 +184,7 @@ namespace Vinifera::Gfx
             PalEffect.Set_Params(device, params);
 
             for (size_t k = i; k < j; ++k) {
-                const SpriteDrawCmd& c = Commands[k];
+                const SpriteDrawCmd& c = pass_commands[k];
                 const ShpFrameInfo* fi = c.Asset->Get_Frame(c.FrameIndex);
                 if (fi == nullptr || fi->W <= 0 || fi->H <= 0) {
                     continue;
@@ -176,7 +204,5 @@ namespace Vinifera::Gfx
          */
         ID3D11ShaderResourceView* null_srvs[3] = {};
         device.Get_Context()->PSSetShaderResources(0, 3, null_srvs);
-
-        Commands.clear();
     }
 }

@@ -3,11 +3,10 @@
 /*******************************************************************************
  *  @brief  Per-frame terrain-tile queue + flush.
  *
- *          The Draw_Tile proxy submits a TileDrawCmd per cell during
- *          Tactical::Render's terrain pass. Flush groups commands that share
- *          (asset, palette) and issues a SpriteBatch pass per group with
- *          depth-write enabled, so subsequent sprite draws can depth-test
- *          against the terrain.
+ *          The Draw_Tile proxy submits a TileDrawCmd per cell tagged with
+ *          the current vanilla Tactical::Render phase. Flush_Pass groups
+ *          commands that share (asset, palette) and issues a SpriteBatch pass
+ *          per group with depth-write enabled.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -19,6 +18,7 @@
 #include <vector>
 
 #include "palette_lut.h"
+#include "render_pass.h"
 #include "sprite_batch.h"
 #include "tile_effect.h"
 #include "tmp_asset.h"
@@ -37,6 +37,7 @@ namespace Vinifera::Gfx
         RectF        Dst;             // backbuffer-pixel space
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
+        RenderPass   Pass;
         uint32_t     VertexTint;      // per-cell brightness modulate
         bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
     };
@@ -57,6 +58,7 @@ namespace Vinifera::Gfx
          *  enabled, then clear the queue. Call before SpriteQueue::Flush.
          */
         void Flush(GraphicsDevice& device);
+        void Flush_Pass(GraphicsDevice& device, RenderPass pass);
 
         void Clear();
 

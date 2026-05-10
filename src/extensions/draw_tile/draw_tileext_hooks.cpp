@@ -27,6 +27,7 @@
 #include "mouse.h"
 #include "optionsext.h"
 #include "palette_lut.h"
+#include "render_pass.h"
 #include "shp_cache.h"
 #include "surface.h"
 #include "syringe.h"
@@ -256,6 +257,7 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.Dst.H        = (float)st->H * yscale;
     cmd.DstZTop      = dz;
     cmd.DstZBottom   = dz;
+    cmd.Pass         = Current_Render_Pass();
     cmd.VertexTint   = tint;
     cmd.DrawExtra    = false;
 

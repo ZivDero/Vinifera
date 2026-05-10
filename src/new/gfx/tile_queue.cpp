@@ -73,8 +73,27 @@ namespace Vinifera::Gfx
 
     void TileQueue::Flush(GraphicsDevice& device)
     {
+        for (int pass = 0; pass < (int)RenderPass::Count; ++pass) {
+            Flush_Pass(device, (RenderPass)pass);
+        }
+        Commands.clear();
+    }
+
+
+    void TileQueue::Flush_Pass(GraphicsDevice& device, RenderPass pass)
+    {
         if (!Initialized || Commands.empty()) {
-            Commands.clear();
+            return;
+        }
+
+        std::vector<TileDrawCmd> pass_commands;
+        pass_commands.reserve(Commands.size());
+        for (const TileDrawCmd& cmd : Commands) {
+            if (cmd.Pass == pass) {
+                pass_commands.push_back(cmd);
+            }
+        }
+        if (pass_commands.empty()) {
             return;
         }
 
@@ -90,7 +109,7 @@ namespace Vinifera::Gfx
          *  because tiles depth-test+depth-write — visibility is determined
          *  by Z, not draw order.
          */
-        std::sort(Commands.begin(), Commands.end(),
+        std::sort(pass_commands.begin(), pass_commands.end(),
             [](const TileDrawCmd& a, const TileDrawCmd& b) {
                 return a.Palette < b.Palette;
             });
@@ -104,13 +123,13 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView* z_atlas_srv = TmpAtlas::Get().Get_Z_Texture().Get_SRV();
 
         size_t i = 0;
-        while (i < Commands.size()) {
+        while (i < pass_commands.size()) {
             size_t j = i + 1;
-            while (j < Commands.size() && Commands[j].Palette == Commands[i].Palette) {
+            while (j < pass_commands.size() && pass_commands[j].Palette == pass_commands[i].Palette) {
                 ++j;
             }
 
-            const TileDrawCmd& head = Commands[i];
+            const TileDrawCmd& head = pass_commands[i];
 
             Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
                         &TileEffectInstance, bb_w, bb_h,
@@ -120,7 +139,7 @@ namespace Vinifera::Gfx
             device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
 
             for (size_t k = i; k < j; ++k) {
-                const TileDrawCmd& c = Commands[k];
+                const TileDrawCmd& c = pass_commands[k];
                 const TmpSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
                 if (st == nullptr) continue;
 
@@ -145,7 +164,5 @@ namespace Vinifera::Gfx
 
         ID3D11ShaderResourceView* null_srvs[3] = {};
         device.Get_Context()->PSSetShaderResources(0, 3, null_srvs);
-
-        Commands.clear();
     }
 }

@@ -30,6 +30,7 @@
 #include "optionsext.h"
 #include "playmovie.h"
 #include "rect.h"
+#include "render_pass.h"
 #include "sdlmouse.h"
 #include "sdlsurface.h"
 #include "tibsun_functions.h"
@@ -707,11 +708,18 @@ bool SDL_Update_Screen(Surface* surface)
 
     /**
      *  Flush GPU queues populated by patched Draw_Tile / Draw_Shape callsites
-     *  during the game's render pass. Tiles go first with depth-write
-     *  enabled, then sprites depth-test against the resulting terrain depth.
+     *  during the game's render pass. Replay them in vanilla Tactical::Render
+     *  pass order so overlays, cell shadows, buildings, units, and UI keep
+     *  their old layer relationships.
      */
-    Vinifera::Gfx::TileQueue::Get().Flush(*Vinifera::Gfx::Device);
-    Vinifera::Gfx::SpriteQueue::Get().Flush(*Vinifera::Gfx::Device);
+    for (int pass = 0; pass < (int)Vinifera::Gfx::RenderPass::Count; ++pass) {
+        const auto render_pass = (Vinifera::Gfx::RenderPass)pass;
+        Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+        Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+    }
+    Vinifera::Gfx::TileQueue::Get().Clear();
+    Vinifera::Gfx::SpriteQueue::Get().Clear();
+    Vinifera::Gfx::Reset_Current_Render_Pass();
 
     /**
      *  Draw overlays, then present.

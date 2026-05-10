@@ -3,10 +3,10 @@
 /*******************************************************************************
  *  @brief  Per-frame sprite queue + flush.
  *
- *          The Draw_Shape proxy submits draw commands here in vanilla's
- *          submission order. SpriteQueue::Flush groups commands that share
- *          (asset, palette, effect-flags, remap) and issues a SpriteBatch
- *          pass per group, rendering on top of the present-quad output.
+ *          The Draw_Shape proxy submits draw commands here tagged with the
+ *          current vanilla Tactical::Render phase. Flush_Pass preserves
+ *          submission order within each phase while batching compatible
+ *          contiguous commands.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "palette_lut.h"
+#include "render_pass.h"
 #include "shp_asset.h"
 #include "sprite_batch.h"
 #include "sprite_effect.h"
@@ -36,6 +37,7 @@ namespace Vinifera::Gfx
         RectF        Dst;             // backbuffer-pixel space
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
+        RenderPass   Pass;
         uint32_t     EffectFlags;     // SEF_* from sprite_effect.h
         uint32_t     VertexTint;      // RGBA8, derived from `intensity`
         bool         UseRemap;
@@ -65,6 +67,7 @@ namespace Vinifera::Gfx
          *  Call after the present-quad upload and before ImGui renders.
          */
         void Flush(GraphicsDevice& device);
+        void Flush_Pass(GraphicsDevice& device, RenderPass pass);
 
         void Clear();
 
