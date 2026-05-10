@@ -308,7 +308,7 @@ void SidebarClassExt::_AI(KeyNumType& input, Point2D& xy)
  */
 void SidebarClassExt::_Draw_It(bool complete)
 {
-    RadarClass::Draw_It(complete);
+    RadarClass::Draw_It(true);
 
     BattleUI.Draw();
     BattleUI.Blit(complete);
