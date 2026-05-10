@@ -32,6 +32,8 @@ namespace Vinifera::Gfx
         int  TileBatches      = 0;
         int  TileDrawCalls    = 0;
         int  AlphaLights      = 0;     // alpha-light shapes submitted this frame
+        int  ShroudFog        = 0;     // shroud/fog cells submitted this frame
+        int  ShroudFogDraws   = 0;     // shroud/fog DrawIndexed calls this frame
 
         /* Cache size snapshot (refreshed each frame). */
         int  ShpCacheSize     = 0;
@@ -71,6 +73,8 @@ namespace Vinifera::Gfx
         void Note_Tile_Batch()        { ++Stats.TileBatches; }
         void Note_Tile_Draw_Call()    { ++Stats.TileDrawCalls; }
         void Set_Alpha_Lights(int n)  { Stats.AlphaLights = n; }
+        void Set_Shroud_Fog(int n)    { Stats.ShroudFog = n; }
+        void Set_Shroud_Fog_Draws(int n) { Stats.ShroudFogDraws = n; }
 
         /* Cache snapshots — called by Begin_Frame; queues update separately. */
         void Set_Cache_Sizes(int shp, int tmp, int pal);

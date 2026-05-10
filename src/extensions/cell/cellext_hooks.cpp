@@ -305,6 +305,7 @@ int CellClassExt::_Reduce_Tiberium(int levels)
 }
 
 
+#if 0
 /**
  *  #issue-381
  * 
@@ -382,6 +383,7 @@ DEFINE_HOOK(0x00455130, _CellClass_Draw_Fog_Patch, 5)
     R->EAX(Cell_FixupFogShape);
     return 0;
 }
+#endif
 
 
 /**

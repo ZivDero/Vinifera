@@ -22,6 +22,7 @@
 #include "perf_monitor.h"
 #include "shp_cache.h"
 #include "shp_viewer.h"
+#include "shroud_fog_queue.h"
 #include "sprite_queue.h"
 #include "tile_queue.h"
 #include "tmp_atlas.h"
@@ -264,6 +265,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera TileQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::ShroudFogQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera ShroudFogQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -282,6 +287,7 @@ void SDL_Reset_Video_Mode()
      */
     Vinifera::Gfx::TileQueue::Get().Shutdown();
     Vinifera::Gfx::SpriteQueue::Get().Shutdown();
+    Vinifera::Gfx::ShroudFogQueue::Get().Shutdown();
     Vinifera::Gfx::TmpCache::Get().Clear();
     Vinifera::Gfx::TmpAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -705,6 +711,15 @@ bool SDL_Update_Screen(Surface* surface)
             static_cast<SDLMouseClass*>(MouseCursor)->Recalc_Cursor_Image();
         }
     }
+
+    /**
+     *  Shroud / fog alpha writes — vanilla's `Draw_Shroud_Or_Fog_Shape` and
+     *  `Draw_Fog_Shape` were patched to enqueue commands here instead of
+     *  blitting into the CPU AlphaBuffer. Must run before alpha lights so
+     *  the multiplicative light formula composes over the shroud baseline
+     *  (alpha = 0 at shrouded cells → light × 0 = 0, which is correct).
+     */
+    Vinifera::Gfx::ShroudFogQueue::Get().Flush(*Vinifera::Gfx::Device);
 
     /**
      *  Replay vanilla's `AlphaShapeClass::Draw_In_Area` blits onto the GPU

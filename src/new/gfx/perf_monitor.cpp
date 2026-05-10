@@ -119,6 +119,11 @@ namespace Vinifera::Gfx
             ImGui::Text("  shapes : %d submitted", Stats.AlphaLights);
 
             ImGui::Separator();
+            ImGui::TextUnformatted("ShroudFog:");
+            ImGui::Text("  cells  : %d submitted", Stats.ShroudFog);
+            ImGui::Text("  draws  : %d", Stats.ShroudFogDraws);
+
+            ImGui::Separator();
             ImGui::TextUnformatted("Caches:");
             ImGui::Text("  ShpCache    : %d entries", Stats.ShpCacheSize);
             ImGui::Text("  TmpCache    : %d entries", Stats.TmpCacheSize);
