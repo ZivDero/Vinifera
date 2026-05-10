@@ -95,6 +95,7 @@ namespace Vinifera::Gfx
             if (a.EffectFlags != b.EffectFlags) return false;
             if (a.UseRemap != b.UseRemap) return false;
             if (a.WriteDepth != b.WriteDepth) return false;
+            if (a.OverlayMode != b.OverlayMode) return false;
             if (a.UseRemap && memcmp(a.RemapTable, b.RemapTable, 16) != 0) return false;
             return true;
         };
@@ -134,9 +135,21 @@ namespace Vinifera::Gfx
              *  Buildings (vanilla SHAPE_Z_READ_WRITE) write depth so units
              *  drawn afterwards behind them are correctly occluded.
              */
-            const EDepthStencil depth_state = head.WriteDepth
-                ? EDepthStencil::WriteLessEqual
-                : EDepthStencil::TestLessEqual_NoWrite;
+            /**
+             *  UI overlays (selection brackets, pips, cameos drawn over the
+             *  tactical view) use a constant per-sprite depth derived from
+             *  the unit's foot, but their quad spans down into screen rows
+             *  belonging to the next-front cell whose tile depth is *closer*
+             *  than the sprite's. Depth-test would clip the bottom edge of
+             *  these overlays. Vanilla doesn't z-test these (they're drawn
+             *  without SHAPE_ZGRAD), so we mirror that by disabling depth
+             *  here and relying on submission order for layering.
+             */
+            const EDepthStencil depth_state = head.OverlayMode
+                ? EDepthStencil::None
+                : (head.WriteDepth
+                    ? EDepthStencil::WriteLessEqual
+                    : EDepthStencil::TestLessEqual_NoWrite);
             Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, bb_w, bb_h,
                         depth_state);
             PalEffect.Bind_Palette(device, *head.Palette);

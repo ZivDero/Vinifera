@@ -40,6 +40,7 @@ namespace Vinifera::Gfx
         uint32_t     VertexTint;      // RGBA8, derived from `intensity`
         bool         UseRemap;
         bool         WriteDepth;      // SHAPE_Z_READ_WRITE: occlude later sprites
+        bool         OverlayMode;     // UI on top of tactical view (pips, select brackets, cameos)
         uint8_t      RemapTable[16];  // copy of caller's `remap` arg
     };
 

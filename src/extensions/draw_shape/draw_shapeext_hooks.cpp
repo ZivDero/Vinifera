@@ -249,6 +249,20 @@ void Draw_Shape_Proxy_DX11(
     cmd.WriteDepth = (flags & SHAPE_Z_READ_WRITE) != 0;
 
     /**
+     *  Vanilla never z-tests Draw_Shape calls that lack SHAPE_ZGRAD/SHAPE_FLAT
+     *  (selection brackets, transport / ammo / health pips, build-state
+     *  overlays, cameos). They're 2D UI laid over the tactical view; their
+     *  quads extend down into screen rows belonging to the next-front cell,
+     *  whose tile depth is closer than the sprite's foot-derived depth, so
+     *  hardware depth-test would clip them at the bottom. Submission order
+     *  handles inter-overlay layering.
+     */
+    cmd.OverlayMode = (flags & SHAPE_FLAT) == 0;
+    if (cmd.OverlayMode) {
+        cmd.WriteDepth = false;
+    }
+
+    /**
      *  House-color remap. Vanilla's `remap` is a 256-byte LUT but only the
      *  16-entry slot for indices 16..31 ever differs in practice. Our
      *  PaletteLUT::Update_Remap consumes 16 bytes; copy from offset 16 of the
