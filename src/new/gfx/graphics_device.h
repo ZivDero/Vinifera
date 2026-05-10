@@ -29,6 +29,12 @@ namespace Vinifera::Gfx
     class Texture2D;
     class RenderTarget2D;
 
+    enum class DepthBinding
+    {
+        None,
+        SharedDepth,
+    };
+
     class GraphicsDevice
     {
     public:
@@ -49,6 +55,7 @@ namespace Vinifera::Gfx
         bool Upload_Surface(const void* pixels, int pitch_bytes);
 
         void Begin_Frame();
+        void Draw_Texture(ID3D11ShaderResourceView* srv, const Rect& dst_rect, SDL_ScaleMode scale_mode, EBlend blend = EBlend::Opaque);
         void Draw_Surface(const Rect& dst_rect, SDL_ScaleMode scale_mode);
         void End_Frame();
 
@@ -56,8 +63,9 @@ namespace Vinifera::Gfx
          *  Bind the back buffer (or a custom RT) as the current render target
          *  with a viewport covering the full target. nullptr -> back buffer.
          */
-        void Set_Render_Target(RenderTarget2D* target);
-        void Bind_Backbuffer() { Set_Render_Target(nullptr); }
+        void Set_Render_Target(RenderTarget2D* target, DepthBinding depth = DepthBinding::None);
+        void Bind_Backbuffer() { Set_Render_Target(nullptr, DepthBinding::SharedDepth); }
+        void Bind_Scene_Target();
 
         ID3D11Device*           Get_Device() const { return Device; }
         ID3D11DeviceContext*    Get_Context() const { return Context; }
@@ -68,6 +76,7 @@ namespace Vinifera::Gfx
         ID3D11RenderTargetView*    Get_Alpha_RTV() const { return AlphaRTV; }
         ID3D11ShaderResourceView*  Get_Alpha_SRV() const { return AlphaSRV; }
         ID3D11UnorderedAccessView* Get_Alpha_UAV() const { return AlphaUAV; }
+        ID3D11ShaderResourceView*  Get_Scene_SRV() const;
         int                     Get_Backbuffer_Width() const { return BackbufferWidth; }
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
 
@@ -88,6 +97,9 @@ namespace Vinifera::Gfx
         bool Create_Depth_Buffer(int width, int height);
         void Release_Depth_Buffer();
 
+        bool Create_Scene_Target(int width, int height);
+        void Release_Scene_Target();
+
         bool Create_Alpha_Buffer(int width, int height);
         void Release_Alpha_Buffer();
 
@@ -106,6 +118,7 @@ namespace Vinifera::Gfx
         ID3D11Texture2D*         DepthTex = nullptr;
         ID3D11DepthStencilView*  DepthDSV = nullptr;
         ID3D11ShaderResourceView*DepthSRV = nullptr;
+        RenderTarget2D*          SceneTarget = nullptr;
 
         /**
          *  Alpha buffer mirrors vanilla's `AlphaBuffer` (a 16-bit-per-pixel

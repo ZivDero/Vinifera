@@ -31,6 +31,8 @@ namespace Vinifera::Gfx
         int  TileCmds         = 0;
         int  TileBatches      = 0;
         int  TileDrawCalls    = 0;
+        int  PrimitiveCmds    = 0;
+        int  PrimitiveDrawCalls = 0;
         int  AlphaLights      = 0;     // alpha-light shapes submitted this frame
         int  ShroudFog        = 0;     // shroud/fog cells submitted this frame
         int  ShroudFogDraws   = 0;     // shroud/fog DrawIndexed calls this frame
@@ -72,6 +74,8 @@ namespace Vinifera::Gfx
         void Note_Tile_Submit()       { ++Stats.TileCmds; }
         void Note_Tile_Batch()        { ++Stats.TileBatches; }
         void Note_Tile_Draw_Call()    { ++Stats.TileDrawCalls; }
+        void Note_Primitive_Submit()  { ++Stats.PrimitiveCmds; }
+        void Note_Primitive_Draw_Call() { ++Stats.PrimitiveDrawCalls; }
         void Set_Alpha_Lights(int n)  { Stats.AlphaLights = n; }
         void Set_Shroud_Fog(int n)    { Stats.ShroudFog = n; }
         void Set_Shroud_Fog_Draws(int n) { Stats.ShroudFogDraws = n; }

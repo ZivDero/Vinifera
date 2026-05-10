@@ -43,6 +43,8 @@ namespace Vinifera::Gfx
         Stats.TileCmds = 0;
         Stats.TileBatches = 0;
         Stats.TileDrawCalls = 0;
+        Stats.PrimitiveCmds = 0;
+        Stats.PrimitiveDrawCalls = 0;
     }
 
 
@@ -113,6 +115,11 @@ namespace Vinifera::Gfx
             ImGui::Text("  cmds   : %d", Stats.TileCmds);
             ImGui::Text("  batches: %d", Stats.TileBatches);
             ImGui::Text("  draws  : %d", Stats.TileDrawCalls);
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("PrimitiveQueue:");
+            ImGui::Text("  cmds   : %d", Stats.PrimitiveCmds);
+            ImGui::Text("  draws  : %d", Stats.PrimitiveDrawCalls);
 
             ImGui::Separator();
             ImGui::TextUnformatted("AlphaLights:");

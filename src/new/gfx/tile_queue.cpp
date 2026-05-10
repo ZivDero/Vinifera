@@ -100,7 +100,7 @@ namespace Vinifera::Gfx
         const int bb_w = device.Get_Backbuffer_Width();
         const int bb_h = device.Get_Backbuffer_Height();
 
-        device.Bind_Backbuffer();
+        device.Bind_Scene_Target();
 
         /**
          *  All TmpAssets share the global TmpAtlas, so the only batch

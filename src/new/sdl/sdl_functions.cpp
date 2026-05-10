@@ -30,6 +30,7 @@
 #include "mouse.h"
 #include "optionsext.h"
 #include "playmovie.h"
+#include "primitive_queue.h"
 #include "rect.h"
 #include "render_pass.h"
 #include "sdlmouse.h"
@@ -269,6 +270,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera ShroudFogQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::PrimitiveQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera PrimitiveQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -288,6 +293,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::TileQueue::Get().Shutdown();
     Vinifera::Gfx::SpriteQueue::Get().Shutdown();
     Vinifera::Gfx::ShroudFogQueue::Get().Shutdown();
+    Vinifera::Gfx::PrimitiveQueue::Get().Shutdown();
     Vinifera::Gfx::TmpCache::Get().Clear();
     Vinifera::Gfx::TmpAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -678,21 +684,21 @@ bool SDL_Update_Screen(Surface* surface)
 
     Vinifera::Gfx::Device->Set_VSync(OptionsExtension->IsVSync);
     Vinifera::Gfx::Device->Begin_Frame();
+    Vinifera::Gfx::Device->Bind_Scene_Target();
 
     /**
-     *  Blit game's surface to the back buffer via the present quad.
+     *  Blit game's surface to the scene target via the present quad.
      */
+    static bool scaled = SDL_Should_Scale();
+    SDL_ScaleMode scale_mode = OptionsExtension->ScaleMode;
+    if (scale_mode == SDL_SCALEMODE_INVALID) {
+        scale_mode = SDL_SCALEMODE_NEAREST;
+    }
+
     if (surface) {
         if (void* pixels = surface->Lock()) {
             Vinifera::Gfx::Device->Upload_Surface(pixels, surface->Stride());
             surface->Unlock();
-        }
-
-        static bool scaled = SDL_Should_Scale();
-
-        SDL_ScaleMode scale_mode = OptionsExtension->ScaleMode;
-        if (scale_mode == SDL_SCALEMODE_INVALID) {
-            scale_mode = SDL_SCALEMODE_NEAREST;
         }
 
         Rect dst;
@@ -739,10 +745,25 @@ bool SDL_Update_Screen(Surface* surface)
         const auto render_pass = (Vinifera::Gfx::RenderPass)pass;
         Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
         Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+        Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
     }
     Vinifera::Gfx::TileQueue::Get().Clear();
     Vinifera::Gfx::SpriteQueue::Get().Clear();
+    Vinifera::Gfx::PrimitiveQueue::Get().Clear();
     Vinifera::Gfx::Reset_Current_Render_Pass();
+
+    /**
+     *  SceneRT is already backbuffer-sized; copy it 1:1 to the swapchain
+     *  backbuffer before drawing debug/UI overlays.
+     */
+    Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
+    Rect scene_dst(0, 0,
+        Vinifera::Gfx::Device->Get_Backbuffer_Width(),
+        Vinifera::Gfx::Device->Get_Backbuffer_Height());
+    Vinifera::Gfx::Device->Draw_Texture(
+        Vinifera::Gfx::Device->Get_Scene_SRV(),
+        scene_dst,
+        SDL_SCALEMODE_NEAREST);
 
     /**
      *  Draw overlays, then present.

@@ -47,6 +47,19 @@ public:
      */
     bool Fill_Rect(Rect const& rect, int color) override;
     bool Fill_Rect(Rect const& cliprect, Rect const& fillrect, int color) override;
+    bool Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int opacity) override;
+    bool Put_Pixel(Point2D const& point, int color) override;
+    bool Draw_Line(Point2D const& startpoint, Point2D const& endpoint, int color) override;
+    bool Draw_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color) override;
+    bool Draw_Line_entry_34(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int a5, int a6, bool a7 = false) override;
+    bool Draw_Line_entry_38(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int a4, int a5, int a6, bool a7 = false) override;
+    bool Draw_Line_entry_3C(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int a5, int a6, bool a7, bool a8, bool a9, bool a10, float a11) override;
+    int Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset) override;
+    int entry_48(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset, bool a6) override;
+    bool entry_4C(Point2D const& startpoint, Point2D const& endpoint, int color, bool a4 = false) override;
+    bool Draw_Rect(Rect const& rect, int color) override;
+    bool Draw_Rect(Rect const& cliprect, Rect const& rect, int color) override;
+    bool entry_84(Point2D const& point, int color, Rect const& rect) override;
 
     /**
      *  Get/Release a windows device context from a DirectX surface

@@ -73,6 +73,10 @@ namespace Vinifera::Gfx
             Shutdown();
             return false;
         }
+        if (!Create_Scene_Target(backbuffer_width, backbuffer_height)) {
+            Shutdown();
+            return false;
+        }
         if (!Create_Alpha_Buffer(backbuffer_width, backbuffer_height)) {
             Shutdown();
             return false;
@@ -97,6 +101,7 @@ namespace Vinifera::Gfx
         Release_Present_Pipeline();
         StateCacheInstance.Shutdown();
         Release_Alpha_Buffer();
+        Release_Scene_Target();
         Release_Depth_Buffer();
         Release_Backbuffer_RTV();
         Safe_Release(SwapChain);
@@ -258,6 +263,32 @@ namespace Vinifera::Gfx
     }
 
 
+    bool GraphicsDevice::Create_Scene_Target(int width, int height)
+    {
+        Release_Scene_Target();
+
+        SceneTarget = new RenderTarget2D();
+        if (SceneTarget == nullptr) {
+            return false;
+        }
+        if (!SceneTarget->Initialize(*this, width, height, DXGI_FORMAT_R8G8B8A8_UNORM)) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: scene render target creation failed.\n");
+            Release_Scene_Target();
+            return false;
+        }
+        return true;
+    }
+
+
+    void GraphicsDevice::Release_Scene_Target()
+    {
+        if (SceneTarget != nullptr) {
+            delete SceneTarget;
+            SceneTarget = nullptr;
+        }
+    }
+
+
     bool GraphicsDevice::Create_Alpha_Buffer(int width, int height)
     {
         D3D11_TEXTURE2D_DESC td = {};
@@ -357,6 +388,7 @@ namespace Vinifera::Gfx
         }
 
         Context->OMSetRenderTargets(0, nullptr, nullptr);
+        Release_Scene_Target();
         Release_Backbuffer_RTV();
         Release_Depth_Buffer();
         Release_Alpha_Buffer();
@@ -369,6 +401,7 @@ namespace Vinifera::Gfx
         BackbufferHeight = height;
         if (!Create_Backbuffer_RTV()) return false;
         if (!Create_Depth_Buffer(width, height)) return false;
+        if (!Create_Scene_Target(width, height)) return false;
         if (!Create_Alpha_Buffer(width, height)) return false;
         return true;
     }
@@ -440,6 +473,9 @@ namespace Vinifera::Gfx
         const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
         Context->OMSetRenderTargets(1, &BackbufferRTV, DepthDSV);
         Context->ClearRenderTargetView(BackbufferRTV, clear_color);
+        if (SceneTarget != nullptr && SceneTarget->Get_RTV() != nullptr) {
+            Context->ClearRenderTargetView(SceneTarget->Get_RTV(), clear_color);
+        }
         if (DepthDSV != nullptr) {
             Context->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
         }
@@ -463,18 +499,17 @@ namespace Vinifera::Gfx
     }
 
 
-    void GraphicsDevice::Set_Render_Target(RenderTarget2D* target)
+    void GraphicsDevice::Set_Render_Target(RenderTarget2D* target, DepthBinding depth)
     {
         if (Context == nullptr) {
             return;
         }
         ID3D11RenderTargetView* rtv = (target != nullptr) ? target->Get_RTV() : BackbufferRTV;
         /**
-         *  Custom render targets don't get the back-buffer's depth buffer —
-         *  they have to bring their own DSV (or none). The backbuffer path
-         *  always uses our shared depth buffer.
+         *  Some passes render color-only while SceneRT and the backbuffer share
+         *  the frame depth buffer.
          */
-        ID3D11DepthStencilView* dsv = (target != nullptr) ? nullptr : DepthDSV;
+        ID3D11DepthStencilView* dsv = (depth == DepthBinding::SharedDepth) ? DepthDSV : nullptr;
         Context->OMSetRenderTargets(1, &rtv, dsv);
 
         D3D11_VIEWPORT vp = {};
@@ -508,9 +543,25 @@ namespace Vinifera::Gfx
     }
 
 
-    void GraphicsDevice::Draw_Surface(const Rect& dst_rect, SDL_ScaleMode scale_mode)
+    void GraphicsDevice::Bind_Scene_Target()
     {
-        if (SurfaceSRV == nullptr || PresentVS == nullptr) {
+        if (SceneTarget != nullptr) {
+            Set_Render_Target(SceneTarget, DepthBinding::SharedDepth);
+        } else {
+            Bind_Backbuffer();
+        }
+    }
+
+
+    ID3D11ShaderResourceView* GraphicsDevice::Get_Scene_SRV() const
+    {
+        return SceneTarget != nullptr ? SceneTarget->Get_SRV() : nullptr;
+    }
+
+
+    void GraphicsDevice::Draw_Texture(ID3D11ShaderResourceView* srv, const Rect& dst_rect, SDL_ScaleMode scale_mode, EBlend blend)
+    {
+        if (srv == nullptr || PresentVS == nullptr) {
             return;
         }
 
@@ -531,10 +582,10 @@ namespace Vinifera::Gfx
         ID3D11SamplerState* sampler =
             StateCacheInstance.Get(scale_mode == SDL_SCALEMODE_LINEAR ? ESampler::LinearClamp : ESampler::PointClamp);
         Context->PSSetSamplers(0, 1, &sampler);
-        Context->PSSetShaderResources(0, 1, &SurfaceSRV);
+        Context->PSSetShaderResources(0, 1, &srv);
 
         const float blend_factor[4] = { 0, 0, 0, 0 };
-        Context->OMSetBlendState(StateCacheInstance.Get(EBlend::Opaque), blend_factor, 0xFFFFFFFF);
+        Context->OMSetBlendState(StateCacheInstance.Get(blend), blend_factor, 0xFFFFFFFF);
         Context->OMSetDepthStencilState(StateCacheInstance.Get(EDepthStencil::None), 0);
         Context->RSSetState(StateCacheInstance.Get(ERasterizer::CullNone));
 
@@ -542,6 +593,12 @@ namespace Vinifera::Gfx
 
         ID3D11ShaderResourceView* null_srv = nullptr;
         Context->PSSetShaderResources(0, 1, &null_srv);
+    }
+
+
+    void GraphicsDevice::Draw_Surface(const Rect& dst_rect, SDL_ScaleMode scale_mode)
+    {
+        Draw_Texture(SurfaceSRV, dst_rect, scale_mode, EBlend::Opaque);
     }
 
 
