@@ -74,25 +74,4 @@ namespace Vinifera::Gfx
     {
         return const_cast<SurfaceTargetRegistry*>(this)->Find(surface);
     }
-
-
-    GpuSurfaceTarget* SurfaceTargetRegistry::Find_Command_Target(Surface* surface)
-    {
-        GpuSurfaceTarget* direct = Find(surface);
-        if (direct != nullptr) {
-            return direct;
-        }
-
-        if (surface == LogicalSurface) {
-            return Find(LogicalSurface);
-        }
-
-        return nullptr;
-    }
-
-
-    const GpuSurfaceTarget* SurfaceTargetRegistry::Find_Command_Target(Surface* surface) const
-    {
-        return const_cast<SurfaceTargetRegistry*>(this)->Find_Command_Target(surface);
-    }
 }

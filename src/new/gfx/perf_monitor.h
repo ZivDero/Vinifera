@@ -33,13 +33,6 @@ namespace Vinifera::Gfx
         int  TileDrawCalls    = 0;
         int  PrimitiveCmds    = 0;
         int  PrimitiveDrawCalls = 0;
-        int  TacticalPrimitiveFallbacks = 0;
-        int  TacticalBlits    = 0;
-        int  TacticalLocks    = 0;
-        int  TacticalDCs      = 0;
-        int  TacticalUnsupportedPrimitives = 0;
-        int  SidebarUploads   = 0;
-        int  SidebarRTDraws   = 0;
         int  SidebarComposites = 0;
         int  AlphaLights      = 0;     // alpha-light shapes submitted this frame
         int  ShroudFog        = 0;     // shroud/fog cells submitted this frame
@@ -84,19 +77,10 @@ namespace Vinifera::Gfx
         void Note_Tile_Draw_Call()    { ++Stats.TileDrawCalls; }
         void Note_Primitive_Submit()  { ++Stats.PrimitiveCmds; }
         void Note_Primitive_Draw_Call() { ++Stats.PrimitiveDrawCalls; }
-        void Note_Tactical_Primitive_Fallback() { ++Stats.TacticalPrimitiveFallbacks; }
-        void Note_Tactical_Blit()      { ++Stats.TacticalBlits; }
-        void Note_Tactical_Lock()      { ++Stats.TacticalLocks; }
-        void Note_Tactical_DC()        { ++Stats.TacticalDCs; }
-        void Note_Tactical_Unsupported_Primitive() { ++Stats.TacticalUnsupportedPrimitives; }
-        void Note_Sidebar_Upload()     { ++Stats.SidebarUploads; }
-        void Note_Sidebar_RT_Draw()    { ++Stats.SidebarRTDraws; }
         void Note_Sidebar_Composite()  { ++Stats.SidebarComposites; }
         void Set_Alpha_Lights(int n)  { Stats.AlphaLights = n; }
         void Set_Shroud_Fog(int n)    { Stats.ShroudFog = n; }
         void Set_Shroud_Fog_Draws(int n) { Stats.ShroudFogDraws = n; }
-
-        bool Hide_CPU_Tactical_Layer() const { return HideCPUTacticalLayer; }
 
         /* Cache snapshots — called by Begin_Frame; queues update separately. */
         void Set_Cache_Sizes(int shp, int tmp, int pal);
@@ -112,7 +96,6 @@ namespace Vinifera::Gfx
         PerfMonitor();
 
         PerfStats   Stats;
-        bool        HideCPUTacticalLayer = true;
         LARGE_INTEGER QpcFreq = {};
         LARGE_INTEGER FrameStart = {};
 

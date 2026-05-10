@@ -27,8 +27,9 @@
 #include "playmovie.h"
 #include "rules.h"
 #include "session.h"
+#include "gpu_surface.h"
+#include "gpu_surface_target.h"
 #include "sidebar.h"
-#include "surface_target_registry.h"
 #include "tibsun_functions.h"
 #include "tibsun_globals.h"
 #include "tooltip.h"
@@ -403,11 +404,15 @@ int SidebarClassExt::_Which_Column(RTTIType type)
 void SidebarClassExt::_Blit_Sidebar(bool)
 {
     if (IsSidebarActive && GameActive && ScenarioActive) {
-        const Vinifera::Gfx::GpuSurfaceTarget* sidebar_target =
-            Vinifera::Gfx::SurfaceTargetRegistry::Get().Find(SidebarSurface);
-        if (sidebar_target != nullptr
-            && sidebar_target->Get_Output_Target() == Vinifera::Gfx::GpuRenderTarget::Sidebar
-            && sidebar_target->Can_Compose()
+        /**
+         *  When `SidebarSurface` is a `GpuSurface` (post-Stage-7-Step-3), the
+         *  sidebar renders into `SidebarRT` via the queues — vanilla's CPU
+         *  blit from `SidebarSurface` to `VisibleSurface` would copy the
+         *  dummy buffer, so skip it under non-legacy mode.
+         */
+        const GpuSurface* gpu_sidebar = dynamic_cast<const GpuSurface*>(SidebarSurface);
+        if (gpu_sidebar != nullptr
+            && gpu_sidebar->Output_Target() == Vinifera::Gfx::GpuRenderTarget::Sidebar
             && OptionsExtension != nullptr
             && !OptionsExtension->LegacyRenderer
             && TacticalActive

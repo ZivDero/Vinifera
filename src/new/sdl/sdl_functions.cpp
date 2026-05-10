@@ -18,6 +18,7 @@
 #include "cdctrl.h"
 #include "command.h"
 #include "convert.h"
+#include "gpu_surface.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
 #include "shp_cache.h"
@@ -85,18 +86,16 @@ namespace
         registry.Clear();
 
         /**
-         *  CompositeSurface: GPU-authoritative for the tactical region. CPU
-         *  pixel writes inside the tactical rect are masked out before the
-         *  GPU queue passes draw (see `SDL_Draw_Tactical_CPU_Layer_Mask`),
-         *  so vanilla effects that bypass our proxies (voxels, sonic /
-         *  laser waves, anything Lock()-and-write) are invisible until they
-         *  GPU-port. Non-tactical regions (HUD overlays, taskbar, message
-         *  strip) still come through the CPU upload path.
+         *  CompositeSurface: `GpuSurface` (Stage 7 Step 2). The tactical
+         *  scene + HUD overlays are owned entirely by `SceneRT`; there is
+         *  no CPU upload path for this surface. Vanilla draw vtable calls
+         *  hit `GpuSurface` virtuals which enqueue to the GPU queues;
+         *  vanilla pixel writes via Lock land in a dummy buffer and
+         *  disappear (sacrificed effects listed in `SDL_Update_Screen`).
          */
         if (CompositeSurface != nullptr) {
             GpuSurfaceTargetDesc desc = {};
             desc.SurfacePtr = CompositeSurface;
-            desc.Role = GpuSurfaceRole::TacticalScene;
             desc.LogicalRect = CompositeSurface->Get_Rect();
             desc.ScreenRect = CompositeSurface->Get_Rect();
             desc.OutputTarget = GpuRenderTarget::Scene;
@@ -106,7 +105,6 @@ namespace
         if (TileSurface != nullptr) {
             GpuSurfaceTargetDesc desc = {};
             desc.SurfacePtr = TileSurface;
-            desc.Role = GpuSurfaceRole::TacticalTile;
             desc.LogicalRect = TileSurface->Get_Rect();
             desc.ScreenRect = TileSurface->Get_Rect();
             desc.OutputTarget = GpuRenderTarget::Scene;
@@ -114,29 +112,30 @@ namespace
         }
 
         /**
-         *  SidebarSurface: architecturally GPU (output target = SidebarRT).
-         *  The CPU pixel buffer + per-frame upload is a working scaffold;
-         *  the migration target is to route sidebar SHP draws through
-         *  `SpriteQueue` and WWFont glyphs through a future GPU font queue,
-         *  both bucketed by `OutputTarget = Sidebar` so they land on
-         *  `SidebarRT` directly. When that lands, flip `Can_Queue_Shapes()`
-         *  / `Can_Queue_Primitives()` to return `true` for the `Sidebar`
-         *  role in `gpu_surface_target.h`.
+         *  SidebarSurface: `GpuSurface` (Stage 7 Step 3). Cameos +
+         *  primitive frames render onto `SidebarRT` via the queues. WWFont
+         *  text and the radar minimap are sacrificed visuals until Steps
+         *  5–6 land their GPU ports; the audit-log warnings from
+         *  `GpuSurface` warn-stubs name remaining CPU-only callers.
          */
         if (SidebarSurface != nullptr) {
             GpuSurfaceTargetDesc desc = {};
             desc.SurfacePtr = SidebarSurface;
-            desc.Role = GpuSurfaceRole::Sidebar;
             desc.LogicalRect = SidebarSurface->Get_Rect();
             desc.ScreenRect = Rect(SidebarRect.X, 0, SidebarSurface->Get_Width(), SidebarSurface->Get_Height());
             desc.OutputTarget = GpuRenderTarget::Sidebar;
             registry.Bind(desc);
         }
 
+        /**
+         *  HiddenSurface / VisibleSurface (CPU `SDLSurface`s for menus /
+         *  legacy compat) carry no GPU output target. They aren't queried
+         *  by any GPU dispatch path; the registry entries exist purely for
+         *  Diagnostics-style enumeration.
+         */
         if (HiddenSurface != nullptr) {
             GpuSurfaceTargetDesc desc = {};
             desc.SurfacePtr = HiddenSurface;
-            desc.Role = GpuSurfaceRole::HiddenUI;
             desc.LogicalRect = HiddenSurface->Get_Rect();
             desc.ScreenRect = HiddenSurface->Get_Rect();
             desc.OutputTarget = GpuRenderTarget::None;
@@ -146,53 +145,11 @@ namespace
         if (VisibleSurface != nullptr) {
             GpuSurfaceTargetDesc desc = {};
             desc.SurfacePtr = VisibleSurface;
-            desc.Role = GpuSurfaceRole::VisibleCompat;
             desc.LogicalRect = VisibleSurface->Get_Rect();
             desc.ScreenRect = VisibleSurface->Get_Rect();
             desc.OutputTarget = GpuRenderTarget::None;
             registry.Bind(desc);
         }
-    }
-
-    void SDL_Draw_Tactical_CPU_Layer_Mask()
-    {
-        if (Vinifera::Gfx::Device == nullptr || VideoWidth <= 0 || VideoHeight <= 0) {
-            return;
-        }
-        if (OptionsExtension != nullptr && OptionsExtension->LegacyRenderer) {
-            return;
-        }
-        if (!TacticalActive || !ScenarioActive) {
-            return;
-        }
-        if (!Vinifera::Gfx::PerfMonitor::Get().Hide_CPU_Tactical_Layer()) {
-            return;
-        }
-
-        const Rect video_rect(0, 0, VideoWidth, VideoHeight);
-        const Rect tactical_rect = Intersect(TacticalRect, video_rect);
-        if (!tactical_rect.Is_Valid()) {
-            return;
-        }
-
-        const float xscale = (float)Vinifera::Gfx::Device->Get_Backbuffer_Width() / (float)VideoWidth;
-        const float yscale = (float)Vinifera::Gfx::Device->Get_Backbuffer_Height() / (float)VideoHeight;
-        if (xscale <= 0.0f || yscale <= 0.0f) {
-            return;
-        }
-
-        const Vinifera::Gfx::RectF mask_rect {
-            (float)tactical_rect.X * xscale,
-            (float)tactical_rect.Y * yscale,
-            (float)tactical_rect.Width * xscale,
-            (float)tactical_rect.Height * yscale
-        };
-        const float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-        Vinifera::Gfx::PrimitiveQueue::Get().Draw_Immediate_Rect(
-            *Vinifera::Gfx::Device,
-            mask_rect,
-            black,
-            Vinifera::Gfx::EBlend::Opaque);
     }
 
     /**
@@ -214,8 +171,6 @@ namespace
         Vinifera::Gfx::GpuSurfaceTarget* target =
             Vinifera::Gfx::SurfaceTargetRegistry::Get().Find(SidebarSurface);
         if (target == nullptr
-            || !target->Can_Upload_CPU()
-            || !target->Can_Compose()
             || target->Get_Output_Target() != Vinifera::Gfx::GpuRenderTarget::Sidebar) {
             return nullptr;
         }
@@ -224,12 +179,12 @@ namespace
 
 
     /**
-     *  Phase 1: Lock SidebarSurface, upload CPU pixels to the sidebar upload
-     *  texture, bind SidebarRT, clear it, and paint the upload onto SidebarRT.
-     *  Runs *before* the GPU queue flushes so sidebar SHP / primitive draws
-     *  layer on top of the CPU upload (radar minimap, WWFont text, etc.).
+     *  Phase 1: Size `SidebarRT` to the sidebar's logical dimensions, bind
+     *  it, and clear it. The queue flushes that follow paint cameos +
+     *  primitives directly onto `SidebarRT` (no CPU upload — `SidebarSurface`
+     *  is `GpuSurface` after Step 3, and its `Lock()` returns a dummy).
      */
-    void SDL_Draw_Sidebar_RT_Upload(SDL_ScaleMode scale_mode)
+    void SDL_Prepare_Sidebar_RT(SDL_ScaleMode /*scale_mode*/)
     {
         if (SDL_Sidebar_RT_Target() == nullptr) {
             return;
@@ -245,22 +200,8 @@ namespace
             return;
         }
 
-        if (void* pixels = SidebarSurface->Lock()) {
-            if (Vinifera::Gfx::Device->Upload_Sidebar_Surface(pixels, SidebarSurface->Stride())) {
-                Vinifera::Gfx::PerfMonitor::Get().Note_Sidebar_Upload();
-            }
-            SidebarSurface->Unlock();
-        } else {
-            return;
-        }
-
         Vinifera::Gfx::Device->Bind_Sidebar_Target();
         Vinifera::Gfx::Device->Clear_Sidebar_Target();
-        Vinifera::Gfx::Device->Draw_Texture(
-            Vinifera::Gfx::Device->Get_Sidebar_Upload_SRV(),
-            Rect(0, 0, sidebar_width, sidebar_height),
-            scale_mode);
-        Vinifera::Gfx::PerfMonitor::Get().Note_Sidebar_RT_Draw();
     }
 
 
@@ -393,21 +334,46 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
     }
 
     if (composite_rect.Is_Valid()) {
-        CompositeSurface = new SDLSurface(composite_rect.Width, composite_rect.Height);
-        CompositeSurface->Fill(0);
-        DEBUG_INFO("CompositeSurface (%dx%d)\n", composite_rect.Width, composite_rect.Height);
+        /**
+         *  Stage 7 Step 2: `CompositeSurface` commits to `GpuSurface`. The
+         *  tactical scene + HUD overlays live on `SceneRT`; vanilla HUD draw
+         *  calls (Fill_Rect / Draw_Line / Put_Pixel / Draw_Shape) route
+         *  through GpuSurface vtable methods which enqueue to the GPU
+         *  queues. Vanilla code that writes pixels directly via Lock
+         *  (voxels, waves, anything we haven't intercepted) writes to the
+         *  dummy buffer and disappears — already sacrificed, recovered by
+         *  Steps 7–8.
+         */
+        CompositeSurface = new GpuSurface(composite_rect.Width, composite_rect.Height,
+                                          Vinifera::Gfx::GpuRenderTarget::Scene);
+        DEBUG_INFO("CompositeSurface (%dx%d) [GpuSurface]\n", composite_rect.Width, composite_rect.Height);
     }
 
     if (tile_rect.Is_Valid()) {
-        TileSurface = new SDLSurface(tile_rect.Width, tile_rect.Height);
-        TileSurface->Fill(0);
-        DEBUG_INFO("TileSurface (%dx%d)\n", tile_rect.Width, tile_rect.Height);
+        /**
+         *  Stage 7 Step 1: `TileSurface` is the first surface to commit to
+         *  the `GpuSurface` class. Terrain pixels live in `SceneRT`; the
+         *  CPU-side dummy buffer satisfies vanilla's `Tactical::Render` outer
+         *  Lock without backing real pixel data. Skip the post-allocation
+         *  Fill(0) — there's nothing to initialise (and `GpuSurface::Fill`
+         *  is a stub).
+         */
+        TileSurface = new GpuSurface(tile_rect.Width, tile_rect.Height,
+                                     Vinifera::Gfx::GpuRenderTarget::Scene);
+        DEBUG_INFO("TileSurface (%dx%d) [GpuSurface]\n", tile_rect.Width, tile_rect.Height);
     }
 
     if (sidebar_rect.Is_Valid()) {
-        SidebarSurface = new SDLSurface(sidebar_rect.Width, sidebar_rect.Height);
-        SidebarSurface->Fill(0);
-        DEBUG_INFO("SidebarSurface (%dx%d)\n", sidebar_rect.Width, sidebar_rect.Height);
+        /**
+         *  Stage 7 Step 3: `SidebarSurface` commits to `GpuSurface`. Sidebar
+         *  SHP cameos + primitive frames render directly into `SidebarRT`
+         *  via the queues; sidebar text (WWFont) and the radar minimap are
+         *  sacrificed until Steps 5–6 GPU-port them. The CPU upload path
+         *  retires here.
+         */
+        SidebarSurface = new GpuSurface(sidebar_rect.Width, sidebar_rect.Height,
+                                        Vinifera::Gfx::GpuRenderTarget::Sidebar);
+        DEBUG_INFO("SidebarSurface (%dx%d) [GpuSurface]\n", sidebar_rect.Width, sidebar_rect.Height);
     }
 
     if (!hidden_first && hidden_rect.Is_Valid()) {
@@ -934,28 +900,6 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     if (surface) {
-        const Vinifera::Gfx::GpuSurfaceTarget* target =
-            Vinifera::Gfx::SurfaceTargetRegistry::Get().Find(surface);
-        const bool allow_cpu_upload = target == nullptr || target->Can_Upload_CPU();
-
-        if (allow_cpu_upload) {
-            SDLSurface::Suppress_Tactical_Lock_Audit(true);
-            if (void* pixels = surface->Lock()) {
-                Vinifera::Gfx::Device->Upload_Surface(pixels, surface->Stride());
-                surface->Unlock();
-            }
-            SDLSurface::Suppress_Tactical_Lock_Audit(false);
-
-            Rect dst;
-            if (!SDL_Should_Scale()) {
-                dst = target != nullptr ? target->Get_Screen_Rect() : surface->Get_Rect();
-            } else {
-                dst = Rect(0, 0, Vinifera::Gfx::Device->Get_Backbuffer_Width(), Vinifera::Gfx::Device->Get_Backbuffer_Height());
-            }
-            Vinifera::Gfx::Device->Draw_Surface(dst, scale_mode);
-            SDL_Draw_Tactical_CPU_Layer_Mask();
-        }
-
         /**
          *  If the scale has changed, recalculate the mouse cursor image.
          */
@@ -966,25 +910,18 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     /**
-     *  Tactical region is GPU-authoritative. SceneRT contents inside the
-     *  tactical rect are produced exclusively by the queue passes below,
-     *  on top of a black mask painted by `SDL_Draw_Tactical_CPU_Layer_Mask`.
-     *  The tactical pixels of the CPU CompositeSurface are uploaded above
-     *  but immediately overwritten by the mask, so any vanilla CPU pixel
-     *  write that lands inside `TacticalRect` is invisible. Known sacrifices
-     *  in this state, to be GPU-ported in follow-up chunks:
+     *  Stage 7 Step 2: `CompositeSurface` is `GpuSurface`. There is no CPU
+     *  buffer to upload — the entire tactical scene + HUD comes from the
+     *  GPU queue flushes below, drawing into `SceneRT`. Known sacrifices in
+     *  this state, to be recovered in Steps 5–8:
      *
      *      - Voxel rendering (vehicles + aircraft) — vanilla locks the
-     *        composite/tile surface and writes voxel pixels directly.
+     *        composite/tile surface and writes pixels directly.
      *      - `WaveClass::Draw_Sonic` — sonic-wave refractive distortion.
      *      - `WaveClass::Draw_Laser` — laser red-channel boost.
-     *      - Anything else surfaced by the per-callsite Lock() audit
-     *        warning in `sdlsurface.cpp:Note_Tactical_Lock` (each new
-     *        offender prints once with its return address).
-     *
-     *  Non-tactical regions of CompositeSurface (HUD, taskbar, message
-     *  strip) still come through the CPU upload path above; their pixels
-     *  are not masked and reach the screen.
+     *      - Sidebar text + radar (still on `SDLSurface` until Step 3,
+     *        recovered by Steps 5–6 once `GpuSurface`-routed).
+     *      - Anything else surfaced by `GpuSurface`'s warn-stub log lines.
      */
 
     /**
@@ -1005,12 +942,13 @@ bool SDL_Update_Screen(Surface* surface)
     Vinifera::Gfx::SpriteQueue::Get().Flush_Alpha_Lights(*Vinifera::Gfx::Device);
 
     /**
-     *  Sidebar upload runs *before* the queue flushes so the queue's Sidebar
-     *  bucket (cameos, build-slot frames) layers on top of the CPU-uploaded
-     *  text / radar pixels. The Compose call runs after the flushes when
-     *  SidebarRT is fully populated.
+     *  Size + bind + clear `SidebarRT` so the queue passes below can paint
+     *  the sidebar's Sidebar-bucketed commands (cameos, frames, primitives)
+     *  directly into it. No CPU upload — sidebar pixels are GPU-authoritative
+     *  after Step 3. The Compose call after the queue flushes blits
+     *  `SidebarRT` onto `SceneRT` at the sidebar's screen position.
      */
-    SDL_Draw_Sidebar_RT_Upload(scale_mode);
+    SDL_Prepare_Sidebar_RT(scale_mode);
 
     /**
      *  Flush GPU queues populated by patched Draw_Tile / Draw_Shape callsites

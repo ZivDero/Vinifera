@@ -31,14 +31,6 @@ namespace Vinifera::Gfx
         GpuSurfaceTarget* Find(Surface* surface);
         const GpuSurfaceTarget* Find(Surface* surface) const;
 
-        /**
-         *  Resolve the surface used by command shims. This preserves vanilla's
-         *  LogicalSurface indirection without making scratch/compat surfaces
-         *  accidentally commandable.
-         */
-        GpuSurfaceTarget* Find_Command_Target(Surface* surface);
-        const GpuSurfaceTarget* Find_Command_Target(Surface* surface) const;
-
     private:
         SurfaceTargetRegistry() = default;
 

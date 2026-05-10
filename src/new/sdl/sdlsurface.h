@@ -1,7 +1,14 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  SDL Surface class.
+ *  @brief  SDL/GDI-backed CPU Surface class.
+ *
+ *          Pure-CPU surface for menus, dialogs, OwnerDraw, and the legacy
+ *          visible-backbuffer compat path. Pixel data lives in a GDI DIB
+ *          section that an SDL_Surface wraps; drawing inherits from
+ *          XSurface / DSurface base implementations. The GPU-dispatch
+ *          duality that lived here through Stage 6 was extracted to
+ *          `GpuSurface` (`src/new/gfx/gpu_surface.h`) in Stage 7.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -23,9 +30,10 @@ enum SDLSurfaceColorMode {
 
 
 /**
- *  This is a concrete surface class that allocates memory as  GDI DIB and
- *  wraps it in an SDL_Surface structure for use with SDL rendering.
- *  It is derived from DSurface to inherit most of the drawing routines.
+ *  Pure-CPU surface backed by a GDI DIB section + thin SDL_Surface wrapper.
+ *  Used for `HiddenSurface`, `AlternateSurface`, `VisibleSurface` — the
+ *  surfaces vanilla writes to via OwnerDraw / direct pixel access / GDI
+ *  bitblt. GPU rendering uses `GpuSurface` instead.
  */
 class SDLSurface : public DSurface
 {
@@ -38,36 +46,22 @@ public:
     SDLSurface(int width, int height);
 
     /**
-     *  Copies regions from one surface to another.
+     *  SDL → SDL fastpath blit. Falls back to XSurface for cross-class or
+     *  translucent blits.
      */
     bool Blit_From(Rect const& dcliprect, Rect const& destrect, Surface const& source, Rect const& scliprect, Rect const& sourcerect, bool trans = false, bool = true) override;
     bool Blit_From(Rect const& destrect, Surface const& source, Rect const& sourcerect, bool trans = false, bool = true) override;
     bool Blit_From(Surface const& source, bool trans = false, bool = true) override;
 
     /**
-     *  Fills a region with a constant color.
+     *  SDL_FillSurfaceRect fastpath fills.
      */
     bool Fill_Rect(Rect const& rect, int color) override;
     bool Fill_Rect(Rect const& cliprect, Rect const& fillrect, int color) override;
-    bool Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int opacity) override;
-    bool Draw_Ellipse(Point2D center, int radius_x, int radius_y, Rect clip, int color) override;
-    bool Put_Pixel(Point2D const& point, int color) override;
-    bool Draw_Line(Point2D const& startpoint, Point2D const& endpoint, int color) override;
-    bool Draw_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color) override;
-    bool Draw_Line_entry_34(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int a5, int a6, bool a7 = false) override;
-    bool Draw_Line_entry_38(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int a4, int a5, int a6, bool a7 = false) override;
-    bool Draw_Line_entry_3C(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int a5, int a6, bool a7, bool a8, bool a9, bool a10, float a11) override;
-    bool Plot_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, void (*drawer_callback)(Point2D&)) override;
-    int Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset) override;
-    int entry_48(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset, bool a6) override;
-    bool entry_4C(Point2D const& startpoint, Point2D const& endpoint, int color, bool a4 = false) override;
-    bool Draw_Rect(Rect const& rect, int color) override;
-    bool Draw_Rect(Rect const& cliprect, Rect const& rect, int color) override;
-    bool entry_84(Point2D const& point, int color, Rect const& rect) override;
-    bool entry_90(Rect& area, Point2D& start, Point2D& end, RGBClass& a4, RGBClass& a5, float& a6, float& a7) override;
 
     /**
-     *  Get/Release a windows device context from a DirectX surface
+     *  GDI device-context interop. Used by vanilla's OwnerDraw / message
+     *  pump / dialog paint paths.
      */
     HDC GetDC();
     int ReleaseDC(HDC hdc);
@@ -76,22 +70,19 @@ public:
      *  Create a surface object that represents the currently visible screen.
      */
     static SDLSurface* Create_Primary(void* = nullptr);
-    static void Suppress_Tactical_Lock_Audit(bool suppress);
 
     /**
-     *  Gets and frees a direct pointer to the video memory.
+     *  Real Lock/Unlock against the GDI DIB section.
      */
     void* Lock(Point2D point = Point2D(0, 0)) const override;
     bool Unlock() const override;
     bool Can_Lock(int x = 0, int y = 0) const override;
 
-    /**
-     *  Queries information about the surface.
-     */
     int Stride() const override;
 
     /**
-     *  Abusing this to signal that this is an SDL surface.
+     *  Marker for code paths that want to detect SDL-backed surfaces (e.g.
+     *  the SDL-fastpath blit recognizes another SDLSurface as a source).
      */
     bool Is_Direct_Draw() const override { return true; }
 

@@ -22,6 +22,8 @@
 #include "convert.h"
 #include "debughandler.h"
 #include "drawshape.h"
+#include "gpu_surface.h"
+#include "gpu_surface_target.h"
 #include "graphics_device.h"
 #include "hooker.h"
 #include "optionsext.h"
@@ -32,7 +34,6 @@
 #include "shp_cache.h"
 #include "sprite_queue.h"
 #include "surface.h"
-#include "surface_target_registry.h"
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
 
@@ -120,11 +121,16 @@ void Draw_Shape_Proxy_DX11(
      *    - Bad inputs (defensive).
      */
     const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-    const GpuSurfaceTarget* surface_target = SurfaceTargetRegistry::Get().Find_Command_Target(&surface);
+    /**
+     *  Stage 7 destination: class identity is the dispatch key. If the
+     *  destination is a `GpuSurface`, route through the queue path; if it's
+     *  a plain `SDLSurface` (HiddenSurface / AlternateSurface / VisibleSurface),
+     *  fall through to vanilla's CPU blit.
+     */
+    GpuSurface* gpu_surface = dynamic_cast<GpuSurface*>(&surface);
     if (legacy
         || Vinifera::Gfx::Device == nullptr
-        || surface_target == nullptr
-        || !surface_target->Can_Queue_Shapes()
+        || gpu_surface == nullptr
         || shapefile == nullptr
         || shapenum < 0)
     {
@@ -203,7 +209,7 @@ void Draw_Shape_Proxy_DX11(
      */
     float xscale = 1.0f;
     float yscale = 1.0f;
-    if (!surface_target->Logical_To_Render_Target(device, xscale, yscale)) {
+    if (!Vinifera::Gfx::Logical_To_Render_Target(device, gpu_surface->Output_Target(), xscale, yscale)) {
         Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
                    remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
         return;
@@ -363,7 +369,7 @@ void Draw_Shape_Proxy_DX11(
         memcpy(cmd.RemapTable, remap + 16, 16);
     }
 
-    cmd.OutputTarget = surface_target->Get_Output_Target();
+    cmd.OutputTarget = gpu_surface->Output_Target();
 
     SpriteQueue::Get().Submit(cmd);
 }

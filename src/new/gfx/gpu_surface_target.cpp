@@ -19,7 +19,13 @@ namespace Vinifera::Gfx
 {
     bool GpuSurfaceTarget::Logical_To_Render_Target(GraphicsDevice& device, float& xscale, float& yscale) const
     {
-        switch (Get_Output_Target()) {
+        return Vinifera::Gfx::Logical_To_Render_Target(device, Get_Output_Target(), xscale, yscale);
+    }
+
+
+    bool Logical_To_Render_Target(GraphicsDevice& device, GpuRenderTarget target, float& xscale, float& yscale)
+    {
+        switch (target) {
         case GpuRenderTarget::Scene:
         case GpuRenderTarget::Backbuffer:
             xscale = 1.0f;
@@ -47,14 +53,6 @@ namespace Vinifera::Gfx
             yscale = 1.0f;
             return false;
         }
-    }
-
-
-    bool GpuSurfaceTarget::Bind_Color_Target(GraphicsDevice& device) const
-    {
-        const GpuRenderTarget target = Get_Output_Target();
-        Bind_Render_Target(device, target);
-        return target != GpuRenderTarget::None;
     }
 
 
