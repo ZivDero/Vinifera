@@ -631,7 +631,7 @@ void RocketLocomotionClass::Explode()
      */
     const auto animtype = Combat_Anim(damage, warhead, Map[cell].Land_Type(), &coord);
     if (animtype)
-        new AnimClass(animtype, coord, 0, 1, SHAPE_WIN_REL | SHAPE_CENTER | SHAPE_FLAT, Get_Explosion_Z(coord));
+        new AnimClass(animtype, coord, 0, 1, SHAPE_WIN_REL | SHAPE_CENTER | SHAPE_ZGRAD, Get_Explosion_Z(coord));
     Combat_Lighting(coord, damage, warhead);
     Explosion_Damage(coord, damage, LinkedTo, warhead, true);
     LinkedTo->Delete_Me();

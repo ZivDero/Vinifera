@@ -61,9 +61,9 @@ namespace
     {
         uint32_t out = 0;
         if (flags & SHAPE_DARKEN)        out |= SEF_DARKEN;
-        if (flags & SHAPE_TRANS25)       out |= SEF_TRANSLUCENT25;
-        if (flags & SHAPE_TRANS50)       out |= SEF_TRANSLUCENT50;
-        if (flags & SHAPE_TRANS75)       out |= SEF_TRANSLUCENT75;
+        if (flags & SHAPE_TRANSLUCENT25) out |= SEF_TRANSLUCENT25;
+        if (flags & SHAPE_TRANSLUCENT50) out |= SEF_TRANSLUCENT50;
+        if (flags & SHAPE_TRANSLUCENT75) out |= SEF_TRANSLUCENT75;
         return out;
     }
 
@@ -213,13 +213,13 @@ void Draw_Shape_Proxy_DX11(
      *  smaller dz → closer to the camera.
      *
      *  Per-vertex Z gradient (DstZTop vs DstZBottom):
-     *    - SHAPE_FLAT (a.k.a. SHAPE_ZGRAD) + ZGRAD_GROUND  → full gradient.
-     *      Top pixel maps to a cell one sprite-height further back; smaller
-     *      screen Y → larger dz at the top vertex.
-     *    - SHAPE_FLAT + ZGRAD_45DEG → half gradient (cliff/ramp face).
-     *    - SHAPE_FLAT + ZGRAD_90DEG → no gradient (vertical structure;
+     *    - SHAPE_ZGRAD + ZGRAD_GROUND → full gradient. Top pixel maps to a
+     *      cell one sprite-height further back; smaller screen Y → larger
+     *      dz at the top vertex.
+     *    - SHAPE_ZGRAD + ZGRAD_45DEG → half gradient (cliff/ramp face).
+     *    - SHAPE_ZGRAD + ZGRAD_90DEG → no gradient (vertical structure;
      *      every pixel sits at the cell-foot's depth — buildings, units).
-     *    - SHAPE_FLAT off, or ZGRAD_NONE → no gradient.
+     *    - SHAPE_ZGRAD off, or ZGRAD_NONE → no gradient.
      */
     {
         const float kSpriteEpsilon = 5e-5f;     // keeps equal-depth object pixels just in front of terrain
@@ -227,7 +227,7 @@ void Draw_Shape_Proxy_DX11(
         const float bottom_y = (float)(y + fi->H) + depth_bias_y;
         float top_y = bottom_y;
 
-        if (flags & SHAPE_FLAT) {
+        if (flags & SHAPE_ZGRAD) {
             if (zgrad == ZGRAD_GROUND) {
                 top_y = bottom_y - (float)fi->H;
             } else if (zgrad == ZGRAD_45DEG) {
@@ -241,15 +241,15 @@ void Draw_Shape_Proxy_DX11(
     }
 
     /**
-     *  SHAPE_Z_READ_WRITE means vanilla's blitter writes per-pixel Z as it
+     *  SHAPE_ZREADWRITE means vanilla's blitter writes per-pixel Z as it
      *  draws (used by buildings and similar large vertical structures so
      *  things drawn afterwards behind them are correctly occluded). Mark
      *  this command so SpriteQueue::Flush picks the depth-write state.
      */
-    cmd.WriteDepth = (flags & SHAPE_Z_READ_WRITE) != 0;
+    cmd.WriteDepth = (flags & SHAPE_ZREADWRITE) != 0;
 
     /**
-     *  Vanilla never z-tests Draw_Shape calls that lack SHAPE_ZGRAD/SHAPE_FLAT
+     *  Vanilla never z-tests Draw_Shape calls that lack SHAPE_ZGRAD
      *  (selection brackets, transport / ammo / health pips, build-state
      *  overlays, cameos). They're 2D UI laid over the tactical view; their
      *  quads extend down into screen rows belonging to the next-front cell,
@@ -257,7 +257,7 @@ void Draw_Shape_Proxy_DX11(
      *  hardware depth-test would clip them at the bottom. Submission order
      *  handles inter-overlay layering.
      */
-    cmd.OverlayMode = (flags & SHAPE_FLAT) == 0;
+    cmd.OverlayMode = (flags & SHAPE_ZGRAD) == 0;
     if (cmd.OverlayMode) {
         cmd.WriteDepth = false;
     }

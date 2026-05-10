@@ -915,7 +915,7 @@ void SidebarStripView::Draw_Cameo(Surface& surface, const Rect& rect, const Buil
  */
 void SidebarStripView::Draw_Clock_Overlay(Surface& surface, const Rect& rect, const Point2D& point, int stage)
 {
-    Draw_Shape_Overlay(surface, Art.ClockShape, rect, point, stage + 1, SHAPE_TRANS50);
+    Draw_Shape_Overlay(surface, Art.ClockShape, rect, point, stage + 1, SHAPE_TRANSLUCENT50);
 }
 
 
@@ -926,7 +926,7 @@ void SidebarStripView::Draw_Clock_Overlay(Surface& surface, const Rect& rect, co
  */
 void SidebarStripView::Draw_Recharge_Clock(Surface& surface, const Rect& rect, const Point2D& point, int stage)
 {
-    Draw_Shape_Overlay(surface, Art.RechargeClockShape, rect, point, stage + 1, SHAPE_TRANS50);
+    Draw_Shape_Overlay(surface, Art.RechargeClockShape, rect, point, stage + 1, SHAPE_TRANSLUCENT50);
 }
 
 

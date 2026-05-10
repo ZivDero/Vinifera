@@ -168,7 +168,7 @@ void AnimClassExt::_AI()
             else {
                 if (Class->ExpireAnim != nullptr) {
                     Vector3 bouncecoord = Bounce.Coords;
-                    new AnimClass(Class->ExpireAnim, Coord(bouncecoord.X, bouncecoord.Y, bouncecoord.Z), 0, 1, ShapeFlags_Type(SHAPE_CENTER | SHAPE_WIN_REL | SHAPE_FLAT), -30);
+                    new AnimClass(Class->ExpireAnim, Coord(bouncecoord.X, bouncecoord.Y, bouncecoord.Z), 0, 1, ShapeFlags_Type(SHAPE_CENTER | SHAPE_WIN_REL | SHAPE_ZGRAD), -30);
                     Explosion_Damage(Bounce.Get_Coord(), Class->Damage, nullptr, Class->Warhead);
                     Combat_Lighting(Bounce.Get_Coord(), Class->Damage, Class->Warhead);
                 }
@@ -749,8 +749,8 @@ void Draw_Shape_Proxy(
             int shadow_shapenum = shapenum + shapefile->Get_Count() / 2;
             Point2D shadow_point = point - Point2D(0, _CurrentlyDrawnAnim->Class->YDrawOffset);
             int shadow_height_offset = height_offset - _CurrentlyDrawnAnim->ZAdjust - _CurrentlyDrawnAnim->Class->YDrawOffset;
-            ShapeFlags_Type shadow_flags = flags & ~SHAPE_FLAT;
-            shadow_flags = (shadow_flags & ~SHAPE_TRANS75) | (SHAPE_DARKEN | SHAPE_CENTER | SHAPE_WIN_REL);
+            ShapeFlags_Type shadow_flags = flags & ~SHAPE_ZGRAD;
+            shadow_flags = (shadow_flags & ~SHAPE_TRANSLUCENT75) | (SHAPE_DARKEN | SHAPE_CENTER | SHAPE_WIN_REL);
 
             Draw_Shape_Proxy_DX11(surface, convert, shapefile, shadow_shapenum, shadow_point, window, shadow_flags, nullptr, shadow_height_offset);
         }

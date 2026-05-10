@@ -132,7 +132,7 @@ namespace Vinifera::Gfx
              *  Sprites depth-test against the shared depth buffer (which the
              *  tile pass populated). Most sprites don't write depth — preserves
              *  vanilla's submission-order layering for inter-sprite cases.
-             *  Buildings (vanilla SHAPE_Z_READ_WRITE) write depth so units
+             *  Buildings (vanilla SHAPE_ZREADWRITE) write depth so units
              *  drawn afterwards behind them are correctly occluded.
              */
             /**
