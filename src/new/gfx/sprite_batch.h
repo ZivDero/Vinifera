@@ -38,6 +38,7 @@ namespace Vinifera::Gfx
     {
         float    Pos[3];        // x, y, z (z = 0 lands at the near plane)
         float    UV[2];
+        float    ZUV[2];        // normalized UV into optional z-shape atlas
         uint32_t Color;         // RGBA8 (R in low byte)
     };
 
@@ -96,6 +97,14 @@ namespace Vinifera::Gfx
          */
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                   uint32_t color, float z_top, float z_bottom);
+
+        /**
+         *  Draw with a second UV rectangle for optional z-shape sampling.
+         *  `z_uv` is already normalized to the z-shape atlas; nullptr means
+         *  no z-shape data for this quad.
+         */
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  uint32_t color, float z_top, float z_bottom, const RectF* z_uv);
 
         /**
          *  Convenience: draw at (x, y) with the texture's natural size.

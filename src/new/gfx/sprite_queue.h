@@ -32,9 +32,11 @@ namespace Vinifera::Gfx
     struct SpriteDrawCmd
     {
         ShpAsset*    Asset;
+        ShpAsset*    ZAsset;
         PaletteLUT*  Palette;
         int          FrameIndex;
         RectF        Dst;             // backbuffer-pixel space
+        RectF        ZSrcUV;          // normalized z-shape atlas UVs
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
         RenderPass   Pass;

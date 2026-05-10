@@ -23,7 +23,7 @@ namespace Vinifera::Gfx
     {
         const char DefaultSpriteShaderHLSL[] =
             "cbuffer SpriteCB : register(b0) { float4x4 ProjMtx; };\n"
-            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
+            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float2 zuv : TEXCOORD1; float4 col : COLOR0; };\n"
             "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
             "VSOut VSMain(VSIn i) {\n"
             "    VSOut o;\n"
@@ -40,7 +40,8 @@ namespace Vinifera::Gfx
         const D3D11_INPUT_ELEMENT_DESC SpriteIL[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,    0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
     }
 
@@ -136,6 +137,13 @@ namespace Vinifera::Gfx
     void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                            uint32_t color, float z_top, float z_bottom)
     {
+        Draw(texture, dst, src, color, z_top, z_bottom, nullptr);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           uint32_t color, float z_top, float z_bottom, const RectF* z_uv)
+    {
         if (!BatchOpen || texture == nullptr || !dst.Is_Valid()) {
             return;
         }
@@ -150,13 +158,21 @@ namespace Vinifera::Gfx
             v1 = (src->Y + src->H) / th;
         }
 
+        float zu0 = 0.0f, zv0 = 0.0f, zu1 = 0.0f, zv1 = 0.0f;
+        if (z_uv != nullptr) {
+            zu0 = z_uv->X;
+            zv0 = z_uv->Y;
+            zu1 = z_uv->X + z_uv->W;
+            zv1 = z_uv->Y + z_uv->H;
+        }
+
         PendingSprite s = {};
         s.Tex = texture;
 
-        s.V[0] = { { dst.X,         dst.Y,         z_top }, { u0, v0 }, color };
-        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top }, { u1, v0 }, color };
-        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, color };
-        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, color };
+        s.V[0] = { { dst.X,         dst.Y,         z_top }, { u0, v0 }, { zu0, zv0 }, color };
+        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top }, { u1, v0 }, { zu1, zv0 }, color };
+        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, { zu1, zv1 }, color };
+        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, { zu0, zv1 }, color };
 
         Pending.push_back(s);
     }

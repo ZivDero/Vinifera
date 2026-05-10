@@ -148,6 +148,19 @@ void Draw_Shape_Proxy_DX11(
         return;
     }
 
+    ShpAsset* z_asset = nullptr;
+    const ShpFrameInfo* z_fi = nullptr;
+    if (z_shapefile != nullptr && z_shapenum >= 0) {
+        z_asset = ShpCache::Get().Get_Or_Load(device, z_shapefile);
+        if (z_asset != nullptr) {
+            z_fi = z_asset->Get_Frame(z_shapenum);
+            if (z_fi == nullptr || z_fi->W <= 0 || z_fi->H <= 0) {
+                z_asset = nullptr;
+                z_fi = nullptr;
+            }
+        }
+    }
+
     /**
      *  Reproduce Draw_Shape's logical-coords math from
      *  D:/Projects/Tiberian-Sun/code/draw.cpp:65-118 to land the sprite at
@@ -189,6 +202,7 @@ void Draw_Shape_Proxy_DX11(
 
     SpriteDrawCmd cmd = {};
     cmd.Asset       = asset;
+    cmd.ZAsset      = z_asset;
     cmd.Palette     = palette;
     cmd.FrameIndex  = shapenum;
     cmd.Dst.X       = x * xscale;
@@ -198,6 +212,31 @@ void Draw_Shape_Proxy_DX11(
     cmd.Pass        = Current_Render_Pass();
     cmd.EffectFlags = Effect_Flags_From_Shape(flags);
     cmd.VertexTint  = Tint_From_Intensity(intensity);
+    if (z_asset != nullptr && z_fi != nullptr) {
+        /**
+         *  Mirror vanilla Draw_Shape's z-shape sampling origin:
+         *    zpoint = z_off - ((logical_size / 2) - visible_frame.xy)
+         *    zpoint += z_frame.xy
+         *  The z-shape atlas stores only the frame's pixel rectangle, so the
+         *  final shader UV is z_frame_atlas_xy + zpoint + visible_local_xy.
+         */
+        Point2D zpoint = z_off;
+        zpoint.X -= logical_w / 2 - fi->X;
+        zpoint.Y -= logical_h / 2 - fi->Y;
+        zpoint.X += z_fi->X;
+        zpoint.Y += z_fi->Y;
+
+        const float ztw = (float)z_asset->Get_Atlas().Width();
+        const float zth = (float)z_asset->Get_Atlas().Height();
+        if (ztw > 0.0f && zth > 0.0f) {
+            cmd.ZSrcUV.X = ((float)z_fi->AtlasX + (float)zpoint.X) / ztw;
+            cmd.ZSrcUV.Y = ((float)z_fi->AtlasY + (float)zpoint.Y) / zth;
+            cmd.ZSrcUV.W = (float)fi->W / ztw;
+            cmd.ZSrcUV.H = (float)fi->H / zth;
+        } else {
+            cmd.ZAsset = nullptr;
+        }
+    }
 
     /**
      *  Depth: WAE-style screen-Y normalization. Larger screen Y means the

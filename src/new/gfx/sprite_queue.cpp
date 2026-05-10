@@ -110,6 +110,7 @@ namespace Vinifera::Gfx
          */
         const auto state_eq = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
             if (a.Asset != b.Asset) return false;
+            if (a.ZAsset != b.ZAsset) return false;
             if (a.Palette != b.Palette) return false;
             if (a.EffectFlags != b.EffectFlags) return false;
             if (a.UseRemap != b.UseRemap) return false;
@@ -140,9 +141,17 @@ namespace Vinifera::Gfx
             SpriteEffectParams params = {};
             params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
             params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
+            if (head.ZAsset != nullptr) {
+                params.ZShapeAtlasSize[0] = (float)head.ZAsset->Get_Atlas().Width();
+                params.ZShapeAtlasSize[1] = (float)head.ZAsset->Get_Atlas().Height();
+                params.ZShapeDepthScale = 1.0f / 16000.0f;
+            }
             params.Flags = head.EffectFlags;
             if (head.UseRemap) {
                 params.Flags |= SEF_USE_REMAP;
+            }
+            if (head.ZAsset != nullptr) {
+                params.Flags |= SEF_USE_ZSHAPE;
             }
 
             /**
@@ -182,6 +191,10 @@ namespace Vinifera::Gfx
                         depth_state);
             PalEffect.Bind_Palette(device, *head.Palette);
             PalEffect.Set_Params(device, params);
+            ID3D11ShaderResourceView* z_srv = head.ZAsset != nullptr
+                ? head.ZAsset->Get_Atlas().Get_SRV()
+                : nullptr;
+            device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
 
             for (size_t k = i; k < j; ++k) {
                 const SpriteDrawCmd& c = pass_commands[k];
@@ -190,7 +203,9 @@ namespace Vinifera::Gfx
                     continue;
                 }
                 const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
-                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint, c.DstZTop, c.DstZBottom);
+                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.VertexTint,
+                           c.DstZTop, c.DstZBottom,
+                           c.ZAsset != nullptr ? &c.ZSrcUV : nullptr);
             }
 
             Batch.End(device);
@@ -202,7 +217,7 @@ namespace Vinifera::Gfx
         /**
          *  Unbind palette/remap SRVs to keep subsequent passes clean.
          */
-        ID3D11ShaderResourceView* null_srvs[3] = {};
-        device.Get_Context()->PSSetShaderResources(0, 3, null_srvs);
+        ID3D11ShaderResourceView* null_srvs[4] = {};
+        device.Get_Context()->PSSetShaderResources(0, 4, null_srvs);
     }
 }

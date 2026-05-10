@@ -25,7 +25,8 @@ namespace Vinifera::Gfx
         const D3D11_INPUT_ELEMENT_DESC SpriteIL[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,    0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
 
         const char PaletteSpriteHLSL[] =
@@ -34,24 +35,27 @@ namespace Vinifera::Gfx
             "};\n"
             "cbuffer EffectCB : register(b1) {\n"
             "    float2 AtlasSize;\n"
-            "    float2 _pad0;\n"
+            "    float2 ZShapeAtlasSize;\n"
+            "    float  ZShapeDepthScale;\n"
             "    uint   Flags;\n"
-            "    uint3  _pad1;\n"
+            "    uint2  _pad1;\n"
             "};\n"
             "static const uint SEF_USE_REMAP     = 0x01;\n"
             "static const uint SEF_DARKEN        = 0x02;\n"
             "static const uint SEF_TRANSLUCENT25 = 0x04;\n"
             "static const uint SEF_TRANSLUCENT50 = 0x08;\n"
             "static const uint SEF_TRANSLUCENT75 = 0x10;\n"
+            "static const uint SEF_USE_ZSHAPE    = 0x20;\n"
             "\n"
-            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
-            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
+            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float2 zuv : TEXCOORD1; float4 col : COLOR0; };\n"
+            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float2 zuv : TEXCOORD1; float4 col : COLOR0; };\n"
             "VSOut VSMain(VSIn i) {\n"
             "    VSOut o;\n"
             "    /* ProjMtx maps (x,y) -> NDC; pos.z passes straight through to clip space. */\n"
             "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
             "    o.pos = float4(p.x, p.y, i.pos.z, 1);\n"
             "    o.uv  = i.uv;\n"
+            "    o.zuv = i.zuv;\n"
             "    o.col = i.col;\n"
             "    return o;\n"
             "}\n"
@@ -59,11 +63,23 @@ namespace Vinifera::Gfx
             "Texture2D<uint>      Atlas    : register(t0);\n"
             "Texture2D<float4>    Palette  : register(t1);\n"
             "Texture2D<uint>      Remap    : register(t2);\n"
+            "Texture2D<uint>      ZShape   : register(t3);\n"
             "\n"
-            "float4 PSMain(VSOut v) : SV_Target {\n"
+            "struct PSOut { float4 color : SV_Target; float depth : SV_Depth; };\n"
+            "PSOut PSMain(VSOut v) {\n"
+            "    PSOut o;\n"
+            "    o.depth = v.pos.z;\n"
             "    int2 px = int2(v.uv * AtlasSize);\n"
             "    uint idx = Atlas.Load(int3(px, 0));\n"
             "    if (idx == 0) discard;\n"
+            "    if (Flags & SEF_USE_ZSHAPE) {\n"
+            "        float2 zpf = v.zuv * ZShapeAtlasSize;\n"
+            "        if (zpf.x >= 0.0 && zpf.y >= 0.0 && zpf.x < ZShapeAtlasSize.x && zpf.y < ZShapeAtlasSize.y) {\n"
+            "            uint zraw = ZShape.Load(int3(int2(zpf), 0)) & 0xFF;\n"
+            "            int zsigned = (zraw >= 128) ? (int)zraw - 256 : (int)zraw;\n"
+            "            o.depth = saturate(o.depth - (float)zsigned * ZShapeDepthScale);\n"
+            "        }\n"
+            "    }\n"
             "    /**\n"
             "     * SHAPE_DARKEN uses the shape only as a hit-test mask; the\n"
             "     * blend state (EBlend::DestMultiplyHalf) is what actually\n"
@@ -71,7 +87,8 @@ namespace Vinifera::Gfx
             "     * ZERO at blend time, so emit anything non-discarded here.\n"
             "     */\n"
             "    if (Flags & SEF_DARKEN) {\n"
-            "        return float4(0, 0, 0, 1);\n"
+            "        o.color = float4(0, 0, 0, 1);\n"
+            "        return o;\n"
             "    }\n"
             "    if ((Flags & SEF_USE_REMAP) && idx >= 16 && idx < 32) {\n"
             "        idx = Remap.Load(int3((int)idx - 16, 0, 0));\n"
@@ -83,7 +100,8 @@ namespace Vinifera::Gfx
             "    if (Flags & SEF_TRANSLUCENT50) c.a *= 0.5;\n"
             "    if (Flags & SEF_TRANSLUCENT75) c.a *= 0.25;\n"
             "    c.rgb *= c.a;     /* premultiply for the EBlend::Premultiplied output */\n"
-            "    return c;\n"
+            "    o.color = c;\n"
+            "    return o;\n"
             "}\n";
     }
 

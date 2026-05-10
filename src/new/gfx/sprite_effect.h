@@ -48,15 +48,17 @@ namespace Vinifera::Gfx
         SEF_TRANSLUCENT25 = 1u << 2,    // alpha 0.75
         SEF_TRANSLUCENT50 = 1u << 3,    // alpha 0.50
         SEF_TRANSLUCENT75 = 1u << 4,    // alpha 0.25
+        SEF_USE_ZSHAPE    = 1u << 5,
     };
 
 
     struct SpriteEffectParams
     {
         float    AtlasSize[2];      // pixels — used for int2(uv * AtlasSize) -> Load() coord
-        float    _Pad0[2];
+        float    ZShapeAtlasSize[2];
+        float    ZShapeDepthScale;
         uint32_t Flags;
-        uint32_t _Pad1[3];
+        uint32_t _Pad1[2];
     };
 
 
