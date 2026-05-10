@@ -105,6 +105,9 @@ namespace Vinifera::Gfx
          */
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                   uint32_t color, float z_top, float z_bottom, const RectF* z_uv);
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  uint32_t color, float z_top, float z_bottom,
+                  const RectF* z_uv, const RectF* clip);
 
         /**
          *  Float-tint variants. RGBA components in the [0, ~2.0] range; used
@@ -116,6 +119,9 @@ namespace Vinifera::Gfx
                   const float tint[4], float z_top, float z_bottom);
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                   const float tint[4], float z_top, float z_bottom, const RectF* z_uv);
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  const float tint[4], float z_top, float z_bottom,
+                  const RectF* z_uv, const RectF* clip);
 
         /**
          *  Convenience: draw at (x, y) with the texture's natural size.
@@ -131,7 +137,8 @@ namespace Vinifera::Gfx
         };
 
         bool Create_Default_Effect(GraphicsDevice& device);
-        void Flush_Group(GraphicsDevice& device, Texture2D* texture, int vertex_offset, int quad_count);
+        void Flush_Group(GraphicsDevice& device, Texture2D* texture, const D3D11_RECT& scissor,
+                         int vertex_offset, int quad_count);
 
         DynamicVertexBuffer<SpriteVertex> VertexBuffer;
         ID3D11Buffer*                     IndexBuffer = nullptr;     // static, max_quads * 6 indices
@@ -148,6 +155,8 @@ namespace Vinifera::Gfx
         {
             Texture2D* Tex;
             SpriteVertex V[4];
+            RectF Clip;
+            bool UseClip;
         };
         std::vector<PendingSprite> Pending;
         bool BatchOpen = false;

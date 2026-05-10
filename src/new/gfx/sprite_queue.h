@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "alpha_write_effect.h"
+#include "gpu_surface_target.h"
 #include "palette_lut.h"
 #include "render_pass.h"
 #include "shp_asset.h"
@@ -53,6 +54,7 @@ namespace Vinifera::Gfx
         PaletteLUT*  Palette;
         int          FrameIndex;
         RectF        Dst;             // backbuffer-pixel space
+        RectF        Clip;            // backbuffer-pixel scissor rect; invalid = full target
         RectF        ZSrcUV;          // normalized z-shape atlas UVs
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
@@ -64,6 +66,7 @@ namespace Vinifera::Gfx
         bool         DisableDepth;    // Non-z UI sprites (pips, select brackets, cameos)
         SpriteDrawMode Mode;          // Color | AlphaWriteAdd | AlphaWriteMult
         uint8_t      RemapTable[16];  // copy of caller's `remap` arg
+        GpuRenderTarget OutputTarget = GpuRenderTarget::Scene;
     };
 
 

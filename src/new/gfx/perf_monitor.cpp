@@ -45,6 +45,14 @@ namespace Vinifera::Gfx
         Stats.TileDrawCalls = 0;
         Stats.PrimitiveCmds = 0;
         Stats.PrimitiveDrawCalls = 0;
+        Stats.TacticalPrimitiveFallbacks = 0;
+        Stats.TacticalBlits = 0;
+        Stats.TacticalLocks = 0;
+        Stats.TacticalDCs = 0;
+        Stats.TacticalUnsupportedPrimitives = 0;
+        Stats.SidebarUploads = 0;
+        Stats.SidebarRTDraws = 0;
+        Stats.SidebarComposites = 0;
     }
 
 
@@ -120,6 +128,21 @@ namespace Vinifera::Gfx
             ImGui::TextUnformatted("PrimitiveQueue:");
             ImGui::Text("  cmds   : %d", Stats.PrimitiveCmds);
             ImGui::Text("  draws  : %d", Stats.PrimitiveDrawCalls);
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("Tactical CPU Surface:");
+            ImGui::Checkbox("Hide CPU tactical layer", &HideCPUTacticalLayer);
+            ImGui::Text("  primitive fallbacks : %d", Stats.TacticalPrimitiveFallbacks);
+            ImGui::Text("  blits               : %d", Stats.TacticalBlits);
+            ImGui::Text("  locks               : %d", Stats.TacticalLocks);
+            ImGui::Text("  DCs                 : %d", Stats.TacticalDCs);
+            ImGui::Text("  unsupported prims   : %d", Stats.TacticalUnsupportedPrimitives);
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("SidebarRT:");
+            ImGui::Text("  uploads   : %d", Stats.SidebarUploads);
+            ImGui::Text("  RT draws  : %d", Stats.SidebarRTDraws);
+            ImGui::Text("  composites: %d", Stats.SidebarComposites);
 
             ImGui::Separator();
             ImGui::TextUnformatted("AlphaLights:");

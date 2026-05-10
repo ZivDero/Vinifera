@@ -16,6 +16,9 @@
 #include "graphics_device.h"
 #include "texture2d.h"
 
+#include <algorithm>
+#include <cmath>
+
 
 namespace Vinifera::Gfx
 {
@@ -137,10 +140,44 @@ namespace Vinifera::Gfx
             out[2] = (float)((color >> 16) & 0xFFu) / 255.0f;
             out[3] = (float)((color >> 24) & 0xFFu) / 255.0f;
         }
+
+        inline D3D11_RECT Full_Scissor(int width, int height)
+        {
+            D3D11_RECT out = {};
+            out.left = 0;
+            out.top = 0;
+            out.right = width;
+            out.bottom = height;
+            return out;
+        }
+
+        inline D3D11_RECT Clip_To_Scissor(const RectF& clip, int width, int height)
+        {
+            D3D11_RECT out = {};
+            out.left = std::max<LONG>(0, std::min<LONG>((LONG)std::floor(clip.X), width));
+            out.top = std::max<LONG>(0, std::min<LONG>((LONG)std::floor(clip.Y), height));
+            out.right = std::max<LONG>(0, std::min<LONG>((LONG)std::ceil(clip.X + clip.W), width));
+            out.bottom = std::max<LONG>(0, std::min<LONG>((LONG)std::ceil(clip.Y + clip.H), height));
+            return out;
+        }
+
+        inline D3D11_RECT Effective_Scissor(bool use_clip, const RectF& clip, int width, int height)
+        {
+            return use_clip ? Clip_To_Scissor(clip, width, height) : Full_Scissor(width, height);
+        }
+
+        inline bool Same_Scissor(const D3D11_RECT& lhs, const D3D11_RECT& rhs)
+        {
+            return lhs.left == rhs.left
+                && lhs.top == rhs.top
+                && lhs.right == rhs.right
+                && lhs.bottom == rhs.bottom;
+        }
     }
 
 
-    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z)
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           uint32_t color, float z)
     {
         Draw(texture, dst, src, color, z, z);
     }
@@ -156,9 +193,17 @@ namespace Vinifera::Gfx
     void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                            uint32_t color, float z_top, float z_bottom, const RectF* z_uv)
     {
+        Draw(texture, dst, src, color, z_top, z_bottom, z_uv, nullptr);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           uint32_t color, float z_top, float z_bottom,
+                           const RectF* z_uv, const RectF* clip)
+    {
         float tint[4];
         Unpack_Color_To_Tint(color, tint);
-        Draw(texture, dst, src, tint, z_top, z_bottom, z_uv);
+        Draw(texture, dst, src, tint, z_top, z_bottom, z_uv, clip);
     }
 
 
@@ -172,7 +217,15 @@ namespace Vinifera::Gfx
     void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                            const float tint[4], float z_top, float z_bottom, const RectF* z_uv)
     {
-        if (!BatchOpen || texture == nullptr || !dst.Is_Valid()) {
+        Draw(texture, dst, src, tint, z_top, z_bottom, z_uv, nullptr);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           const float tint[4], float z_top, float z_bottom,
+                           const RectF* z_uv, const RectF* clip)
+    {
+        if (!BatchOpen || texture == nullptr || !dst.Is_Valid() || (clip != nullptr && !clip->Is_Valid())) {
             return;
         }
 
@@ -196,6 +249,10 @@ namespace Vinifera::Gfx
 
         PendingSprite s = {};
         s.Tex = texture;
+        if (clip != nullptr) {
+            s.Clip = *clip;
+            s.UseClip = true;
+        }
 
         const float t[4] = { tint[0], tint[1], tint[2], tint[3] };
 
@@ -267,7 +324,7 @@ namespace Vinifera::Gfx
         }
         ctx->OMSetBlendState(device.States().Get(ActiveBlend), blend_factor, 0xFFFFFFFFu);
         ctx->OMSetDepthStencilState(device.States().Get(ActiveDepth), 0);
-        ctx->RSSetState(device.States().Get(ERasterizer::CullNone));
+        ctx->RSSetState(device.States().Get(ERasterizer::CullNoneScissor));
 
         /**
          *  Match the viewport to the target so that the pixel-space ortho
@@ -311,16 +368,22 @@ namespace Vinifera::Gfx
 
             /**
              *  Walk the pending slice issuing a DrawIndexed per contiguous
-             *  texture run.
+             *  texture+scissor run.
              */
             size_t run_start = 0;
             Texture2D* run_tex = Pending[consumed].Tex;
+            D3D11_RECT run_scissor = Effective_Scissor(
+                Pending[consumed].UseClip, Pending[consumed].Clip, TargetWidth, TargetHeight);
             for (size_t i = 1; i <= batch_quads; ++i) {
                 Texture2D* tex_now = (i < batch_quads) ? Pending[consumed + i].Tex : nullptr;
-                if (i == batch_quads || tex_now != run_tex) {
-                    Flush_Group(device, run_tex, (int)run_start * 4, (int)(i - run_start));
+                D3D11_RECT scissor_now = (i < batch_quads)
+                    ? Effective_Scissor(Pending[consumed + i].UseClip, Pending[consumed + i].Clip, TargetWidth, TargetHeight)
+                    : D3D11_RECT{};
+                if (i == batch_quads || tex_now != run_tex || !Same_Scissor(scissor_now, run_scissor)) {
+                    Flush_Group(device, run_tex, run_scissor, (int)run_start * 4, (int)(i - run_start));
                     run_start = i;
                     run_tex = tex_now;
+                    run_scissor = scissor_now;
                 }
             }
 
@@ -331,14 +394,15 @@ namespace Vinifera::Gfx
     }
 
 
-    void SpriteBatch::Flush_Group(GraphicsDevice& device, Texture2D* texture,
+    void SpriteBatch::Flush_Group(GraphicsDevice& device, Texture2D* texture, const D3D11_RECT& scissor,
                                   int vertex_offset, int quad_count)
     {
-        if (quad_count <= 0 || texture == nullptr) {
+        if (quad_count <= 0 || texture == nullptr || scissor.right <= scissor.left || scissor.bottom <= scissor.top) {
             return;
         }
         ID3D11DeviceContext* ctx = device.Get_Context();
         ID3D11ShaderResourceView* srv = texture->Get_SRV();
+        ctx->RSSetScissorRects(1, &scissor);
         ctx->PSSetShaderResources(0, 1, &srv);
         ctx->DrawIndexed(quad_count * 6, 0, vertex_offset);
     }

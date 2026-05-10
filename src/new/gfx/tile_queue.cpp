@@ -97,20 +97,18 @@ namespace Vinifera::Gfx
             return;
         }
 
-        const int bb_w = device.Get_Backbuffer_Width();
-        const int bb_h = device.Get_Backbuffer_Height();
-
-        device.Bind_Scene_Target();
-
         /**
-         *  All TmpAssets share the global TmpAtlas, so the only batch
-         *  boundary is Palette. Sort by Palette so contiguous runs collapse
-         *  into one DrawIndexed per distinct palette. Safe to reorder
-         *  because tiles depth-test+depth-write — visibility is determined
-         *  by Z, not draw order.
+         *  Sort by (OutputTarget, Palette). Terrain is scene-only by
+         *  construction, so the outer bucketing degenerates to one bucket
+         *  (`Scene`) in practice — but threading it keeps the queue
+         *  consistent with `SpriteQueue` / `PrimitiveQueue` and would
+         *  correctly handle a hypothetical future tile target.
          */
         std::sort(pass_commands.begin(), pass_commands.end(),
             [](const TileDrawCmd& a, const TileDrawCmd& b) {
+                if (a.OutputTarget != b.OutputTarget) {
+                    return (uint8_t)a.OutputTarget < (uint8_t)b.OutputTarget;
+                }
                 return a.Palette < b.Palette;
             });
 
@@ -122,52 +120,84 @@ namespace Vinifera::Gfx
         params.ZDataDepthScale = 1.0f / 16000.0f;
         ID3D11ShaderResourceView* z_atlas_srv = TmpAtlas::Get().Get_Z_Texture().Get_SRV();
 
-        size_t i = 0;
-        while (i < pass_commands.size()) {
-            size_t j = i + 1;
-            while (j < pass_commands.size() && pass_commands[j].Palette == pass_commands[i].Palette) {
-                ++j;
+        size_t bucket_start = 0;
+        while (bucket_start < pass_commands.size()) {
+            const GpuRenderTarget bucket_target = pass_commands[bucket_start].OutputTarget;
+            size_t bucket_end = bucket_start + 1;
+            while (bucket_end < pass_commands.size()
+                && pass_commands[bucket_end].OutputTarget == bucket_target) {
+                ++bucket_end;
             }
 
-            const TileDrawCmd& head = pass_commands[i];
-
-            Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
-                        &TileEffectInstance, bb_w, bb_h,
-                        EDepthStencil::WriteLessEqual);
-            TileEffectInstance.Bind_Palette(device, *head.Palette);
-            TileEffectInstance.Set_Params(device, params);
-            device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
-
-            /**
-             *  Alpha buffer at PS slot 3. Populated for the frame by
-             *  `SpriteQueue::Flush_Alpha_Lights`, sampled per-pixel by the
-             *  tile shader to modulate brightness for alpha lights.
-             */
-            ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
-            device.Get_Context()->PSSetShaderResources(3, 1, &alpha_srv);
-
-            for (size_t k = i; k < j; ++k) {
-                const TileDrawCmd& c = pass_commands[k];
-                const TmpSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
-                if (st == nullptr) continue;
-
-                RectF src;
-                if (c.DrawExtra) {
-                    if (!st->HasExtraData || st->ExtraW <= 0 || st->ExtraH <= 0) continue;
-                    src = { (float)st->ExtraAtlasX, (float)st->ExtraAtlasY,
-                            (float)st->ExtraW,       (float)st->ExtraH };
-                } else {
-                    if (st->W <= 0 || st->H <= 0) continue;
-                    src = { (float)st->AtlasX, (float)st->AtlasY,
-                            (float)st->W,       (float)st->H };
+            if (bucket_target == GpuRenderTarget::None) {
+                static bool warned = false;
+                if (!warned) {
+                    DEBUG_WARNING("TileQueue: dropping %zu commands with OutputTarget::None.\n",
+                        bucket_end - bucket_start);
+                    warned = true;
                 }
-                Batch.Draw(&shared_atlas, c.Dst, &src, c.Tint, c.DstZTop, c.DstZBottom);
+                bucket_start = bucket_end;
+                continue;
             }
 
-            Batch.End(device);
-            PerfMonitor::Get().Note_Tile_Batch();
-            PerfMonitor::Get().Note_Tile_Draw_Call();
-            i = j;
+            Bind_Render_Target(device, bucket_target);
+
+            const bool is_sidebar = (bucket_target == GpuRenderTarget::Sidebar);
+            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Backbuffer_Width();
+            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Backbuffer_Height();
+            const EDepthStencil depth_state = is_sidebar
+                ? EDepthStencil::None
+                : EDepthStencil::WriteLessEqual;
+
+            size_t i = bucket_start;
+            while (i < bucket_end) {
+                size_t j = i + 1;
+                while (j < bucket_end && pass_commands[j].Palette == pass_commands[i].Palette) {
+                    ++j;
+                }
+
+                const TileDrawCmd& head = pass_commands[i];
+
+                Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
+                            &TileEffectInstance, target_w, target_h, depth_state);
+                TileEffectInstance.Bind_Palette(device, *head.Palette);
+                TileEffectInstance.Set_Params(device, params);
+                device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
+
+                /**
+                 *  Alpha buffer at PS slot 3. Populated for the frame by
+                 *  `SpriteQueue::Flush_Alpha_Lights`, sampled per-pixel by the
+                 *  tile shader to modulate brightness for alpha lights.
+                 */
+                ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
+                device.Get_Context()->PSSetShaderResources(3, 1, &alpha_srv);
+
+                for (size_t k = i; k < j; ++k) {
+                    const TileDrawCmd& c = pass_commands[k];
+                    const TmpSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
+                    if (st == nullptr) continue;
+
+                    RectF src;
+                    if (c.DrawExtra) {
+                        if (!st->HasExtraData || st->ExtraW <= 0 || st->ExtraH <= 0) continue;
+                        src = { (float)st->ExtraAtlasX, (float)st->ExtraAtlasY,
+                                (float)st->ExtraW,       (float)st->ExtraH };
+                    } else {
+                        if (st->W <= 0 || st->H <= 0) continue;
+                        src = { (float)st->AtlasX, (float)st->AtlasY,
+                                (float)st->W,       (float)st->H };
+                    }
+                    Batch.Draw(&shared_atlas, c.Dst, &src, c.Tint, c.DstZTop, c.DstZBottom, nullptr,
+                               c.Clip.Is_Valid() ? &c.Clip : nullptr);
+                }
+
+                Batch.End(device);
+                PerfMonitor::Get().Note_Tile_Batch();
+                PerfMonitor::Get().Note_Tile_Draw_Call();
+                i = j;
+            }
+
+            bucket_start = bucket_end;
         }
 
         ID3D11ShaderResourceView* null_srvs[4] = {};

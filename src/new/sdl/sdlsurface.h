@@ -41,6 +41,8 @@ public:
      *  Copies regions from one surface to another.
      */
     bool Blit_From(Rect const& dcliprect, Rect const& destrect, Surface const& source, Rect const& scliprect, Rect const& sourcerect, bool trans = false, bool = true) override;
+    bool Blit_From(Rect const& destrect, Surface const& source, Rect const& sourcerect, bool trans = false, bool = true) override;
+    bool Blit_From(Surface const& source, bool trans = false, bool = true) override;
 
     /**
      *  Fills a region with a constant color.
@@ -48,18 +50,21 @@ public:
     bool Fill_Rect(Rect const& rect, int color) override;
     bool Fill_Rect(Rect const& cliprect, Rect const& fillrect, int color) override;
     bool Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int opacity) override;
+    bool Draw_Ellipse(Point2D center, int radius_x, int radius_y, Rect clip, int color) override;
     bool Put_Pixel(Point2D const& point, int color) override;
     bool Draw_Line(Point2D const& startpoint, Point2D const& endpoint, int color) override;
     bool Draw_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color) override;
     bool Draw_Line_entry_34(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int a5, int a6, bool a7 = false) override;
     bool Draw_Line_entry_38(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int a4, int a5, int a6, bool a7 = false) override;
     bool Draw_Line_entry_3C(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int a5, int a6, bool a7, bool a8, bool a9, bool a10, float a11) override;
+    bool Plot_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, void (*drawer_callback)(Point2D&)) override;
     int Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset) override;
     int entry_48(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset, bool a6) override;
     bool entry_4C(Point2D const& startpoint, Point2D const& endpoint, int color, bool a4 = false) override;
     bool Draw_Rect(Rect const& rect, int color) override;
     bool Draw_Rect(Rect const& cliprect, Rect const& rect, int color) override;
     bool entry_84(Point2D const& point, int color, Rect const& rect) override;
+    bool entry_90(Rect& area, Point2D& start, Point2D& end, RGBClass& a4, RGBClass& a5, float& a6, float& a7) override;
 
     /**
      *  Get/Release a windows device context from a DirectX surface
@@ -71,6 +76,7 @@ public:
      *  Create a surface object that represents the currently visible screen.
      */
     static SDLSurface* Create_Primary(void* = nullptr);
+    static void Suppress_Tactical_Lock_Audit(bool suppress);
 
     /**
      *  Gets and frees a direct pointer to the video memory.

@@ -20,6 +20,7 @@
 #include "tactical.h"
 #include "tibsun_globals.h"
 
+#include <algorithm>
 #include <cstring>
 
 
@@ -199,28 +200,37 @@ namespace Vinifera::Gfx
             return;
         }
 
-        bool has_pass_commands = false;
+        /**
+         *  Phase 4.1 Chunk A: only render `Color` mode commands. Alpha-buffer
+         *  write modes (AlphaWriteAdd / AlphaWriteMult) are handled by
+         *  `Flush_Alpha_Lights`.
+         */
+        std::vector<SpriteDrawCmd> pass_commands;
+        pass_commands.reserve(Commands.size());
         for (const SpriteDrawCmd& cmd : Commands) {
             if (cmd.Pass == pass && cmd.Mode == SpriteDrawMode::Color) {
-                has_pass_commands = true;
-                break;
+                pass_commands.push_back(cmd);
             }
         }
-        if (!has_pass_commands) {
+        if (pass_commands.empty()) {
             return;
         }
 
-        const int bb_w = device.Get_Backbuffer_Width();
-        const int bb_h = device.Get_Backbuffer_Height();
-
-        device.Bind_Scene_Target();
+        /**
+         *  Bucket by output target (Scene / Sidebar / ...). Stable-sort so
+         *  submission order within each bucket is preserved — depth ordering
+         *  and overlap semantics still match vanilla's per-target paint order.
+         */
+        std::stable_sort(pass_commands.begin(), pass_commands.end(),
+            [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
+                return (uint8_t)a.OutputTarget < (uint8_t)b.OutputTarget;
+            });
 
         /**
-         *  Walk the queue in submission order, grouping contiguous commands
-         *  that share (Asset, Palette, EffectFlags, Remap). The `Set_Params`
-         *  uniform (AtlasSize, Flags) is set once per batch since SpriteBatch
-         *  defers all DrawIndexed calls to End() — so the atlas the shader
-         *  uses must be constant across a batch.
+         *  Inner contiguous-state grouping: walk a bucket in submission
+         *  order, batching commands that share (Asset, Palette, EffectFlags,
+         *  Remap, depth flags). `Set_Params` runs once per batch since
+         *  `SpriteBatch` defers all DrawIndexed calls to `End()`.
          */
         const auto state_eq = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
             if (a.Asset != b.Asset) return false;
@@ -234,114 +244,112 @@ namespace Vinifera::Gfx
             return true;
         };
 
-        std::vector<SpriteDrawCmd> pass_commands;
-        pass_commands.reserve(Commands.size());
-        for (const SpriteDrawCmd& cmd : Commands) {
-            /**
-             *  Phase 4.1 Chunk A: only render `Color` mode commands. Alpha
-             *  -buffer write modes (AlphaWriteAdd / AlphaWriteMult) require
-             *  binding `AlphaRTV` instead of the backbuffer and a different
-             *  blend formula — not yet implemented; a follow-up chunk hooks
-             *  vanilla's `AlphaShapeClass` system and routes those commands
-             *  through a dedicated alpha-write path.
-             */
-            if (cmd.Pass == pass && cmd.Mode == SpriteDrawMode::Color) {
-                pass_commands.push_back(cmd);
-            }
-        }
-
-        size_t i = 0;
-        while (i < pass_commands.size()) {
-            size_t j = i + 1;
-            while (j < pass_commands.size() && state_eq(pass_commands[i], pass_commands[j])) {
-                ++j;
+        size_t bucket_start = 0;
+        while (bucket_start < pass_commands.size()) {
+            const GpuRenderTarget bucket_target = pass_commands[bucket_start].OutputTarget;
+            size_t bucket_end = bucket_start + 1;
+            while (bucket_end < pass_commands.size()
+                && pass_commands[bucket_end].OutputTarget == bucket_target) {
+                ++bucket_end;
             }
 
-            const SpriteDrawCmd& head = pass_commands[i];
-            head.Palette->Update_Remap(head.UseRemap ? head.RemapTable : nullptr);
-
-            SpriteEffectParams params = {};
-            params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
-            params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
-            if (head.ZAsset != nullptr) {
-                params.ZShapeAtlasSize[0] = (float)head.ZAsset->Get_Atlas().Width();
-                params.ZShapeAtlasSize[1] = (float)head.ZAsset->Get_Atlas().Height();
-                params.ZShapeDepthScale = 1.0f / 16000.0f;
-            }
-            params.Flags = head.EffectFlags;
-            if (head.UseRemap) {
-                params.Flags |= SEF_USE_REMAP;
-            }
-            if (head.ZAsset != nullptr) {
-                params.Flags |= SEF_USE_ZSHAPE;
-            }
-
-            /**
-             *  SHAPE_DARKEN is a destination-multiply-by-0.5 op masked by the
-             *  shape's non-zero pixels — the source color is irrelevant. Use
-             *  the matching blend state for these groups; everything else
-             *  stays on the standard premultiplied-alpha path.
-             */
-            const EBlend blend = (head.EffectFlags & SEF_DARKEN)
-                ? EBlend::DestMultiplyHalf
-                : EBlend::Premultiplied;
-
-            /**
-             *  Sprites depth-test against the shared depth buffer (which the
-             *  tile pass populated). Most sprites don't write depth — preserves
-             *  vanilla's submission-order layering for inter-sprite cases.
-             *  Buildings (vanilla SHAPE_ZREADWRITE) write depth so units
-             *  drawn afterwards behind them are correctly occluded.
-             */
-            /**
-             *  UI overlays (selection brackets, pips, cameos drawn over the
-             *  tactical view) use a constant per-sprite depth derived from
-             *  the unit's foot, but their quad spans down into screen rows
-             *  belonging to the next-front cell whose tile depth is *closer*
-             *  than the sprite's. Depth-test would clip the bottom edge of
-             *  these overlays. Vanilla doesn't z-test shapes that select a
-             *  non-z blitter, so we mirror that by disabling depth here and
-             *  relying on submission order for layering.
-             */
-            const EDepthStencil depth_state = head.DisableDepth
-                ? EDepthStencil::None
-                : (head.WriteDepth
-                    ? EDepthStencil::WriteLessEqual
-                    : EDepthStencil::TestLessEqual_NoWrite);
-            Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, bb_w, bb_h,
-                        depth_state);
-            PalEffect.Bind_Palette(device, *head.Palette);
-            PalEffect.Set_Params(device, params);
-            ID3D11ShaderResourceView* z_srv = head.ZAsset != nullptr
-                ? head.ZAsset->Get_Atlas().Get_SRV()
-                : nullptr;
-            device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
-
-            /**
-             *  Alpha buffer at PS slot 4. Populated for the frame by
-             *  `Flush_Alpha_Lights`, sampled per-pixel by the sprite shader so
-             *  buildings / units inside an alpha-light cone brighten the same
-             *  way tiles do.
-             */
-            ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
-            device.Get_Context()->PSSetShaderResources(4, 1, &alpha_srv);
-
-            for (size_t k = i; k < j; ++k) {
-                const SpriteDrawCmd& c = pass_commands[k];
-                const ShpFrameInfo* fi = c.Asset->Get_Frame(c.FrameIndex);
-                if (fi == nullptr || fi->W <= 0 || fi->H <= 0) {
-                    continue;
+            if (bucket_target == GpuRenderTarget::None) {
+                static bool warned = false;
+                if (!warned) {
+                    DEBUG_WARNING("SpriteQueue: dropping %zu commands with OutputTarget::None.\n",
+                        bucket_end - bucket_start);
+                    warned = true;
                 }
-                const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
-                Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.Tint,
-                           c.DstZTop, c.DstZBottom,
-                           c.ZAsset != nullptr ? &c.ZSrcUV : nullptr);
+                bucket_start = bucket_end;
+                continue;
             }
 
-            Batch.End(device);
-            PerfMonitor::Get().Note_Sprite_Batch();
-            PerfMonitor::Get().Note_Sprite_Draw_Call();
-            i = j;
+            Bind_Render_Target(device, bucket_target);
+
+            const bool is_sidebar = (bucket_target == GpuRenderTarget::Sidebar);
+            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Backbuffer_Width();
+            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Backbuffer_Height();
+
+            size_t i = bucket_start;
+            while (i < bucket_end) {
+                size_t j = i + 1;
+                while (j < bucket_end && state_eq(pass_commands[i], pass_commands[j])) {
+                    ++j;
+                }
+
+                const SpriteDrawCmd& head = pass_commands[i];
+                head.Palette->Update_Remap(head.UseRemap ? head.RemapTable : nullptr);
+
+                SpriteEffectParams params = {};
+                params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
+                params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
+                if (head.ZAsset != nullptr) {
+                    params.ZShapeAtlasSize[0] = (float)head.ZAsset->Get_Atlas().Width();
+                    params.ZShapeAtlasSize[1] = (float)head.ZAsset->Get_Atlas().Height();
+                    params.ZShapeDepthScale = 1.0f / 16000.0f;
+                }
+                params.Flags = head.EffectFlags;
+                if (head.UseRemap) {
+                    params.Flags |= SEF_USE_REMAP;
+                }
+                if (head.ZAsset != nullptr) {
+                    params.Flags |= SEF_USE_ZSHAPE;
+                }
+
+                const EBlend blend = (head.EffectFlags & SEF_DARKEN)
+                    ? EBlend::DestMultiplyHalf
+                    : EBlend::Premultiplied;
+
+                /**
+                 *  SidebarRT has no DSV (Bind_Sidebar_Target uses
+                 *  DepthBinding::None). Force depth-off for the Sidebar
+                 *  bucket so EDepthStencil::TestLessEqual against a null
+                 *  DSV doesn't trip undefined behaviour. Submission order
+                 *  preserves layer ordering, matching vanilla's CPU paint.
+                 */
+                EDepthStencil depth_state;
+                if (is_sidebar) {
+                    depth_state = EDepthStencil::None;
+                } else {
+                    depth_state = head.DisableDepth
+                        ? EDepthStencil::None
+                        : (head.WriteDepth
+                            ? EDepthStencil::WriteLessEqual
+                            : EDepthStencil::TestLessEqual_NoWrite);
+                }
+
+                Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, target_w, target_h,
+                            depth_state);
+                PalEffect.Bind_Palette(device, *head.Palette);
+                PalEffect.Set_Params(device, params);
+                ID3D11ShaderResourceView* z_srv = head.ZAsset != nullptr
+                    ? head.ZAsset->Get_Atlas().Get_SRV()
+                    : nullptr;
+                device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
+
+                ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
+                device.Get_Context()->PSSetShaderResources(4, 1, &alpha_srv);
+
+                for (size_t k = i; k < j; ++k) {
+                    const SpriteDrawCmd& c = pass_commands[k];
+                    const ShpFrameInfo* fi = c.Asset->Get_Frame(c.FrameIndex);
+                    if (fi == nullptr || fi->W <= 0 || fi->H <= 0) {
+                        continue;
+                    }
+                    const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
+                    Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.Tint,
+                               c.DstZTop, c.DstZBottom,
+                               c.ZAsset != nullptr ? &c.ZSrcUV : nullptr,
+                               c.Clip.Is_Valid() ? &c.Clip : nullptr);
+                }
+
+                Batch.End(device);
+                PerfMonitor::Get().Note_Sprite_Batch();
+                PerfMonitor::Get().Note_Sprite_Draw_Call();
+                i = j;
+            }
+
+            bucket_start = bucket_end;
         }
 
         /**

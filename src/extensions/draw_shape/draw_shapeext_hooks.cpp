@@ -31,6 +31,8 @@
 #include "shp_asset.h"
 #include "shp_cache.h"
 #include "sprite_queue.h"
+#include "surface.h"
+#include "surface_target_registry.h"
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
 
@@ -118,10 +120,11 @@ void Draw_Shape_Proxy_DX11(
      *    - Bad inputs (defensive).
      */
     const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-    const bool tactical_surface = (&surface == CompositeSurface) || (&surface == TileSurface);
+    const GpuSurfaceTarget* surface_target = SurfaceTargetRegistry::Get().Find_Command_Target(&surface);
     if (legacy
         || Vinifera::Gfx::Device == nullptr
-        || !tactical_surface
+        || surface_target == nullptr
+        || !surface_target->Can_Queue_Shapes()
         || shapefile == nullptr
         || shapenum < 0)
     {
@@ -198,8 +201,18 @@ void Draw_Shape_Proxy_DX11(
      *  backbuffer. To align our GPU sprite with the surrounding CPU-blitted
      *  scene we apply the same scale to dst.
      */
-    const float xscale = (VideoWidth > 0) ? (float)device.Get_Backbuffer_Width()  / (float)VideoWidth  : 1.0f;
-    const float yscale = (VideoHeight > 0) ? (float)device.Get_Backbuffer_Height() / (float)VideoHeight : 1.0f;
+    float xscale = 1.0f;
+    float yscale = 1.0f;
+    if (!surface_target->Logical_To_Render_Target(device, xscale, yscale)) {
+        Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
+                   remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
+        return;
+    }
+
+    const Rect clipped_window = Intersect(window, surface.Get_Rect());
+    if (!clipped_window.Is_Valid()) {
+        return;
+    }
 
     SpriteDrawCmd cmd = {};
     cmd.Asset       = asset;
@@ -210,6 +223,10 @@ void Draw_Shape_Proxy_DX11(
     cmd.Dst.Y       = y * yscale;
     cmd.Dst.W       = fi->W * xscale;
     cmd.Dst.H       = fi->H * yscale;
+    cmd.Clip.X      = clipped_window.X * xscale;
+    cmd.Clip.Y      = clipped_window.Y * yscale;
+    cmd.Clip.W      = clipped_window.Width * xscale;
+    cmd.Clip.H      = clipped_window.Height * yscale;
     cmd.Pass        = Current_Render_Pass();
     cmd.EffectFlags = Effect_Flags_From_Shape(flags);
     Tint_From_Intensity(intensity, cmd.Tint);
@@ -345,6 +362,8 @@ void Draw_Shape_Proxy_DX11(
         cmd.UseRemap = true;
         memcpy(cmd.RemapTable, remap + 16, 16);
     }
+
+    cmd.OutputTarget = surface_target->Get_Output_Target();
 
     SpriteQueue::Get().Submit(cmd);
 }

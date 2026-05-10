@@ -13,6 +13,7 @@
 
 #include "dynamic_buffer.h"
 #include "effect.h"
+#include "gpu_surface_target.h"
 #include "render_pass.h"
 #include "sprite_batch.h"
 #include "states.h"
@@ -42,6 +43,7 @@ namespace Vinifera::Gfx
         float         Y1 = 0.0f;
         float         Thickness = 1.0f;
         float         Color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        GpuRenderTarget OutputTarget = GpuRenderTarget::Scene;
     };
 
 
@@ -56,6 +58,7 @@ namespace Vinifera::Gfx
         bool Is_Initialized() const { return Initialized; }
 
         void Submit(const PrimitiveDrawCmd& cmd);
+        void Draw_Immediate_Rect(GraphicsDevice& device, const RectF& rect, const float color[4], EBlend blend = EBlend::Opaque);
         void Flush_Pass(GraphicsDevice& device, RenderPass pass);
         void Clear();
 
@@ -76,7 +79,7 @@ namespace Vinifera::Gfx
         bool Create_Effect(GraphicsDevice& device);
         void Emit_Rect(std::vector<PrimitiveVertex>& vertices, const RectF& rect, const float color[4]);
         void Emit_Line(std::vector<PrimitiveVertex>& vertices, const PrimitiveDrawCmd& cmd);
-        void Draw_Group(GraphicsDevice& device, const std::vector<PrimitiveDrawCmd>& commands, size_t begin, size_t end);
+        void Draw_Group(GraphicsDevice& device, const std::vector<PrimitiveDrawCmd>& commands, size_t begin, size_t end, int target_w, int target_h);
 
         DynamicVertexBuffer<PrimitiveVertex> VertexBuffer;
         Effect                               PrimitiveEffect;

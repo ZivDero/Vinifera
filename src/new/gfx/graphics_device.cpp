@@ -97,10 +97,12 @@ namespace Vinifera::Gfx
 
     void GraphicsDevice::Shutdown()
     {
+        Release_Sidebar_Surface_Texture();
         Release_Surface_Texture();
         Release_Present_Pipeline();
         StateCacheInstance.Shutdown();
         Release_Alpha_Buffer();
+        Release_Sidebar_Target();
         Release_Scene_Target();
         Release_Depth_Buffer();
         Release_Backbuffer_RTV();
@@ -116,6 +118,8 @@ namespace Vinifera::Gfx
         BackbufferHeight = 0;
         SurfaceWidth = 0;
         SurfaceHeight = 0;
+        SidebarSurfaceWidth = 0;
+        SidebarSurfaceHeight = 0;
         WindowHandle = nullptr;
     }
 
@@ -289,6 +293,32 @@ namespace Vinifera::Gfx
     }
 
 
+    bool GraphicsDevice::Create_Sidebar_Target(int width, int height)
+    {
+        Release_Sidebar_Target();
+
+        SidebarTarget = new RenderTarget2D();
+        if (SidebarTarget == nullptr) {
+            return false;
+        }
+        if (!SidebarTarget->Initialize(*this, width, height, DXGI_FORMAT_R8G8B8A8_UNORM)) {
+            DEBUG_ERROR("Gfx::GraphicsDevice: sidebar render target creation failed.\n");
+            Release_Sidebar_Target();
+            return false;
+        }
+        return true;
+    }
+
+
+    void GraphicsDevice::Release_Sidebar_Target()
+    {
+        if (SidebarTarget != nullptr) {
+            delete SidebarTarget;
+            SidebarTarget = nullptr;
+        }
+    }
+
+
     bool GraphicsDevice::Create_Alpha_Buffer(int width, int height)
     {
         D3D11_TEXTURE2D_DESC td = {};
@@ -378,6 +408,15 @@ namespace Vinifera::Gfx
     }
 
 
+    void GraphicsDevice::Release_Sidebar_Surface_Texture()
+    {
+        Safe_Release(SidebarSurfaceSRV);
+        Safe_Release(SidebarSurfaceTex);
+        SidebarSurfaceWidth = 0;
+        SidebarSurfaceHeight = 0;
+    }
+
+
     bool GraphicsDevice::Resize_Backbuffer(int width, int height)
     {
         if (SwapChain == nullptr || width <= 0 || height <= 0) {
@@ -441,6 +480,51 @@ namespace Vinifera::Gfx
     }
 
 
+    bool GraphicsDevice::Set_Sidebar_Surface_Format(int width, int height)
+    {
+        if (Device == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+        if (SidebarSurfaceTex != nullptr
+            && SidebarSurfaceWidth == width
+            && SidebarSurfaceHeight == height
+            && SidebarTarget != nullptr
+            && SidebarTarget->Width() == width
+            && SidebarTarget->Height() == height) {
+            return true;
+        }
+
+        Release_Sidebar_Surface_Texture();
+        if (!Create_Sidebar_Target(width, height)) {
+            return false;
+        }
+
+        D3D11_TEXTURE2D_DESC td = {};
+        td.Width = width;
+        td.Height = height;
+        td.MipLevels = 1;
+        td.ArraySize = 1;
+        td.Format = DXGI_FORMAT_B5G6R5_UNORM;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_DYNAMIC;
+        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        if (FAILED(Device->CreateTexture2D(&td, nullptr, &SidebarSurfaceTex))) {
+            Release_Sidebar_Target();
+            return false;
+        }
+        if (FAILED(Device->CreateShaderResourceView(SidebarSurfaceTex, nullptr, &SidebarSurfaceSRV))) {
+            Release_Sidebar_Surface_Texture();
+            Release_Sidebar_Target();
+            return false;
+        }
+        SidebarSurfaceWidth = width;
+        SidebarSurfaceHeight = height;
+        return true;
+    }
+
+
     bool GraphicsDevice::Upload_Surface(const void* pixels, int pitch_bytes)
     {
         if (SurfaceTex == nullptr || pixels == nullptr) {
@@ -465,6 +549,30 @@ namespace Vinifera::Gfx
     }
 
 
+    bool GraphicsDevice::Upload_Sidebar_Surface(const void* pixels, int pitch_bytes)
+    {
+        if (SidebarSurfaceTex == nullptr || pixels == nullptr) {
+            return false;
+        }
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        if (FAILED(Context->Map(SidebarSurfaceTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+            return false;
+        }
+        const int row_bytes = SidebarSurfaceWidth * 2;
+        const unsigned char* src = static_cast<const unsigned char*>(pixels);
+        unsigned char* dst = static_cast<unsigned char*>(mapped.pData);
+        if (mapped.RowPitch == (UINT)pitch_bytes && pitch_bytes == row_bytes) {
+            memcpy(dst, src, (size_t)pitch_bytes * SidebarSurfaceHeight);
+        } else {
+            for (int y = 0; y < SidebarSurfaceHeight; ++y) {
+                memcpy(dst + y * mapped.RowPitch, src + y * pitch_bytes, row_bytes);
+            }
+        }
+        Context->Unmap(SidebarSurfaceTex, 0);
+        return true;
+    }
+
+
     void GraphicsDevice::Begin_Frame()
     {
         if (BackbufferRTV == nullptr) {
@@ -475,6 +583,9 @@ namespace Vinifera::Gfx
         Context->ClearRenderTargetView(BackbufferRTV, clear_color);
         if (SceneTarget != nullptr && SceneTarget->Get_RTV() != nullptr) {
             Context->ClearRenderTargetView(SceneTarget->Get_RTV(), clear_color);
+        }
+        if (SidebarTarget != nullptr && SidebarTarget->Get_RTV() != nullptr) {
+            Context->ClearRenderTargetView(SidebarTarget->Get_RTV(), clear_color);
         }
         if (DepthDSV != nullptr) {
             Context->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -553,9 +664,46 @@ namespace Vinifera::Gfx
     }
 
 
+    void GraphicsDevice::Bind_Sidebar_Target()
+    {
+        if (SidebarTarget != nullptr) {
+            Set_Render_Target(SidebarTarget, DepthBinding::None);
+        } else {
+            Bind_Scene_Target();
+        }
+    }
+
+
+    void GraphicsDevice::Clear_Sidebar_Target()
+    {
+        if (SidebarTarget != nullptr) {
+            const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            SidebarTarget->Clear(clear_color);
+        }
+    }
+
+
     ID3D11ShaderResourceView* GraphicsDevice::Get_Scene_SRV() const
     {
         return SceneTarget != nullptr ? SceneTarget->Get_SRV() : nullptr;
+    }
+
+
+    int GraphicsDevice::Get_Sidebar_Target_Width() const
+    {
+        return SidebarTarget != nullptr ? SidebarTarget->Width() : 0;
+    }
+
+
+    int GraphicsDevice::Get_Sidebar_Target_Height() const
+    {
+        return SidebarTarget != nullptr ? SidebarTarget->Height() : 0;
+    }
+
+
+    ID3D11ShaderResourceView* GraphicsDevice::Get_Sidebar_Target_SRV() const
+    {
+        return SidebarTarget != nullptr ? SidebarTarget->Get_SRV() : nullptr;
     }
 
 

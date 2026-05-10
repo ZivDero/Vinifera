@@ -15,6 +15,7 @@
 #include "graphics_device.h"
 #include "perf_monitor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -106,6 +107,28 @@ namespace Vinifera::Gfx
     }
 
 
+    void PrimitiveQueue::Draw_Immediate_Rect(GraphicsDevice& device, const RectF& rect, const float color[4], EBlend blend)
+    {
+        if (!Initialized || !rect.Is_Valid()) {
+            return;
+        }
+
+        PrimitiveDrawCmd cmd = {};
+        cmd.Kind = PrimitiveKind::SolidRect;
+        cmd.Blend = blend;
+        cmd.Rect = rect;
+        cmd.Color[0] = color[0];
+        cmd.Color[1] = color[1];
+        cmd.Color[2] = color[2];
+        cmd.Color[3] = color[3];
+
+        const std::vector<PrimitiveDrawCmd> commands { cmd };
+        device.Bind_Scene_Target();
+        Draw_Group(device, commands, 0, commands.size(),
+                   device.Get_Backbuffer_Width(), device.Get_Backbuffer_Height());
+    }
+
+
     void PrimitiveQueue::Emit_Rect(std::vector<PrimitiveVertex>& vertices, const RectF& rect, const float color[4])
     {
         if (!rect.Is_Valid()) {
@@ -164,9 +187,9 @@ namespace Vinifera::Gfx
     }
 
 
-    void PrimitiveQueue::Draw_Group(GraphicsDevice& device, const std::vector<PrimitiveDrawCmd>& commands, size_t begin, size_t end)
+    void PrimitiveQueue::Draw_Group(GraphicsDevice& device, const std::vector<PrimitiveDrawCmd>& commands, size_t begin, size_t end, int target_w, int target_h)
     {
-        if (begin >= end) {
+        if (begin >= end || target_w <= 0 || target_h <= 0) {
             return;
         }
 
@@ -187,13 +210,11 @@ namespace Vinifera::Gfx
         }
 
         ID3D11DeviceContext* ctx = device.Get_Context();
-        const int bb_w = device.Get_Backbuffer_Width();
-        const int bb_h = device.Get_Backbuffer_Height();
 
         const float L = 0.0f;
-        const float R = (float)bb_w;
+        const float R = (float)target_w;
         const float T = 0.0f;
-        const float B = (float)bb_h;
+        const float B = (float)target_h;
         PrimitiveCB cb = {};
         cb.ProjMtx[0]  = 2.0f / (R - L);
         cb.ProjMtx[5]  = 2.0f / (T - B);
@@ -204,8 +225,8 @@ namespace Vinifera::Gfx
         PrimitiveEffect.Set_Constants(device, &cb);
 
         D3D11_VIEWPORT vp = {};
-        vp.Width = (float)bb_w;
-        vp.Height = (float)bb_h;
+        vp.Width = (float)target_w;
+        vp.Height = (float)target_h;
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
         ctx->RSSetViewports(1, &vp);
@@ -251,16 +272,53 @@ namespace Vinifera::Gfx
             return;
         }
 
-        device.Bind_Scene_Target();
+        /**
+         *  Bucket by output target. Stable-sort preserves submission order
+         *  within a bucket, then Blend-grouping inside each bucket collapses
+         *  contiguous matching-blend commands into one DrawCall.
+         */
+        std::stable_sort(pass_commands.begin(), pass_commands.end(),
+            [](const PrimitiveDrawCmd& a, const PrimitiveDrawCmd& b) {
+                return (uint8_t)a.OutputTarget < (uint8_t)b.OutputTarget;
+            });
 
-        size_t begin = 0;
-        while (begin < pass_commands.size()) {
-            size_t end = begin + 1;
-            while (end < pass_commands.size() && pass_commands[end].Blend == pass_commands[begin].Blend) {
-                ++end;
+        size_t bucket_start = 0;
+        while (bucket_start < pass_commands.size()) {
+            const GpuRenderTarget bucket_target = pass_commands[bucket_start].OutputTarget;
+            size_t bucket_end = bucket_start + 1;
+            while (bucket_end < pass_commands.size()
+                && pass_commands[bucket_end].OutputTarget == bucket_target) {
+                ++bucket_end;
             }
-            Draw_Group(device, pass_commands, begin, end);
-            begin = end;
+
+            if (bucket_target == GpuRenderTarget::None) {
+                static bool warned = false;
+                if (!warned) {
+                    DEBUG_WARNING("PrimitiveQueue: dropping %zu commands with OutputTarget::None.\n",
+                        bucket_end - bucket_start);
+                    warned = true;
+                }
+                bucket_start = bucket_end;
+                continue;
+            }
+
+            Bind_Render_Target(device, bucket_target);
+
+            const bool is_sidebar = (bucket_target == GpuRenderTarget::Sidebar);
+            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Backbuffer_Width();
+            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Backbuffer_Height();
+
+            size_t begin = bucket_start;
+            while (begin < bucket_end) {
+                size_t end = begin + 1;
+                while (end < bucket_end && pass_commands[end].Blend == pass_commands[begin].Blend) {
+                    ++end;
+                }
+                Draw_Group(device, pass_commands, begin, end, target_w, target_h);
+                begin = end;
+            }
+
+            bucket_start = bucket_end;
         }
     }
 }

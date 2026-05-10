@@ -53,6 +53,8 @@ namespace Vinifera::Gfx
 
         bool Set_Surface_Format(int width, int height);
         bool Upload_Surface(const void* pixels, int pitch_bytes);
+        bool Set_Sidebar_Surface_Format(int width, int height);
+        bool Upload_Sidebar_Surface(const void* pixels, int pitch_bytes);
 
         void Begin_Frame();
         void Draw_Texture(ID3D11ShaderResourceView* srv, const Rect& dst_rect, SDL_ScaleMode scale_mode, EBlend blend = EBlend::Opaque);
@@ -66,6 +68,8 @@ namespace Vinifera::Gfx
         void Set_Render_Target(RenderTarget2D* target, DepthBinding depth = DepthBinding::None);
         void Bind_Backbuffer() { Set_Render_Target(nullptr, DepthBinding::SharedDepth); }
         void Bind_Scene_Target();
+        void Bind_Sidebar_Target();
+        void Clear_Sidebar_Target();
 
         ID3D11Device*           Get_Device() const { return Device; }
         ID3D11DeviceContext*    Get_Context() const { return Context; }
@@ -77,8 +81,12 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView*  Get_Alpha_SRV() const { return AlphaSRV; }
         ID3D11UnorderedAccessView* Get_Alpha_UAV() const { return AlphaUAV; }
         ID3D11ShaderResourceView*  Get_Scene_SRV() const;
+        ID3D11ShaderResourceView*  Get_Sidebar_Upload_SRV() const { return SidebarSurfaceSRV; }
+        ID3D11ShaderResourceView*  Get_Sidebar_Target_SRV() const;
         int                     Get_Backbuffer_Width() const { return BackbufferWidth; }
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
+        int                     Get_Sidebar_Target_Width() const;
+        int                     Get_Sidebar_Target_Height() const;
 
         StateCache&             States() { return StateCacheInstance; }
 
@@ -100,6 +108,9 @@ namespace Vinifera::Gfx
         bool Create_Scene_Target(int width, int height);
         void Release_Scene_Target();
 
+        bool Create_Sidebar_Target(int width, int height);
+        void Release_Sidebar_Target();
+
         bool Create_Alpha_Buffer(int width, int height);
         void Release_Alpha_Buffer();
 
@@ -107,6 +118,7 @@ namespace Vinifera::Gfx
         void Release_Present_Pipeline();
 
         void Release_Surface_Texture();
+        void Release_Sidebar_Surface_Texture();
 
         HWND                     WindowHandle = nullptr;
 
@@ -119,6 +131,7 @@ namespace Vinifera::Gfx
         ID3D11DepthStencilView*  DepthDSV = nullptr;
         ID3D11ShaderResourceView*DepthSRV = nullptr;
         RenderTarget2D*          SceneTarget = nullptr;
+        RenderTarget2D*          SidebarTarget = nullptr;
 
         /**
          *  Alpha buffer mirrors vanilla's `AlphaBuffer` (a 16-bit-per-pixel
@@ -145,6 +158,11 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView*SurfaceSRV = nullptr;
         int                      SurfaceWidth = 0;
         int                      SurfaceHeight = 0;
+
+        ID3D11Texture2D*         SidebarSurfaceTex = nullptr;
+        ID3D11ShaderResourceView*SidebarSurfaceSRV = nullptr;
+        int                      SidebarSurfaceWidth = 0;
+        int                      SidebarSurfaceHeight = 0;
 
         StateCache               StateCacheInstance;
     };

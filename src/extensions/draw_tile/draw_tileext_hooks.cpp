@@ -171,7 +171,6 @@ void IsoTileTypeClassExt::_Draw_Tile(
     if (z_clear_only && !solid_mask && !fog_mask) {
         (void)use_z;
         (void)grey_shift;
-        (void)cliprect;
         return;
     }
     if (solid_mask || fog_mask) {
@@ -219,6 +218,11 @@ void IsoTileTypeClassExt::_Draw_Tile(
     const float xscale = (VideoWidth > 0) ? (float)device.Get_Backbuffer_Width()  / (float)VideoWidth  : 1.0f;
     const float yscale = (VideoHeight > 0) ? (float)device.Get_Backbuffer_Height() / (float)VideoHeight : 1.0f;
 
+    const Rect clipped_rect = Intersect(cliprect, surface.Get_Rect());
+    if (!clipped_rect.Is_Valid()) {
+        return;
+    }
+
     /**
      *  Vanilla seeds one base Z value per tile from the visually-raised
      *  y_off, then subtracts another half-cell-height per cell_level. Since
@@ -252,6 +256,10 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.Dst.Y        = (float)y_off * yscale;
     cmd.Dst.W        = (float)st->W * xscale;
     cmd.Dst.H        = (float)st->H * yscale;
+    cmd.Clip.X       = (float)clipped_rect.X * xscale;
+    cmd.Clip.Y       = (float)clipped_rect.Y * yscale;
+    cmd.Clip.W       = (float)clipped_rect.Width * xscale;
+    cmd.Clip.H       = (float)clipped_rect.Height * yscale;
     cmd.DstZTop      = dz;
     cmd.DstZBottom   = dz;
     cmd.Pass         = Current_Render_Pass();
@@ -290,7 +298,6 @@ void IsoTileTypeClassExt::_Draw_Tile(
 
     (void)use_z;
     (void)grey_shift;
-    (void)cliprect;
 }
 
 

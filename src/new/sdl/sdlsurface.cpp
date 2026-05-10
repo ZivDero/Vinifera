@@ -16,16 +16,20 @@
 #include "dsurface.h"
 #include "graphics_device.h"
 #include "optionsext.h"
+#include "perf_monitor.h"
 #include "primitive_queue.h"
 #include "render_pass.h"
 #include "rgb.h"
 #include "sdl_functions.h"
+#include "surface_target_registry.h"
 #include "tibsun_functions.h"
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
 
 #include <algorithm>
 #include <cmath>
+#include <intrin.h>
+#include <unordered_set>
 
 
 /**
@@ -53,41 +57,112 @@ namespace
     using Vinifera::Gfx::RectF;
 
     constexpr int DASH_PATTERN_LENGTH = 16;
+    bool SuppressTacticalLockAudit = false;
 
-    bool Can_Queue_Tactical_Primitives(const SDLSurface* surface)
+    bool Is_Tactical_Surface_Target(const SDLSurface* surface)
     {
-        if (surface == nullptr || Vinifera::Gfx::Device == nullptr) {
+        if (surface == nullptr || !TacticalActive || !ScenarioActive) {
+            return false;
+        }
+
+        const auto* target = Vinifera::Gfx::SurfaceTargetRegistry::Get().Find_Command_Target(const_cast<SDLSurface*>(surface));
+        return target != nullptr && target->Is_Tactical();
+    }
+
+
+    Vinifera::Gfx::GpuSurfaceTarget* Find_Primitive_Target(const SDLSurface* surface)
+    {
+        return Vinifera::Gfx::SurfaceTargetRegistry::Get().Find_Command_Target(const_cast<SDLSurface*>(surface));
+    }
+
+
+    /**
+     *  Gate for routing surface vtable primitive draws through PrimitiveQueue.
+     *  After Stage 6 this covers any role with `Can_Queue_Primitives()` —
+     *  tactical (Scene/Tile) and Sidebar. The function name retains "Tactical"
+     *  for source-stability; the broadened gate is intentional.
+     */
+    bool Can_Attempt_Tactical_Primitive(const SDLSurface* surface)
+    {
+        Vinifera::Gfx::GpuSurfaceTarget* target = Find_Primitive_Target(surface);
+        if (target == nullptr || !target->Can_Queue_Primitives() || Vinifera::Gfx::Device == nullptr) {
             return false;
         }
         if (OptionsExtension != nullptr && OptionsExtension->LegacyRenderer) {
             return false;
         }
-        if (!TacticalActive || !ScenarioActive) {
-            return false;
-        }
-        if (!PrimitiveQueue::Get().Is_Initialized()) {
+        return PrimitiveQueue::Get().Is_Initialized();
+    }
+
+
+    bool Can_Queue_Tactical_Primitives(const SDLSurface* surface)
+    {
+        if (!Can_Attempt_Tactical_Primitive(surface)) {
             return false;
         }
         //if (surface->Is_Locked()) {
         //    return false;
         //}
-
-        const Surface* target = surface;
-        return target == CompositeSurface
-            || target == TileSurface
-            || (target == LogicalSurface && (LogicalSurface == CompositeSurface || LogicalSurface == TileSurface));
+        return true;
     }
 
 
-    bool Backbuffer_Scale(float& xscale, float& yscale)
+    void Note_Tactical_Primitive_Fallback(const SDLSurface* surface)
     {
-        if (Vinifera::Gfx::Device == nullptr || VideoWidth <= 0 || VideoHeight <= 0) {
-            return false;
+        /**
+         *  Counter stays tactical-only — sidebar fallbacks (if any ever
+         *  happen) aren't a regression from Stage 4 baselines.
+         */
+        if (Can_Attempt_Tactical_Primitive(surface) && Is_Tactical_Surface_Target(surface)) {
+            Vinifera::Gfx::PerfMonitor::Get().Note_Tactical_Primitive_Fallback();
+        }
+    }
+
+
+    void Note_Tactical_Blit(const SDLSurface* surface)
+    {
+        if (Is_Tactical_Surface_Target(surface)) {
+            Vinifera::Gfx::PerfMonitor::Get().Note_Tactical_Blit();
+        }
+    }
+
+
+    void Note_Tactical_Lock(const SDLSurface* surface, void* return_addr)
+    {
+        if (SuppressTacticalLockAudit || !Is_Tactical_Surface_Target(surface)) {
+            return;
         }
 
-        xscale = (float)Vinifera::Gfx::Device->Get_Backbuffer_Width() / (float)VideoWidth;
-        yscale = (float)Vinifera::Gfx::Device->Get_Backbuffer_Height() / (float)VideoHeight;
-        return xscale > 0.0f && yscale > 0.0f;
+        Vinifera::Gfx::PerfMonitor::Get().Note_Tactical_Lock();
+
+        /**
+         *  One-shot per-callsite warning: the first time a given caller
+         *  Lock()s a tactical-role surface outside of the SDL upload
+         *  window, log its return address so the migration list of "what
+         *  still writes to the dead tactical CPU buffer" is discoverable.
+         *  The address can be resolved against the binary's map / IDA.
+         */
+        static std::unordered_set<void*> seen_callsites;
+        if (return_addr != nullptr && seen_callsites.insert(return_addr).second) {
+            DEBUG_WARNING("Tactical Lock() outside upload window from caller 0x%p (CPU pixel writes here are invisible until GPU-ported).\n",
+                return_addr);
+        }
+    }
+
+
+    void Note_Tactical_DC(const SDLSurface* surface)
+    {
+        if (Is_Tactical_Surface_Target(surface)) {
+            Vinifera::Gfx::PerfMonitor::Get().Note_Tactical_DC();
+        }
+    }
+
+
+    void Note_Tactical_Unsupported_Primitive(const SDLSurface* surface)
+    {
+        if (Is_Tactical_Surface_Target(surface)) {
+            Vinifera::Gfx::PerfMonitor::Get().Note_Tactical_Unsupported_Primitive();
+        }
     }
 
 
@@ -134,7 +209,8 @@ namespace
 
         float xscale = 1.0f;
         float yscale = 1.0f;
-        if (!Backbuffer_Scale(xscale, yscale)) {
+        Vinifera::Gfx::GpuSurfaceTarget* target = Find_Primitive_Target(surface);
+        if (target == nullptr || !target->Logical_To_Render_Target(*Vinifera::Gfx::Device, xscale, yscale)) {
             return false;
         }
 
@@ -152,6 +228,7 @@ namespace
         cmd.Color[1] = color[1];
         cmd.Color[2] = color[2];
         cmd.Color[3] = color[3];
+        cmd.OutputTarget = target->Get_Output_Target();
 
         PrimitiveQueue::Get().Submit(cmd);
         return true;
@@ -171,7 +248,8 @@ namespace
 
         float xscale = 1.0f;
         float yscale = 1.0f;
-        if (!Backbuffer_Scale(xscale, yscale)) {
+        Vinifera::Gfx::GpuSurfaceTarget* target = Find_Primitive_Target(surface);
+        if (target == nullptr || !target->Logical_To_Render_Target(*Vinifera::Gfx::Device, xscale, yscale)) {
             return false;
         }
 
@@ -188,6 +266,7 @@ namespace
         cmd.Color[1] = color[1];
         cmd.Color[2] = color[2];
         cmd.Color[3] = color[3];
+        cmd.OutputTarget = target->Get_Output_Target();
 
         PrimitiveQueue::Get().Submit(cmd);
         return true;
@@ -473,6 +552,12 @@ SDLSurface* SDLSurface::Create_Primary(void*)
 }
 
 
+void SDLSurface::Suppress_Tactical_Lock_Audit(bool suppress)
+{
+    SuppressTacticalLockAudit = suppress;
+}
+
+
 /**
  *  Blit from one surface to this one.
  *
@@ -481,6 +566,7 @@ SDLSurface* SDLSurface::Create_Primary(void*)
 bool SDLSurface::Blit_From(Rect const& dcliprect, Rect const& destrect, Surface const& ssource, Rect const& scliprect, Rect const& sourcerect, bool trans, bool)
 {
     if (!dcliprect.Is_Valid() || !scliprect.Is_Valid() || !destrect.Is_Valid() || !sourcerect.Is_Valid()) return false;
+    Note_Tactical_Blit(this);
 
     bool use_xsurface = false;
 
@@ -518,6 +604,18 @@ bool SDLSurface::Blit_From(Rect const& dcliprect, Rect const& destrect, Surface 
 
     SDL_SetSurfaceBlendMode(src_surf, SDL_BLENDMODE_NONE);
     return SDL_BlitSurfaceScaled(src_surf, &src, dst_surf, &dst, SDL_SCALEMODE_LINEAR);
+}
+
+
+bool SDLSurface::Blit_From(Rect const& destrect, Surface const& source, Rect const& sourcerect, bool trans, bool a5)
+{
+    return SDLSurface::Blit_From(Get_Rect(), destrect, source, source.Get_Rect(), sourcerect, trans, a5);
+}
+
+
+bool SDLSurface::Blit_From(Surface const& source, bool trans, bool a3)
+{
+    return SDLSurface::Blit_From(Get_Rect(), Get_Rect(), source, source.Get_Rect(), source.Get_Rect(), trans, a3);
 }
 
 
@@ -564,6 +662,7 @@ bool SDLSurface::Fill_Rect(Rect const& cliprect, Rect const& fillrect, int color
     if (Queue_Rect(this, frect, rgba, EBlend::Opaque)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     SDL_Rect rect;
     rect.x = frect.X;
@@ -590,8 +689,16 @@ bool SDLSurface::Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int op
             return true;
         }
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return DSurface::Fill_Rect_Trans(rect, color, opacity);
+}
+
+
+bool SDLSurface::Draw_Ellipse(Point2D center, int radius_x, int radius_y, Rect clip, int color)
+{
+    Note_Tactical_Unsupported_Primitive(this);
+    return XSurface::Draw_Ellipse(center, radius_x, radius_y, clip, color);
 }
 
 
@@ -608,6 +715,7 @@ bool SDLSurface::Put_Pixel(Point2D const& point, int color)
     if (Queue_Rect(this, rect, rgba, EBlend::Opaque)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return XSurface::Put_Pixel(point, color);
 }
@@ -625,6 +733,7 @@ bool SDLSurface::Draw_Line(Point2D const& startpoint, Point2D const& endpoint, i
     if (Queue_Line(this, Get_Rect(), startpoint, endpoint, rgba)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return XSurface::Draw_Line(startpoint, endpoint, color);
 }
@@ -638,6 +747,7 @@ bool SDLSurface::Draw_Line(Rect const& cliprect, Point2D const& startpoint, Poin
     if (Queue_Line(this, cliprect, startpoint + origin, endpoint + origin, rgba)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return XSurface::Draw_Line(cliprect, startpoint, endpoint, color);
 }
@@ -651,6 +761,7 @@ bool SDLSurface::Draw_Line_entry_34(Rect const& cliprect, Point2D const& startpo
     if (Queue_Line(this, cliprect, startpoint + origin, endpoint + origin, rgba)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return DSurface::Draw_Line_entry_34(cliprect, startpoint, endpoint, color, a5, a6, a7);
 }
@@ -664,6 +775,7 @@ bool SDLSurface::Draw_Line_entry_38(Rect const& cliprect, Point2D const& startpo
     if (Queue_Line(this, cliprect, startpoint + origin, endpoint + origin, rgba)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return DSurface::Draw_Line_entry_38(cliprect, startpoint, endpoint, a4, a5, a6, a7);
 }
@@ -677,8 +789,16 @@ bool SDLSurface::Draw_Line_entry_3C(Rect const& cliprect, Point2D const& startpo
     if (Queue_Line(this, cliprect, startpoint + origin, endpoint + origin, rgba)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return DSurface::Draw_Line_entry_3C(cliprect, startpoint, endpoint, color, a5, a6, a7, a8, a9, a10, a11);
+}
+
+
+bool SDLSurface::Plot_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, void (*drawer_callback)(Point2D&))
+{
+    Note_Tactical_Unsupported_Primitive(this);
+    return XSurface::Plot_Line(cliprect, startpoint, endpoint, drawer_callback);
 }
 
 
@@ -693,6 +813,7 @@ int SDLSurface::Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpo
     if (Queue_Dashed_Line(this, startpoint, endpoint, color, pattern, offset, out_offset)) {
         return out_offset;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return XSurface::Draw_Dashed_Line(startpoint, endpoint, color, pattern, offset);
 }
@@ -704,6 +825,7 @@ int SDLSurface::entry_48(Point2D const& startpoint, Point2D const& endpoint, int
     if (Queue_Dashed_Line(this, startpoint, endpoint, color, pattern, offset, out_offset)) {
         return out_offset;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return DSurface::entry_48(startpoint, endpoint, color, pattern, offset, a6);
 }
@@ -716,6 +838,7 @@ bool SDLSurface::entry_4C(Point2D const& startpoint, Point2D const& endpoint, in
     if (Queue_Line(this, Get_Rect(), startpoint, endpoint, rgba)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return DSurface::entry_4C(startpoint, endpoint, color, a4);
 }
@@ -726,6 +849,7 @@ bool SDLSurface::Draw_Rect(Rect const& rect, int color)
     if (Queue_Rect_Outline(this, Get_Rect(), rect, color)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return XSurface::Draw_Rect(rect, color);
 }
@@ -736,6 +860,7 @@ bool SDLSurface::Draw_Rect(Rect const& cliprect, Rect const& rect, int color)
     if (Queue_Rect_Outline(this, cliprect, rect.Bias_To(Intersect(cliprect, Get_Rect())), color)) {
         return true;
     }
+    Note_Tactical_Primitive_Fallback(this);
 
     return XSurface::Draw_Rect(cliprect, rect, color);
 }
@@ -743,15 +868,26 @@ bool SDLSurface::Draw_Rect(Rect const& cliprect, Rect const& rect, int color)
 
 bool SDLSurface::entry_84(Point2D const& point, int color, Rect const& rect)
 {
-    if (rect.Is_Point_Within(point) && Get_Rect().Is_Point_Within(point)) {
+    const bool in_bounds = rect.Is_Point_Within(point) && Get_Rect().Is_Point_Within(point);
+    if (in_bounds) {
         float rgba[4];
         Color_From_Hicolor(color, 1.0f, rgba);
         if (Queue_Rect(this, Rect(point.X, point.Y, 1, 1), rgba, EBlend::Opaque)) {
             return true;
         }
     }
+    if (in_bounds) {
+        Note_Tactical_Primitive_Fallback(this);
+    }
 
     return XSurface::entry_84(point, color, rect);
+}
+
+
+bool SDLSurface::entry_90(Rect& area, Point2D& start, Point2D& end, RGBClass& a4, RGBClass& a5, float& a6, float& a7)
+{
+    Note_Tactical_Unsupported_Primitive(this);
+    return DSurface::entry_90(area, start, end, a4, a5, a6, a7);
 }
 
 
@@ -766,6 +902,7 @@ HDC SDLSurface::GetDC()
         return nullptr;
     }
 
+    Note_Tactical_DC(this);
     LockCount++;
     return GDIDC;
 }
@@ -809,6 +946,7 @@ int SDLSurface::Stride() const
 void* SDLSurface::Lock(Point2D point) const
 {
     if (point.X < 0 || point.Y < 0) return nullptr;
+    Note_Tactical_Lock(this, _ReturnAddress());
 
     if (LockCount == 0) {
         if (SDL_MUSTLOCK(SDLSurfacePtr)) {

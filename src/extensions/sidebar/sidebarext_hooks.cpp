@@ -17,6 +17,7 @@
 #include "extension.h"
 #include "factory.h"
 #include "fatal.h"
+#include "graphics_device.h"
 #include "hooker.h"
 #include "house.h"
 #include "language.h"
@@ -27,6 +28,7 @@
 #include "rules.h"
 #include "session.h"
 #include "sidebar.h"
+#include "surface_target_registry.h"
 #include "tibsun_functions.h"
 #include "tibsun_globals.h"
 #include "tooltip.h"
@@ -401,6 +403,17 @@ int SidebarClassExt::_Which_Column(RTTIType type)
 void SidebarClassExt::_Blit_Sidebar(bool)
 {
     if (IsSidebarActive && GameActive && ScenarioActive) {
+        const Vinifera::Gfx::GpuSurfaceTarget* sidebar_target =
+            Vinifera::Gfx::SurfaceTargetRegistry::Get().Find(SidebarSurface);
+        if (sidebar_target != nullptr
+            && sidebar_target->Get_Output_Target() == Vinifera::Gfx::GpuRenderTarget::Sidebar
+            && sidebar_target->Can_Compose()
+            && OptionsExtension != nullptr
+            && !OptionsExtension->LegacyRenderer
+            && TacticalActive
+            && !Debug_Map) {
+            return;
+        }
 
         /**
          *  Blit the entire sidebar surface.

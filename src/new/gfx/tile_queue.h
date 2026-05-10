@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "gpu_surface_target.h"
 #include "palette_lut.h"
 #include "render_pass.h"
 #include "sprite_batch.h"
@@ -35,11 +36,13 @@ namespace Vinifera::Gfx
         PaletteLUT*  Palette;
         int          SubTileIndex;
         RectF        Dst;             // backbuffer-pixel space
+        RectF        Clip;            // backbuffer-pixel scissor rect; invalid = full target
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
         RenderPass   Pass;
         float        Tint[4];         // per-cell brightness modulate (1.0 = neutral, 2.0 = max overbright)
         bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
+        GpuRenderTarget OutputTarget = GpuRenderTarget::Scene;
     };
 
 
