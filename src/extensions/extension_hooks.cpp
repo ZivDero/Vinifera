@@ -92,6 +92,7 @@
 #include "draw_shapeext_hooks.h"
 #include "draw_tileext_hooks.h"
 #include "shroudext_hooks.h"
+#include "voxel_blit_hooks.h"
 #include "wwfontext_hooks.h"
 #include "spawnmanager_hooks.h"
 #include "storageext_hooks.h"
@@ -275,6 +276,7 @@ void Extension_Hooks()
     DrawTile_Hooks();
     AlphaShape_Hooks();
     Shroud_Hooks();
+    Voxel_Blit_Hooks();
     WWFont_Hooks();
 
     /**
