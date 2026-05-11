@@ -5,8 +5,10 @@
  *
  *          The `CellClassExt::_Draw_It` reimpl submits a TileDrawCmd per cell
  *          tagged with the current vanilla Tactical::Render phase. Every tile
- *          draws against the single global `IsoTilePaletteRes` palette + tint
- *          mask, so Flush_Pass issues exactly one SpriteBatch pass per output
+ *          draws against a single shared `PaletteLUT` (looked up from
+ *          `PaletteCache` keyed on the active `PaletteClass*` — typically
+ *          vanilla's `IsoTilePalette`) and the tile-effect-owned tint mask,
+ *          so Flush_Pass issues exactly one SpriteBatch pass per output
  *          target with depth-write enabled. Per-cell lighting (RedTint /
  *          GreenTint / BlueTint / TileBrightness) rides in the vertex color
  *          attribute and is unfolded by the tile shader.

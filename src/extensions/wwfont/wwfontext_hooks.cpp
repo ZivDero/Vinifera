@@ -82,10 +82,8 @@ Point2D WWFontClassExt::_Print(char const* string, Surface& surface, Rect const&
      *  GPU-eligibility pre-check. Any failure falls back to the original
      *  vanilla `Print` so menus / dialogs / `SDLSurface` callers keep working.
      */
-    const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
     GpuSurface* gpu = dynamic_cast<GpuSurface*>(&surface);
-    if (legacy
-        || Vinifera::Gfx::Device == nullptr
+    if (Vinifera::Gfx::Device == nullptr
         || gpu == nullptr
         || string == nullptr
         || *string == '\0'

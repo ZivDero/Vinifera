@@ -6,9 +6,9 @@
  *          Each Patch_Call entry rewrites a single CALL 0x0047C780 inside the
  *          original TS binary so it lands in our `Draw_Shape_Proxy_DX11`
  *          instead. The proxy decides per-call whether to fall through to
- *          vanilla CPU rendering (LegacyRenderer flag set, or surface is not
- *          CompositeSurface) or to translate the call into a SpriteDrawCmd
- *          and Submit() it to the per-frame queue.
+ *          vanilla CPU rendering (destination isn't a `GpuSurface`) or to
+ *          translate the call into a SpriteDrawCmd and Submit() it to the
+ *          per-frame queue.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -108,28 +108,16 @@ void Draw_Shape_Proxy_DX11(
 {
     /**
      *  Fall-through cases that always run vanilla CPU code:
-     *    - LegacyRenderer flag set (developer A/B switch).
-     *    - Target surface isn't one of the tactical buffers — sidebar /
-     *      hidden / cameo / etc. The `CompositeSurface` and `TileSurface`
-     *      globals get swapped during the tile pass (tactical.cpp:806-810),
-     *      so we accept whichever is the in-flight target. Buildings, trees,
-     *      and cell shadows render with `LogicalSurface = TileSurface` during
-     *      the tile pass; units / anims / particles render post-tile with
-     *      `LogicalSurface = CompositeSurface`. Both must reach the GPU
-     *      pipeline, otherwise the GPU tile pass overwrites their CPU pixels.
+     *    - Target surface isn't a `GpuSurface` — `SDLSurface` destinations
+     *      (HiddenSurface / AlternateSurface / VisibleSurface, plus the
+     *      menus / cameos / hidden buffers) keep using vanilla's CPU blit.
+     *      `CompositeSurface` and `TileSurface` are both `GpuSurface` and
+     *      get swapped during the tile pass — either one routes here.
      *    - GraphicsDevice not initialized yet (pre-video-mode boot path).
      *    - Bad inputs (defensive).
      */
-    const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-    /**
-     *  Stage 7 destination: class identity is the dispatch key. If the
-     *  destination is a `GpuSurface`, route through the queue path; if it's
-     *  a plain `SDLSurface` (HiddenSurface / AlternateSurface / VisibleSurface),
-     *  fall through to vanilla's CPU blit.
-     */
     GpuSurface* gpu_surface = dynamic_cast<GpuSurface*>(&surface);
-    if (legacy
-        || Vinifera::Gfx::Device == nullptr
+    if (Vinifera::Gfx::Device == nullptr
         || gpu_surface == nullptr
         || shapefile == nullptr
         || shapenum < 0)

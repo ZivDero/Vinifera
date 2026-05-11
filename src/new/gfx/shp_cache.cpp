@@ -14,6 +14,7 @@
 #include "convert.h"
 #include "debughandler.h"
 #include "graphics_device.h"
+#include "palette.h"
 #include "palette_lut.h"
 #include "shapeset.h"
 #include "shp_asset.h"
@@ -73,23 +74,6 @@ namespace Vinifera::Gfx
     }
 
 
-    namespace
-    {
-        /**
-         *  FNV-1a 64-bit hash for the 768-byte decoded RGB palette.
-         */
-        static uint64_t Hash_Palette_Bytes(const uint8_t* bytes, size_t len)
-        {
-            uint64_t h = 0xcbf29ce484222325ull;
-            for (size_t i = 0; i < len; ++i) {
-                h ^= (uint64_t)bytes[i];
-                h *= 0x100000001b3ull;
-            }
-            return h;
-        }
-    }
-
-
     PaletteLUT* PaletteCache::Get_Or_Build(GraphicsDevice& device, const ConvertClass* convert)
     {
         if (convert == nullptr) {
@@ -97,7 +81,7 @@ namespace Vinifera::Gfx
         }
         auto it = ByConvert.find(convert);
         if (it != ByConvert.end()) {
-            return it->second;
+            return it->second.get();
         }
 
         /**
@@ -130,20 +114,6 @@ namespace Vinifera::Gfx
             }
         }
 
-        /**
-         *  Vanilla's `LightConvertClass` allocates one converter per cell, but
-         *  cells under identical lighting decode to byte-identical RGB. Hash
-         *  the decoded bytes so all such converters alias to one LUT — this
-         *  is what lets `TileQueue::Flush_Pass` collapse hundreds of palette
-         *  buckets to one draw call.
-         */
-        const uint64_t content_hash = Hash_Palette_Bytes(rgb_triples, sizeof(rgb_triples));
-        auto hit = ByContent.find(content_hash);
-        if (hit != ByContent.end()) {
-            ByConvert.emplace(convert, hit->second);
-            return hit->second;
-        }
-
         auto lut = std::make_unique<PaletteLUT>();
         if (!lut->Initialize(device)) {
             return nullptr;
@@ -156,9 +126,31 @@ namespace Vinifera::Gfx
         lut->Update_Palette(rgb_triples, /*six_bit*/ false, 1000, 1000, 1000);
 
         PaletteLUT* raw = lut.get();
-        Owned.push_back(std::move(lut));
-        ByConvert.emplace(convert, raw);
-        ByContent.emplace(content_hash, raw);
+        ByConvert.emplace(convert, std::move(lut));
+        return raw;
+    }
+
+
+    PaletteLUT* PaletteCache::Get_Or_Build(GraphicsDevice& device, const PaletteClass* palette,
+                                           bool six_bit)
+    {
+        if (palette == nullptr) {
+            return nullptr;
+        }
+        auto it = ByPalette.find(palette);
+        if (it != ByPalette.end()) {
+            return it->second.get();
+        }
+
+        auto lut = std::make_unique<PaletteLUT>();
+        if (!lut->Initialize(device)) {
+            return nullptr;
+        }
+        const unsigned char* rgb_bytes = (const unsigned char*)(*palette);
+        lut->Update_Palette(rgb_bytes, six_bit, 1000, 1000, 1000);
+
+        PaletteLUT* raw = lut.get();
+        ByPalette.emplace(palette, std::move(lut));
         return raw;
     }
 
@@ -166,8 +158,7 @@ namespace Vinifera::Gfx
     void PaletteCache::Clear()
     {
         ByConvert.clear();
-        ByContent.clear();
-        Owned.clear();
+        ByPalette.clear();
     }
 
 

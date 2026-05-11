@@ -31,7 +31,6 @@
 #include "tile_queue.h"
 #include "voxel_composite_queue.h"
 #include "iso_tile_atlas.h"
-#include "iso_tile_palette.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -163,9 +162,6 @@ namespace
     static Vinifera::Gfx::GpuSurfaceTarget* SDL_Sidebar_RT_Target()
     {
         if (Vinifera::Gfx::Device == nullptr || SidebarSurface == nullptr || VideoWidth <= 0 || VideoHeight <= 0) {
-            return nullptr;
-        }
-        if (OptionsExtension != nullptr && OptionsExtension->LegacyRenderer) {
             return nullptr;
         }
         if (!GameActive || !TacticalActive || !ScenarioActive || !Map.IsSidebarActive || Debug_Map) {
@@ -486,10 +482,6 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera VoxelCompositeQueue could not be initialized.\n");
     }
 
-    if (!Vinifera::Gfx::IsoTilePaletteRes::Get().Initialize(*Vinifera::Gfx::Device)) {
-        DEBUG_ERROR("Vinifera IsoTilePaletteRes could not be initialized.\n");
-    }
-
     return true;
 }
 
@@ -513,7 +505,6 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::FontQueue::Get().Shutdown();
     Vinifera::Gfx::TacticalLineQueue::Get().Shutdown();
     Vinifera::Gfx::VoxelCompositeQueue::Get().Shutdown();
-    Vinifera::Gfx::IsoTilePaletteRes::Get().Shutdown();
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -898,15 +889,7 @@ bool SDL_Update_Screen(Surface* surface)
     Vinifera::Gfx::PerfMonitor::Get().Set_Cache_Sizes(
         Vinifera::Gfx::ShpCache::Get().Size(),
         Vinifera::Gfx::IsoTileCache::Get().Size(),
-        Vinifera::Gfx::PaletteCache::Get().Size(),
-        Vinifera::Gfx::PaletteCache::Get().Alias_Count());
-
-    /**
-     *  Vanilla loads `IsoTilePalette` during scenario init — after our
-     *  `Initialize` ran. Refresh per-frame; the hash-skip makes this a
-     *  no-op when the palette hasn't changed since last frame.
-     */
-    Vinifera::Gfx::IsoTilePaletteRes::Get().Refresh(*Vinifera::Gfx::Device);
+        Vinifera::Gfx::PaletteCache::Get().Size());
 
     Vinifera::Gfx::Device->Set_VSync(OptionsExtension->IsVSync);
     Vinifera::Gfx::Device->Begin_Frame();

@@ -95,14 +95,6 @@ public:
     bool IsVSync;
 
     /**
-     *  When true (default during Stage 2b development), all `Draw_Shape`
-     *  callsite hooks installed by `DrawShape_Hooks` fall through to vanilla
-     *  CPU rendering. Set to `false` in INI to route the patched callsites
-     *  through the GPU sprite pipeline.
-     */
-    bool LegacyRenderer;
-
-    /**
      *  Which VOX subtitles should be displayed.
      */
     SubtitleModeType SubtitleMode;

@@ -2,8 +2,10 @@
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
  *  @brief  Replaces `CellClass::Draw_It` with a GPU-friendly variant that
- *          submits one `TileDrawCmd` per cell against the single global
- *          `IsoTilePaletteRes` palette + tint mask. Per-cell lighting
+ *          submits one `TileDrawCmd` per cell against a shared palette
+ *          (looked up via `PaletteCache` from the active `PaletteClass*` —
+ *          today `IsoTilePalette`) plus the tile-effect-owned tint mask.
+ *          Per-cell lighting
  *          (RedTint / GreenTint / BlueTint / TileBrightness) rides in the
  *          vertex color attribute and is unfolded by the tile shader.
  *
@@ -26,9 +28,7 @@
 #include "hooker.h"
 #include "mouse.h"
 #include "iso_tile_asset.h"
-#include "iso_tile_palette.h"
 #include "isotiletype.h"
-#include "optionsext.h"
 #include "render_pass.h"
 #include "shp_cache.h"
 #include "smudgetype.h"
@@ -44,8 +44,8 @@ using namespace Vinifera::Gfx;
 
 /**
  *  Function-pointer to vanilla `IsometricTileTypeClass::Draw_Tile`. Used only
- *  for the `LegacyRenderer` / device-not-ready fall-through inside our
- *  `Draw_It` reimpl; the function entry stays unpatched.
+ *  for the device-not-ready fall-through inside our `Draw_It` reimpl; the
+ *  function entry stays unpatched.
  */
 typedef void (__thiscall *VanillaDrawTileFn)(IsometricTileTypeClass*,
     LightConvertClass*, int, Surface&, int, int, Rect, int, int,
@@ -254,24 +254,13 @@ void CellClassExt::_Draw_It(Point2D const& xdrawpoint, Rect const& cliprect, boo
     Point2D drawpoint = xdrawpoint;
     drawpoint.Y -= LEVEL_PIXEL_H_1 * Height;
 
-    if (ittype->Get_Tile_Data() != nullptr) {
+    if (ittype->Get_Tile_Data() != nullptr && Vinifera::Gfx::Device != nullptr) {
         Point2D p = drawpoint + Point2D(0, TacticalRect.Y);
-        const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-        if (legacy || Vinifera::Gfx::Device == nullptr) {
-            Vanilla_Draw_Tile(ittype, Drawer, subtile, *LogicalSurface, p.X, p.Y,
-                              cliprect, Height, TileBrightness,
-                              true, icon, false, false, false, 0);
-        } else {
-            Submit_Tile_GPU(this, ittype, subtile, p.X, p.Y, cliprect, Height, icon);
-        }
+        Submit_Tile_GPU(this, ittype, subtile, p.X, p.Y, cliprect, Height, icon);
     }
 
     if (Smudge != SMUDGE_NONE) {
-        Point2D smudge_pt = drawpoint + Point2D(ISO_TILE_PIXEL_W / 2, TacticalRect.Y) - cliprect.TopLeft;
-        Rect smudge_clip = cliprect;
-        SmudgeTypes[Smudge]->Draw_It(smudge_pt, smudge_clip, SmudgeData,
-                                     LEVEL_LEPTON_H * Height,
-                                     const_cast<Cell&>(CellID));
+        SmudgeTypes[Smudge]->Draw_It(drawpoint + Point2D(ISO_TILE_PIXEL_W / 2, TacticalRect.Y) - cliprect.TopLeft, cliprect, SmudgeData, LEVEL_LEPTON_H * Height, CellID);
     }
 }
 
@@ -284,6 +273,23 @@ void CellClassExt::_Draw_It(Point2D const& xdrawpoint, Rect const& cliprect, boo
 DEFINE_HOOK(0x004B95C6, _GScrenClass_Render_Draw_Flags_Zero, 5)
 {
     Map.DrawFlags = GS_REDRAW_ALL;
+    return 0;
+}
+
+
+/**
+ *  `IsometricTileTypeClass::Read_Control_File` reloads the theater's
+ *  IsoTilePalette + all tile sets. Clear `PaletteCache` so the next
+ *  `Get_Or_Build` rebuilds with the fresh palette content; otherwise we'd
+ *  keep serving stale colors after a theater swap. SHP / voxel / font
+ *  palettes also get invalidated — those `ConvertClass` instances are
+ *  rebuilt against the new theater anyway.
+ *
+ *  Entry instruction `sub esp, 91Ch` (81 EC 1C 09 00 00) — 6 bytes.
+ */
+DEFINE_HOOK(0x004F39E0, _Read_Control_File_Clear_Palette_Cache, 6)
+{
+    PaletteCache::Get().Clear();
     return 0;
 }
 

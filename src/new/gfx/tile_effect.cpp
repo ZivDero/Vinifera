@@ -15,6 +15,7 @@
 #include "gfx_utils.h"
 #include "graphics_device.h"
 #include "palette_lut.h"
+#include "tibsun_globals.h"
 
 
 namespace Vinifera::Gfx
@@ -121,12 +122,30 @@ namespace Vinifera::Gfx
             Shutdown();
             return false;
         }
+
+        /**
+         *  Upload vanilla's `_default_mask` (256 bools, all true on a stock
+         *  build) as a 256x1 R8_UNORM texture for the shader's `is_tint`
+         *  branch. The mask is a compile-time constant in vanilla — no need
+         *  to refresh per-frame.
+         */
+        uint8_t mask_bytes[256];
+        for (int i = 0; i < 256; ++i) {
+            mask_bytes[i] = DefaultTintMask[i] ? 255 : 0;
+        }
+        if (!TintMaskTex.Initialize(device, 256, 1, DXGI_FORMAT_R8_UNORM,
+                                    D3D11_USAGE_DEFAULT, mask_bytes, 256)) {
+            DEBUG_ERROR("TileEffect: TintMaskTex creation failed.\n");
+            Shutdown();
+            return false;
+        }
         return true;
     }
 
 
     void TileEffect::Shutdown()
     {
+        TintMaskTex.Shutdown();
         Safe_Release(ParamsCB);
         Effect::Shutdown();
     }
@@ -139,6 +158,16 @@ namespace Vinifera::Gfx
 
         ID3D11ShaderResourceView* srv = palette.Get_Palette_Texture().Get_SRV();
         ctx->PSSetShaderResources(1, 1, &srv);
+    }
+
+
+    void TileEffect::Bind_Tint_Mask(GraphicsDevice& device)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr) return;
+
+        ID3D11ShaderResourceView* srv = TintMaskTex.Get_SRV();
+        ctx->PSSetShaderResources(4, 1, &srv);
     }
 
 

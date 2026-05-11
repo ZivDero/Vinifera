@@ -76,15 +76,10 @@ void CellClassFake::_Draw_Shroud_Or_Fog_Shape(Point2D& drawpoint, Rect& cliprect
     }
 
     /**
-     *  LegacyRenderer flag or pre-init device: defer to no-op. The CPU
-     *  AlphaBuffer never gets the write either way (we replaced the function
-     *  entirely), so on legacy renderer the visual loses shroud darkening.
-     *  This matches the broader Phase 4.x pattern — legacy mode is only
-     *  pixel-identical when *no* GPU code is running, which it isn't here.
-     *  Acceptable: legacy is a developer A/B switch, not a shipping path.
+     *  Pre-init device: defer to no-op (vanilla CPU AlphaBuffer never sees
+     *  this write because we replaced the function entirely).
      */
-    const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-    if (legacy || Vinifera::Gfx::Device == nullptr || Scen == nullptr) {
+    if (Vinifera::Gfx::Device == nullptr || Scen == nullptr) {
         return;
     }
 
@@ -149,11 +144,7 @@ void CellClassFake::_Draw_Fog_Shape(Point2D& drawpoint, Rect& cliprect, int shap
      *  `Scen->Special.IsFogOfWar && !PlayerPtr->IsDefeated`, so we never
      *  arrive here unless fog is active. No additional gating needed.
      */
-    const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-    if (legacy || Vinifera::Gfx::Device == nullptr) {
-        return;
-    }
-    if (Cell_FogShape == nullptr) {
+    if (Vinifera::Gfx::Device == nullptr || Cell_FogShape == nullptr) {
         return;
     }
 

@@ -413,8 +413,6 @@ void SidebarClassExt::_Blit_Sidebar(bool)
         const GpuSurface* gpu_sidebar = dynamic_cast<const GpuSurface*>(SidebarSurface);
         if (gpu_sidebar != nullptr
             && gpu_sidebar->Output_Target() == Vinifera::Gfx::GpuRenderTarget::Sidebar
-            && OptionsExtension != nullptr
-            && !OptionsExtension->LegacyRenderer
             && TacticalActive
             && !Debug_Map) {
             return;

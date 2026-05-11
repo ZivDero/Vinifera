@@ -324,10 +324,6 @@ namespace
                                  bool has_per_pixel_z,
                                  BSurface const* z_source)
     {
-        const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-        if (legacy) {
-            return false;
-        }
         GpuSurface* gpu_dest = dynamic_cast<GpuSurface*>(&dest);
         if (gpu_dest == nullptr) {
             return false;
@@ -445,9 +441,9 @@ void UnitClassExt::_Unit_Blit_Voxel(Surface& surface, Point2D xyoff, Rect rect, 
         if (blitter != nullptr) {
             /**
              *  Predator-offset for VISUAL_RIPPLE isn't exposed in TSpp; pass
-             *  0 (no warp) in the fall-through case. Only matters when the
-             *  user has `LegacyRenderer=yes` AND the unit is cloaked AND the
-             *  dest somehow isn't a GpuSurface — minor regression.
+             *  0 (no warp) in the fall-through case. Only reached when the
+             *  destination isn't a `GpuSurface` (CPU-only surface) — minor
+             *  visual regression for cloaked units in that corner.
              */
             const ZGradientType zgrad = const_cast<UnitClassExt*>(this)->Get_Z_Gradient();
             Bit_Blit(surface, rect, dst_rect,

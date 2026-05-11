@@ -17,14 +17,13 @@
 
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <unordered_map>
-#include <vector>
 
 
 class ShapeSet;
 class ConvertClass;
+class PaletteClass;
 
 
 namespace Vinifera::Gfx
@@ -63,36 +62,31 @@ namespace Vinifera::Gfx
         static PaletteCache& Get();
 
         /**
-         *  Look up the palette LUT for `convert`. If not yet cached, decode
-         *  the converter's `Translator` field (vanilla's 16-bit RGB565 LUT)
-         *  back into 8-bit RGB triples and upload as a 256x1 RGBA8 texture.
-         *
-         *  Two `ConvertClass*` instances whose decoded RGB bytes are identical
-         *  share one `PaletteLUT` — vanilla creates one `LightConvertClass`
-         *  per cell, so naive pointer-keying produces hundreds of duplicate
-         *  GPU LUTs (and breaks `TileQueue` batching by palette). Content-key
-         *  the deduplication so cells under identical lighting share one
-         *  texture and collapse into a single draw call.
-         *
-         *  Returns nullptr on failure.
+         *  Look up the palette LUT for `convert`. Decodes the converter's
+         *  16-bit RGB565 `Translator` into 8-bit RGB and uploads as a 256x1
+         *  RGBA8 texture. Cached on the pointer. Returns nullptr on failure.
          */
         PaletteLUT* Get_Or_Build(GraphicsDevice& device, const ConvertClass* convert);
 
+        /**
+         *  Look up the palette LUT for a raw `PaletteClass*` (no converter).
+         *  Used for the tile renderer's lookup of `IsoTilePalette`: the
+         *  un-tinted 256-entry art palette, tint + intensity applied in the
+         *  shader. `six_bit=false` for `IsoTilePalette` (its bytes are
+         *  pre-shifted by vanilla's `<<= 2` loop in `Init_Theater`).
+         */
+        PaletteLUT* Get_Or_Build(GraphicsDevice& device, const PaletteClass* palette,
+                                 bool six_bit = false);
+
         void Clear();
 
-        /**
-         *  Count of unique GPU palettes (post-dedup). The pointer-keyed
-         *  alias map can be much larger.
-         */
-        int Size() const { return (int)Owned.size(); }
-        int Alias_Count() const { return (int)ByConvert.size(); }
+        int Size() const { return (int)(ByConvert.size() + ByPalette.size()); }
 
     private:
         PaletteCache() = default;
 
-        std::vector<std::unique_ptr<PaletteLUT>>           Owned;
-        std::unordered_map<const ConvertClass*, PaletteLUT*> ByConvert;
-        std::unordered_map<uint64_t,             PaletteLUT*> ByContent;
+        std::unordered_map<const ConvertClass*, std::unique_ptr<PaletteLUT>> ByConvert;
+        std::unordered_map<const PaletteClass*, std::unique_ptr<PaletteLUT>> ByPalette;
     };
 
 

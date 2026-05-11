@@ -14,7 +14,6 @@
 #include "clipline.h"
 #include "debughandler.h"
 #include "graphics_device.h"
-#include "optionsext.h"
 #include "primitive_queue.h"
 #include "render_pass.h"
 #include "rgb.h"
@@ -47,7 +46,6 @@ namespace
     {
         if (target == GpuRenderTarget::None) return false;
         if (Vinifera::Gfx::Device == nullptr) return false;
-        if (OptionsExtension != nullptr && OptionsExtension->LegacyRenderer) return false;
         return PrimitiveQueue::Get().Is_Initialized();
     }
 
@@ -236,7 +234,6 @@ namespace
     {
         if (target == GpuRenderTarget::None) return false;
         if (Vinifera::Gfx::Device == nullptr) return false;
-        if (OptionsExtension != nullptr && OptionsExtension->LegacyRenderer) return false;
         if (!TacticalLineQueue::Get().Is_Initialized()) return false;
 
         float xscale = 1.0f;

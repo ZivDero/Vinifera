@@ -49,7 +49,6 @@ namespace Vinifera::Gfx
         int  ShpCacheSize     = 0;
         int  IsoTileCacheSize     = 0;
         int  PaletteCacheSize = 0;
-        int  PaletteCacheAliases = 0;  // pointer-keyed aliases sharing a unique palette
 
         /* Frame timing in milliseconds. */
         double LastFrameMs = 0.0;
@@ -98,7 +97,7 @@ namespace Vinifera::Gfx
         void Set_Shroud_Fog_Draws(int n) { Stats.ShroudFogDraws = n; }
 
         /* Cache snapshots — called by Begin_Frame; queues update separately. */
-        void Set_Cache_Sizes(int shp, int iso_tile, int pal, int pal_aliases);
+        void Set_Cache_Sizes(int shp, int iso_tile, int pal);
 
         const PerfStats& Get_Stats() const { return Stats; }
 

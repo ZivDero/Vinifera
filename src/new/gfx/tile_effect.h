@@ -24,6 +24,7 @@
 #include <d3d11.h>
 
 #include "effect.h"
+#include "texture2d.h"
 
 
 namespace Vinifera::Gfx
@@ -55,11 +56,19 @@ namespace Vinifera::Gfx
         void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);
 
         /**
+         *  Bind the tint mask (mirrors vanilla's `_default_mask`) to t4.
+         *  The texture is built once in `Initialize` from `DefaultTintMask`
+         *  and lives with this effect for its lifetime.
+         */
+        void Bind_Tint_Mask(GraphicsDevice& device);
+
+        /**
          *  Update per-batch effect parameters (atlas size).
          */
         void Set_Params(GraphicsDevice& device, const TileEffectParams& params);
 
     private:
         ID3D11Buffer* ParamsCB = nullptr;
+        Texture2D     TintMaskTex;
     };
 }

@@ -14,9 +14,10 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "iso_tile_atlas.h"
-#include "iso_tile_palette.h"
 #include "palette_lut.h"
 #include "perf_monitor.h"
+#include "shp_cache.h"
+#include "tibsun_globals.h"
 
 #include <algorithm>
 
@@ -101,18 +102,16 @@ namespace Vinifera::Gfx
 
         /**
          *  Stable-sort by OutputTarget only. Every tile uses the single
-         *  global `IsoTilePaletteRes` palette, so there's no secondary key —
-         *  one `Batch.Begin/End` per output-target bucket.
+         *  shared palette (looked up via `PaletteCache::Get_Or_Build`), so
+         *  there's no secondary key — one `Batch.Begin/End` per bucket.
          */
         std::stable_sort(pass_commands.begin(), pass_commands.end(),
             [](const TileDrawCmd& a, const TileDrawCmd& b) {
                 return (uint8_t)a.OutputTarget < (uint8_t)b.OutputTarget;
             });
 
-        IsoTilePaletteRes& tile_pal = IsoTilePaletteRes::Get();
-        PaletteLUT* shared_palette = tile_pal.Get_Palette_LUT();
-        ID3D11ShaderResourceView* tint_mask_srv = tile_pal.Get_Tint_Mask_SRV();
-        if (shared_palette == nullptr || tint_mask_srv == nullptr) {
+        PaletteLUT* shared_palette = PaletteCache::Get().Get_Or_Build(device, &IsoTilePalette, /*six_bit*/ false);
+        if (shared_palette == nullptr) {
             return;
         }
 
@@ -169,11 +168,10 @@ namespace Vinifera::Gfx
             device.Get_Context()->PSSetShaderResources(3, 1, &alpha_srv);
 
             /**
-             *  Tint mask at PS slot 4. 256x1 R8_UNORM mirror of vanilla's
-             *  `_default_mask` — picks whether a palette index gets RGB tint
-             *  (mask=255) or just intensity scaling (mask=0).
+             *  Tint mask at PS slot 4. Owned by `TileEffect`; built once from
+             *  vanilla's `DefaultTintMask` at effect init.
              */
-            device.Get_Context()->PSSetShaderResources(4, 1, &tint_mask_srv);
+            TileEffectInstance.Bind_Tint_Mask(device);
 
             for (size_t k = bucket_start; k < bucket_end; ++k) {
                 const TileDrawCmd& c = pass_commands[k];
