@@ -42,13 +42,22 @@ namespace Vinifera::Gfx
      */
     enum SpriteEffectFlag : uint32_t
     {
-        SEF_NONE          = 0,
-        SEF_USE_REMAP     = 1u << 0,
-        SEF_DARKEN        = 1u << 1,
-        SEF_TRANSLUCENT25 = 1u << 2,    // alpha 0.75
-        SEF_TRANSLUCENT50 = 1u << 3,    // alpha 0.50
-        SEF_TRANSLUCENT75 = 1u << 4,    // alpha 0.25
-        SEF_USE_ZSHAPE    = 1u << 5,
+        SEF_NONE             = 0,
+        SEF_USE_REMAP        = 1u << 0,
+        SEF_DARKEN           = 1u << 1,
+        SEF_TRANSLUCENT25    = 1u << 2,    // alpha 0.75
+        SEF_TRANSLUCENT50    = 1u << 3,    // alpha 0.50
+        SEF_TRANSLUCENT75    = 1u << 4,    // alpha 0.25
+        SEF_USE_ZSHAPE       = 1u << 5,
+        /**
+         *  Skip the alpha-buffer modulation. The shared `AlphaTex` is sized
+         *  to the scene (backbuffer) and contains tactical alpha-light /
+         *  shroud data; sampling it from non-Scene render targets (sidebar
+         *  cameos, future menu sprites) bleeds tactical lighting and shroud
+         *  through. Set this flag for any bucket whose `OutputTarget` is not
+         *  `Scene`.
+         */
+        SEF_NO_ALPHA_BUFFER  = 1u << 6,
     };
 
 

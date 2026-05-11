@@ -292,6 +292,15 @@ namespace Vinifera::Gfx
                 if (head.UseRemap) {
                     params.Flags |= SEF_USE_REMAP;
                 }
+                if (is_sidebar) {
+                    /**
+                     *  Sidebar (and any future non-Scene bucket) must not
+                     *  sample the scene-relative AlphaTex — its contents are
+                     *  tactical alpha-light + shroud at backbuffer coords and
+                     *  would leak through onto cameos / build-slot frames.
+                     */
+                    params.Flags |= SEF_NO_ALPHA_BUFFER;
+                }
                 if (head.ZAsset != nullptr) {
                     params.Flags |= SEF_USE_ZSHAPE;
                 }
