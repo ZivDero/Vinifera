@@ -47,30 +47,54 @@ namespace Vinifera::Gfx
             "    o.col = i.col;\n"
             "    return o;\n"
             "}\n"
-            "Texture2D<uint>   Atlas    : register(t0);\n"
-            "Texture2D<float4> Palette  : register(t1);\n"
-            "Texture2D<uint>   ZAtlas   : register(t2);\n"
-            "Texture2D<float>  AlphaTex : register(t3);\n"
+            "Texture2D<uint>   Atlas     : register(t0);\n"
+            "Texture2D<float4> Palette   : register(t1);\n"
+            "Texture2D<uint>   ZAtlas    : register(t2);\n"
+            "Texture2D<float>  AlphaTex  : register(t3);\n"
+            "Texture2D<float>  TintMaskT : register(t4);\n"
             "struct PSOut { float4 color : SV_Target; float depth : SV_Depth; };\n"
+            /**
+             *  Vanilla lighting model — replicated in float per pixel.
+             *
+             *  Per pixel, vanilla does:
+             *    row = AlphaLightingRemap[cell_color_q][alpha_byte] >> 8
+             *    out = drawer.Translator[row * 256 + idx]
+             *
+             *  Where drawer.Translator row N is built by `Apply_Tint`:
+             *    if TintMask[idx]: rgb = palette[idx].rgb * tint_rgb * (2N/62)
+             *    else:             rgb = palette[idx].rgb * clamp(N/max_level, 0, 1)
+             *  with max_level ≈ 8 (= 30*63/200 - 1).
+             *
+             *  Inputs from the vertex stream:
+             *    v.col.rgb = cell.RedTint/GreenTint/BlueTint   (already / 1000)
+             *    v.col.a   = cell.TileBrightness               (already / 1000)
+             */
             "PSOut PSMain(VSOut v) {\n"
             "    int2 px = int2(v.uv * AtlasSize);\n"
             "    uint idx = Atlas.Load(int3(px, 0));\n"
             "    if (idx == 0) discard;\n"
-            "    float4 c = Palette.Load(int3((int)idx, 0, 0));\n"
-            "    c.rgb *= v.col.rgb;\n"
-            "    /**\n"
-            "     * Alpha-buffer modulation. AlphaTex is R8_UNORM; vanilla\n"
-            "     * seeds it to 127/255 each frame and the AlphaShape system\n"
-            "     * writes lighter / darker values where lights / shroud apply.\n"
-            "     * 127 = neutral (=> *1), 254 ~= 2x overbright, 0 = full dark.\n"
-            "     */\n"
-            "    float alpha_byte = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0;\n"
-            "    c.rgb *= alpha_byte / 127.0;\n"
-            "    /* Tiles are opaque; alpha not used downstream, but write 1 to be safe. */\n"
-            "    c.a = 1.0;\n"
-            "    uint z = ZAtlas.Load(int3(px, 0));\n"
+            "\n"
+            "    float3 base    = Palette.Load(int3((int)idx, 0, 0)).rgb;\n"
+            "    float  is_tint = TintMaskT.Load(int3((int)idx, 0, 0));\n"
+            "    float3 tint_rgb   = v.col.rgb;\n"
+            "    float  cell_color = v.col.a * 1000.0;\n"
+            "\n"
+            "    /* AlphaLightingRemap quantisation. */\n"
+            "    float cc_q = clamp(floor((261.0 * cell_color) / 2048.0), 0.0, 254.0);\n"
+            "    float alpha_b = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0;\n"
+            "    const float kLevels = 62.0;\n"
+            "    float row = clamp(floor((alpha_b * cc_q * kLevels) / 32258.0), 0.0, kLevels);\n"
+            "\n"
+            "    /* Tinted path: linear 0..2.0 across the 62 levels. */\n"
+            "    float tint_intensity = row / 31.0;\n"
+            "    /* Untinted path: ramp 0..1 across the first ~8 levels, then plateau. */\n"
+            "    const float kMaxLevel = 8.0;\n"
+            "    float intensity = saturate(row / kMaxLevel);\n"
+            "\n"
+            "    float3 lit = base * lerp(intensity.xxx, tint_rgb * tint_intensity, is_tint);\n"
             "    PSOut o;\n"
-            "    o.color = c;\n"
+            "    o.color = float4(saturate(lit), 1.0);\n"
+            "    uint z = ZAtlas.Load(int3(px, 0));\n"
             "    o.depth = saturate(v.pos.z + (float)z * ZDataDepthScale);\n"
             "    return o;\n"
             "}\n";

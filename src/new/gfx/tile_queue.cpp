@@ -13,8 +13,10 @@
 
 #include "debughandler.h"
 #include "graphics_device.h"
-#include "perf_monitor.h"
 #include "iso_tile_atlas.h"
+#include "iso_tile_palette.h"
+#include "palette_lut.h"
+#include "perf_monitor.h"
 
 #include <algorithm>
 
@@ -57,7 +59,7 @@ namespace Vinifera::Gfx
 
     void TileQueue::Submit(const TileDrawCmd& cmd)
     {
-        if (!Initialized || cmd.Asset == nullptr || cmd.Palette == nullptr) {
+        if (!Initialized || cmd.Asset == nullptr) {
             return;
         }
         Commands.push_back(cmd);
@@ -98,19 +100,21 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Sort by (OutputTarget, Palette). Terrain is scene-only by
-         *  construction, so the outer bucketing degenerates to one bucket
-         *  (`Scene`) in practice — but threading it keeps the queue
-         *  consistent with `SpriteQueue` / `PrimitiveQueue` and would
-         *  correctly handle a hypothetical future tile target.
+         *  Stable-sort by OutputTarget only. Every tile uses the single
+         *  global `IsoTilePaletteRes` palette, so there's no secondary key —
+         *  one `Batch.Begin/End` per output-target bucket.
          */
-        std::sort(pass_commands.begin(), pass_commands.end(),
+        std::stable_sort(pass_commands.begin(), pass_commands.end(),
             [](const TileDrawCmd& a, const TileDrawCmd& b) {
-                if (a.OutputTarget != b.OutputTarget) {
-                    return (uint8_t)a.OutputTarget < (uint8_t)b.OutputTarget;
-                }
-                return a.Palette < b.Palette;
+                return (uint8_t)a.OutputTarget < (uint8_t)b.OutputTarget;
             });
+
+        IsoTilePaletteRes& tile_pal = IsoTilePaletteRes::Get();
+        PaletteLUT* shared_palette = tile_pal.Get_Palette_LUT();
+        ID3D11ShaderResourceView* tint_mask_srv = tile_pal.Get_Tint_Mask_SRV();
+        if (shared_palette == nullptr || tint_mask_srv == nullptr) {
+            return;
+        }
 
         Texture2D& shared_atlas = IsoTileAtlas::Get().Get_Texture();
 
@@ -149,58 +153,55 @@ namespace Vinifera::Gfx
                 ? EDepthStencil::None
                 : EDepthStencil::WriteLessEqual;
 
-            size_t i = bucket_start;
-            while (i < bucket_end) {
-                size_t j = i + 1;
-                while (j < bucket_end && pass_commands[j].Palette == pass_commands[i].Palette) {
-                    ++j;
+            Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
+                        &TileEffectInstance, target_w, target_h, depth_state);
+            TileEffectInstance.Bind_Palette(device, *shared_palette);
+            TileEffectInstance.Set_Params(device, params);
+            device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
+
+            /**
+             *  Alpha buffer at PS slot 3. Populated for the frame by
+             *  `SpriteQueue::Flush_Alpha_Lights`, sampled per-pixel by the
+             *  tile shader as the dynamic alpha-byte input to vanilla's
+             *  `AlphaLightingRemap` formula.
+             */
+            ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
+            device.Get_Context()->PSSetShaderResources(3, 1, &alpha_srv);
+
+            /**
+             *  Tint mask at PS slot 4. 256x1 R8_UNORM mirror of vanilla's
+             *  `_default_mask` — picks whether a palette index gets RGB tint
+             *  (mask=255) or just intensity scaling (mask=0).
+             */
+            device.Get_Context()->PSSetShaderResources(4, 1, &tint_mask_srv);
+
+            for (size_t k = bucket_start; k < bucket_end; ++k) {
+                const TileDrawCmd& c = pass_commands[k];
+                const IsoTileSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
+                if (st == nullptr) continue;
+
+                RectF src;
+                if (c.DrawExtra) {
+                    if (!st->HasExtraData || st->ExtraW <= 0 || st->ExtraH <= 0) continue;
+                    src = { (float)st->ExtraAtlasX, (float)st->ExtraAtlasY,
+                            (float)st->ExtraW,       (float)st->ExtraH };
+                } else {
+                    if (st->W <= 0 || st->H <= 0) continue;
+                    src = { (float)st->AtlasX, (float)st->AtlasY,
+                            (float)st->W,       (float)st->H };
                 }
-
-                const TileDrawCmd& head = pass_commands[i];
-
-                Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
-                            &TileEffectInstance, target_w, target_h, depth_state);
-                TileEffectInstance.Bind_Palette(device, *head.Palette);
-                TileEffectInstance.Set_Params(device, params);
-                device.Get_Context()->PSSetShaderResources(2, 1, &z_atlas_srv);
-
-                /**
-                 *  Alpha buffer at PS slot 3. Populated for the frame by
-                 *  `SpriteQueue::Flush_Alpha_Lights`, sampled per-pixel by the
-                 *  tile shader to modulate brightness for alpha lights.
-                 */
-                ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
-                device.Get_Context()->PSSetShaderResources(3, 1, &alpha_srv);
-
-                for (size_t k = i; k < j; ++k) {
-                    const TileDrawCmd& c = pass_commands[k];
-                    const IsoTileSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
-                    if (st == nullptr) continue;
-
-                    RectF src;
-                    if (c.DrawExtra) {
-                        if (!st->HasExtraData || st->ExtraW <= 0 || st->ExtraH <= 0) continue;
-                        src = { (float)st->ExtraAtlasX, (float)st->ExtraAtlasY,
-                                (float)st->ExtraW,       (float)st->ExtraH };
-                    } else {
-                        if (st->W <= 0 || st->H <= 0) continue;
-                        src = { (float)st->AtlasX, (float)st->AtlasY,
-                                (float)st->W,       (float)st->H };
-                    }
-                    Batch.Draw(&shared_atlas, c.Dst, &src, c.Tint, c.DstZTop, c.DstZBottom, nullptr,
-                               c.Clip.Is_Valid() ? &c.Clip : nullptr);
-                }
-
-                Batch.End(device);
-                PerfMonitor::Get().Note_Tile_Batch();
-                PerfMonitor::Get().Note_Tile_Draw_Call();
-                i = j;
+                Batch.Draw(&shared_atlas, c.Dst, &src, c.Tint, c.DstZTop, c.DstZBottom, nullptr,
+                           c.Clip.Is_Valid() ? &c.Clip : nullptr);
             }
+
+            Batch.End(device);
+            PerfMonitor::Get().Note_Tile_Batch();
+            PerfMonitor::Get().Note_Tile_Draw_Call();
 
             bucket_start = bucket_end;
         }
 
-        ID3D11ShaderResourceView* null_srvs[4] = {};
-        device.Get_Context()->PSSetShaderResources(0, 4, null_srvs);
+        ID3D11ShaderResourceView* null_srvs[5] = {};
+        device.Get_Context()->PSSetShaderResources(0, 5, null_srvs);
     }
 }

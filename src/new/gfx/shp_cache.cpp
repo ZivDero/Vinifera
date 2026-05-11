@@ -73,14 +73,31 @@ namespace Vinifera::Gfx
     }
 
 
+    namespace
+    {
+        /**
+         *  FNV-1a 64-bit hash for the 768-byte decoded RGB palette.
+         */
+        static uint64_t Hash_Palette_Bytes(const uint8_t* bytes, size_t len)
+        {
+            uint64_t h = 0xcbf29ce484222325ull;
+            for (size_t i = 0; i < len; ++i) {
+                h ^= (uint64_t)bytes[i];
+                h *= 0x100000001b3ull;
+            }
+            return h;
+        }
+    }
+
+
     PaletteLUT* PaletteCache::Get_Or_Build(GraphicsDevice& device, const ConvertClass* convert)
     {
         if (convert == nullptr) {
             return nullptr;
         }
-        auto it = Map.find(convert);
-        if (it != Map.end()) {
-            return it->second.get();
+        auto it = ByConvert.find(convert);
+        if (it != ByConvert.end()) {
+            return it->second;
         }
 
         /**
@@ -113,9 +130,22 @@ namespace Vinifera::Gfx
             }
         }
 
+        /**
+         *  Vanilla's `LightConvertClass` allocates one converter per cell, but
+         *  cells under identical lighting decode to byte-identical RGB. Hash
+         *  the decoded bytes so all such converters alias to one LUT — this
+         *  is what lets `TileQueue::Flush_Pass` collapse hundreds of palette
+         *  buckets to one draw call.
+         */
+        const uint64_t content_hash = Hash_Palette_Bytes(rgb_triples, sizeof(rgb_triples));
+        auto hit = ByContent.find(content_hash);
+        if (hit != ByContent.end()) {
+            ByConvert.emplace(convert, hit->second);
+            return hit->second;
+        }
+
         auto lut = std::make_unique<PaletteLUT>();
         if (!lut->Initialize(device)) {
-            Map.emplace(convert, nullptr);
             return nullptr;
         }
         /**
@@ -126,14 +156,18 @@ namespace Vinifera::Gfx
         lut->Update_Palette(rgb_triples, /*six_bit*/ false, 1000, 1000, 1000);
 
         PaletteLUT* raw = lut.get();
-        Map.emplace(convert, std::move(lut));
+        Owned.push_back(std::move(lut));
+        ByConvert.emplace(convert, raw);
+        ByContent.emplace(content_hash, raw);
         return raw;
     }
 
 
     void PaletteCache::Clear()
     {
-        Map.clear();
+        ByConvert.clear();
+        ByContent.clear();
+        Owned.clear();
     }
 
 

@@ -3,10 +3,13 @@
 /*******************************************************************************
  *  @brief  Per-frame terrain-tile queue + flush.
  *
- *          The Draw_Tile proxy submits a TileDrawCmd per cell tagged with
- *          the current vanilla Tactical::Render phase. Flush_Pass groups
- *          commands that share (asset, palette) and issues a SpriteBatch pass
- *          per group with depth-write enabled.
+ *          The `CellClassExt::_Draw_It` reimpl submits a TileDrawCmd per cell
+ *          tagged with the current vanilla Tactical::Render phase. Every tile
+ *          draws against the single global `IsoTilePaletteRes` palette + tint
+ *          mask, so Flush_Pass issues exactly one SpriteBatch pass per output
+ *          target with depth-write enabled. Per-cell lighting (RedTint /
+ *          GreenTint / BlueTint / TileBrightness) rides in the vertex color
+ *          attribute and is unfolded by the tile shader.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -18,7 +21,6 @@
 #include <vector>
 
 #include "gpu_surface_target.h"
-#include "palette_lut.h"
 #include "render_pass.h"
 #include "sprite_batch.h"
 #include "tile_effect.h"
@@ -33,14 +35,21 @@ namespace Vinifera::Gfx
     struct TileDrawCmd
     {
         IsoTileAsset*    Asset;
-        PaletteLUT*  Palette;
         int          SubTileIndex;
         RectF        Dst;             // backbuffer-pixel space
         RectF        Clip;            // backbuffer-pixel scissor rect; invalid = full target
         float        DstZTop;          // depth value [0,1]; 0 = near plane
         float        DstZBottom;
         RenderPass   Pass;
-        float        Tint[4];         // per-cell brightness modulate (1.0 = neutral, 2.0 = max overbright)
+        /**
+         *  Per-cell lighting, sampled by the tile shader:
+         *    Tint[0] = cell.RedTint    / 1000.0   (0..2, 1.0 = neutral)
+         *    Tint[1] = cell.GreenTint  / 1000.0
+         *    Tint[2] = cell.BlueTint   / 1000.0
+         *    Tint[3] = cell.TileBrightness / 1000.0  (treated by shader as
+         *              cell_color * 1000 for the AlphaLightingRemap formula)
+         */
+        float        Tint[4];
         bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
         GpuRenderTarget OutputTarget = GpuRenderTarget::Scene;
     };

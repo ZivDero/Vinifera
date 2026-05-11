@@ -17,8 +17,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 
 class ShapeSet;
@@ -64,17 +66,33 @@ namespace Vinifera::Gfx
          *  Look up the palette LUT for `convert`. If not yet cached, decode
          *  the converter's `Translator` field (vanilla's 16-bit RGB565 LUT)
          *  back into 8-bit RGB triples and upload as a 256x1 RGBA8 texture.
+         *
+         *  Two `ConvertClass*` instances whose decoded RGB bytes are identical
+         *  share one `PaletteLUT` — vanilla creates one `LightConvertClass`
+         *  per cell, so naive pointer-keying produces hundreds of duplicate
+         *  GPU LUTs (and breaks `TileQueue` batching by palette). Content-key
+         *  the deduplication so cells under identical lighting share one
+         *  texture and collapse into a single draw call.
+         *
          *  Returns nullptr on failure.
          */
         PaletteLUT* Get_Or_Build(GraphicsDevice& device, const ConvertClass* convert);
 
         void Clear();
 
-        int Size() const { return (int)Map.size(); }
+        /**
+         *  Count of unique GPU palettes (post-dedup). The pointer-keyed
+         *  alias map can be much larger.
+         */
+        int Size() const { return (int)Owned.size(); }
+        int Alias_Count() const { return (int)ByConvert.size(); }
 
     private:
         PaletteCache() = default;
-        std::unordered_map<const ConvertClass*, std::unique_ptr<PaletteLUT>> Map;
+
+        std::vector<std::unique_ptr<PaletteLUT>>           Owned;
+        std::unordered_map<const ConvertClass*, PaletteLUT*> ByConvert;
+        std::unordered_map<uint64_t,             PaletteLUT*> ByContent;
     };
 
 

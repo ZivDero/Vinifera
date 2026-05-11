@@ -1,15 +1,16 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Stage 3: per-callsite interception of vanilla
- *          IsometricTileTypeClass::Draw_Tile.
+ *  @brief  Replaces `CellClass::Draw_It` with a GPU-friendly variant that
+ *          submits one `TileDrawCmd` per cell against the single global
+ *          `IsoTilePaletteRes` palette + tint mask. Per-cell lighting
+ *          (RedTint / GreenTint / BlueTint / TileBrightness) rides in the
+ *          vertex color attribute and is unfolded by the tile shader.
  *
- *          Each Patch_Call entry rewrites a single CALL 0x004F6630 inside the
- *          original TS binary so it lands in our `IsoTileTypeClassExt::_Draw_Tile`
- *          instead. The proxy decides per-call whether to fall through to
- *          vanilla CPU rendering (LegacyRenderer flag set, or surface is not
- *          CompositeSurface) or to translate the call into a TileDrawCmd
- *          and Submit() it to the per-frame queue.
+ *          Stops intercepting `IsometricTileTypeClass::Draw_Tile` — vanilla's
+ *          CPU rasterizer is now unreachable from the GPU path. The
+ *          `Draw_Clear_Tile` proxy is also dropped; per-cell z-buffer
+ *          pre-clear is redundant against the GPU depth-target frame clear.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -19,22 +20,22 @@
 
 #include "draw_tileext_hooks.h"
 
-#include "brightness.h"
+#include "cell.h"
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "hooker.h"
-#include "isotiletype.h"
-#include "lightconvert.h"
 #include "mouse.h"
+#include "iso_tile_asset.h"
+#include "iso_tile_palette.h"
+#include "isotiletype.h"
 #include "optionsext.h"
-#include "palette_lut.h"
 #include "render_pass.h"
 #include "shp_cache.h"
+#include "smudgetype.h"
 #include "surface.h"
 #include "syringe.h"
 #include "tibsun_globals.h"
 #include "tile_queue.h"
-#include "iso_tile_asset.h"
 #include "vinifera_globals.h"
 
 
@@ -42,17 +43,16 @@ using namespace Vinifera::Gfx;
 
 
 /**
- *  Function-pointer to the vanilla IsometricTileTypeClass::Draw_Tile (its
- *  entry at 0x004F6630 stays unpatched — we only rewrite individual CALL
- *  instructions, not the function entry, so calling through this thunk
- *  reaches vanilla without infinite recursion).
+ *  Function-pointer to vanilla `IsometricTileTypeClass::Draw_Tile`. Used only
+ *  for the `LegacyRenderer` / device-not-ready fall-through inside our
+ *  `Draw_It` reimpl; the function entry stays unpatched.
  */
 typedef void (__thiscall *VanillaDrawTileFn)(IsometricTileTypeClass*,
     LightConvertClass*, int, Surface&, int, int, Rect, int, int,
     bool, int, bool, bool, bool, signed int);
-
 static const VanillaDrawTileFn Vanilla_Draw_Tile =
     reinterpret_cast<VanillaDrawTileFn>(0x004F6630);
+
 
 static float Tile_Base_Depth_From_Visual_Y(int y_off, int cell_level, int tile_height)
 {
@@ -95,113 +95,27 @@ static IsometricTileTypeClass* Resolve_Tile_Variation(IsometricTileTypeClass* is
 
 
 /**
- *  Fake extension class so we can declare a member function with __thiscall
- *  semantics. Patch_Call extracts the code-pointer half of the member-pointer.
- *
- *  @note: must not contain ctor/dtor/virtuals.
+ *  Submit a tile cell's terrain icon to the GPU queue. Reads tint/brightness
+ *  directly off `cell` (matching what vanilla's `Init_Drawer` writes back into
+ *  CellClass), packs them into the 4-float vertex color attribute, and lets
+ *  the tile shader unfold the AlphaLightingRemap math at pixel time.
  */
-class IsoTileTypeClassExt : public IsometricTileTypeClass
+static void Submit_Tile_GPU(const CellClass* cell, IsometricTileTypeClass* ittype,
+                            int subtile, int x_off, int y_off,
+                            Rect const& cliprect, int cell_level, int cell_variation)
 {
-public:
-    void _Draw_Tile(
-        LightConvertClass* drawer,
-        int tile_num,
-        Surface& surface,
-        int x_off, int y_off,
-        Rect cliprect,
-        int cell_level,
-        int cell_color,
-        bool use_z,
-        int cell_variation,
-        bool solid_mask,
-        bool z_clear_only,
-        bool fog_mask,
-        signed int grey_shift);
-};
-
-
-void IsoTileTypeClassExt::_Draw_Tile(
-    LightConvertClass* drawer,
-    int tile_num,
-    Surface& surface,
-    int x_off, int y_off,
-    Rect cliprect,
-    int cell_level,
-    int cell_color,
-    bool use_z,
-    int cell_variation,
-    bool solid_mask,
-    bool z_clear_only,
-    bool fog_mask,
-    signed int grey_shift)
-{
-    /**
-     *  Fall-through cases:
-     *    - LegacyRenderer flag set
-     *    - GraphicsDevice not initialized
-     *    - bad inputs
-     *
-     *  We do NOT check the target surface: vanilla passes `LogicalSurface`,
-     *  which during the tile pass is set to `TileSurface` (not the
-     *  CompositeSurface the sprite proxy expects). Tile draws are inherently
-     *  world-related; intercepting all of them is correct.
-     */
-    const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
-    if (legacy
-        || Vinifera::Gfx::Device == nullptr
-        || drawer == nullptr)
-    {
-        Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
-                          cell_level, cell_color, use_z, cell_variation,
-                          solid_mask, z_clear_only, fog_mask, grey_shift);
-        return;
-    }
-
-    /**
-     *  Vanilla uses these booleans for non-standard tile blits:
-     *    solid_mask:   solid grey/masked footprint + z write
-     *    z_clear_only: z-buffer footprint clear only (CellClass::Draw_Clear_Tile)
-     *    fog_mask:     fog/shroud-style grey/checker mask
-     *
-     *  The normal terrain pass is all-false. For z_clear_only, there is no color draw
-     *  to preserve, and the DX11 depth buffer starts clear each frame, so the
-     *  correct Stage-3 behavior is to avoid submitting a visible tile. Keep
-     *  the visible special modes on vanilla until they have a GPU equivalent.
-     */
-    if (z_clear_only && !solid_mask && !fog_mask) {
-        (void)use_z;
-        (void)grey_shift;
-        return;
-    }
-    if (solid_mask || fog_mask) {
-        Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
-                          cell_level, cell_color, use_z, cell_variation,
-                          solid_mask, z_clear_only, fog_mask, grey_shift);
-        return;
-    }
-
-    /**
-     *  Resolve atlas + palette via process-wide caches. The IsoTileSet
-     *  pointer comes from this->Get_Tile_Data(); LightConvertClass is itself
-     *  a ConvertClass subclass so PaletteCache is keyed on its address.
-     */
     GraphicsDevice& device = *Vinifera::Gfx::Device;
-    IsometricTileTypeClass* draw_type = Resolve_Tile_Variation(this, cell_variation);
+    IsometricTileTypeClass* draw_type = Resolve_Tile_Variation(ittype, cell_variation);
+    if (draw_type == nullptr) {
+        return;
+    }
     const void* iso_tileset = static_cast<const void*>(draw_type->Get_Tile_Data());
     IsoTileAsset* asset = IsoTileCache::Get().Get_Or_Load(device, iso_tileset);
-    PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(device, drawer);
-    if (asset == nullptr || palette == nullptr) {
-        Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
-                          cell_level, cell_color, use_z, cell_variation,
-                          solid_mask, z_clear_only, fog_mask, grey_shift);
+    if (asset == nullptr) {
         return;
     }
 
-    /**
-     *  Wrap the sub-tile index with the count, mirroring vanilla's behavior
-     *  (Fetch_Record_Pointer applies index % Tile_Count()).
-     */
-    int sub_index = tile_num;
+    int sub_index = subtile;
     if (sub_index < 0) {
         sub_index = 0;
     } else if (asset->Sub_Tile_Count() > 0) {
@@ -212,46 +126,32 @@ void IsoTileTypeClassExt::_Draw_Tile(
         return;
     }
 
-    /**
-     *  Logical → backbuffer-pixel scale, same as the sprite proxy.
-     */
     const float xscale = (VideoWidth > 0) ? (float)device.Get_Backbuffer_Width()  / (float)VideoWidth  : 1.0f;
     const float yscale = (VideoHeight > 0) ? (float)device.Get_Backbuffer_Height() / (float)VideoHeight : 1.0f;
 
-    const Rect clipped_rect = Intersect(cliprect, surface.Get_Rect());
+    const Surface* surface = LogicalSurface;
+    const Rect surface_rect = (surface != nullptr) ? surface->Get_Rect() : Rect(0, 0, VideoWidth, VideoHeight);
+    const Rect clipped_rect = Intersect(cliprect, surface_rect);
     if (!clipped_rect.Is_Valid()) {
         return;
     }
 
     /**
-     *  Vanilla seeds one base Z value per tile from the visually-raised
-     *  y_off, then subtracts another half-cell-height per cell_level. Since
-     *  CellClass::Draw_It already raised y_off by LEVEL_PIXEL_H_1 * level,
-     *  those terms cancel back to the unraised cell plane. Per-pixel terrain
-     *  shape comes from TMP ZData / ExtraZOffset, not from a whole-cell level
-     *  band or a synthetic vertex gradient.
+     *  Per-cell lighting. RedTint / GreenTint / BlueTint / TileBrightness are
+     *  vanilla's 0..2000-range values (1000 = neutral); the shader divides
+     *  `cell_color = v.col.a * 1000` to recover TileBrightness for the
+     *  AlphaLightingRemap formula.
      */
-    const float dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
+    const float tint_r      = (float)cell->RedTint        / 1000.0f;
+    const float tint_g      = (float)cell->GreenTint      / 1000.0f;
+    const float tint_b      = (float)cell->BlueTint       / 1000.0f;
+    const float brightness  = (float)cell->TileBrightness / 1000.0f;
 
-    /**
-     *  Per-cell brightness modulate. Vanilla `cell_color` (mis-named — it's
-     *  the cell's TileBrightness) is in the 0..2000 range with 1000 = full
-     *  normal and 2000 = max overbright. Brightness_To_Tint converts that
-     *  to a [0, 2] linear RGB multiplier; the float vertex tint preserves
-     *  values above 1.0 through to the shader.
-     */
-    const float tint_rgb = Brightness_To_Tint(cell_color);
+    const float dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
 
     TileDrawCmd cmd = {};
     cmd.Asset        = asset;
-    cmd.Palette      = palette;
     cmd.SubTileIndex = sub_index;
-    /*
-     * Vanilla draws the base 48x24 diamond at the cell drawpoint. The TMP
-     * record X/Y fields describe where this sub-tile sits when composing the
-     * whole multi-cell TMP; applying them again here shifts occupied cells
-     * away from their map positions and opens gaps between sub-tiles.
-     */
     cmd.Dst.X        = (float)x_off * xscale;
     cmd.Dst.Y        = (float)y_off * yscale;
     cmd.Dst.W        = (float)st->W * xscale;
@@ -263,20 +163,20 @@ void IsoTileTypeClassExt::_Draw_Tile(
     cmd.DstZTop      = dz;
     cmd.DstZBottom   = dz;
     cmd.Pass         = Current_Render_Pass();
-    cmd.Tint[0]      = tint_rgb;
-    cmd.Tint[1]      = tint_rgb;
-    cmd.Tint[2]      = tint_rgb;
-    cmd.Tint[3]      = 1.0f;
+    cmd.Tint[0]      = tint_r;
+    cmd.Tint[1]      = tint_g;
+    cmd.Tint[2]      = tint_b;
+    cmd.Tint[3]      = brightness;
     cmd.DrawExtra    = false;
 
     TileQueue::Get().Submit(cmd);
 
     /**
      *  Cliffs / walls / ramp bodies live in the per-record extra rect.
-     *  vanilla blits this on top of the base diamond at offset
+     *  Vanilla blits this on top of the base diamond at offset
      *  (record->ExtraX, record->ExtraY) — typically negative Y for cliffs
-     *  that extend upward. Render as a separate quad with the same base Z;
-     *  ExtraZOffset supplies the per-pixel cliff/body depth.
+     *  that extend upward. Same lighting; same base Z; per-pixel cliff/body
+     *  depth comes from `ExtraZOffset`.
      */
     if (st->HasExtraData && st->ExtraW > 0 && st->ExtraH > 0) {
         TileDrawCmd extra_cmd = cmd;
@@ -285,22 +185,102 @@ void IsoTileTypeClassExt::_Draw_Tile(
         extra_cmd.Dst.W     = (float)st->ExtraW * xscale;
         extra_cmd.Dst.H     = (float)st->ExtraH * yscale;
         extra_cmd.DrawExtra = true;
-        /**
-         *  Cliffs draw on top of the base ground at the same cell — bias Z
-         *  slightly closer than the base so depth-test resolves correctly.
-         */
-        const float extra_dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
-        extra_cmd.DstZTop = extra_dz;
-        extra_cmd.DstZBottom = extra_dz;
-
         TileQueue::Get().Submit(extra_cmd);
     }
-
-    (void)use_z;
-    (void)grey_shift;
 }
 
 
+/**
+ *  Fake extension class for `Patch_Jump` on `CellClass::Draw_It` (entry @
+ *  0x004564D0). Vanilla signature: `void (Point2D const&, Rect const&, bool) const`.
+ *
+ *  @note: must not contain ctor/dtor/virtuals.
+ */
+class CellClassExt : public CellClass
+{
+public:
+    void _Draw_It(Point2D const& xdrawpoint, Rect const& cliprect, bool objects) const;
+};
+
+
+void CellClassExt::_Draw_It(Point2D const& xdrawpoint, Rect const& cliprect, bool objects) const
+{
+    /**
+     *  Vanilla's `Draw_It` only acts in the `!objects` branch — the "objects"
+     *  pass is owned by other code paths that walk the cell's occupiers.
+     */
+    if (objects) {
+        return;
+    }
+
+    /**
+     *  Vanilla init-on-first-use: cells with no drawer get a neutral one.
+     *  Const-cast matches vanilla's own `((CellClass*)this)->Init_Drawer(NULL)`.
+     */
+    if (Drawer == nullptr) {
+        const_cast<CellClassExt*>(this)->Init_Drawer(nullptr);
+    }
+
+    /**
+     *  Inlined `Fetch_Icon` (vanilla `cell.cpp:2286`) — picks the iso-tile
+     *  type, subtile, and variation icon for this cell.
+     */
+    IsometricTileTypeClass* ittype = nullptr;
+    int subtile = 0;
+    int icon = 0;
+    if (ITType != ISOTILE_NONE) {
+        ittype = IsoTileTypes[ITType];
+        subtile = SubTile;
+        if (ittype != nullptr && ittype->TilesInSequence > 1) {
+            /**
+             *  Vanilla checks `Is_Randomized(SubTile)` to choose between
+             *  bridge-damage-driven and `Clear_Icon`-driven variation. We
+             *  always use `Clear_Icon` here — `Is_Randomized` isn't exported
+             *  by TSpp and the bridge-damage path is a minor visual nuance
+             *  on a single set of tiles. TODO: wire it up.
+             */
+            icon = const_cast<CellClassExt*>(this)->Clear_Icon(ITType, ittype->TilesInSequence);
+        }
+    } else {
+        ittype = IsoTileTypes[ISOTILE_CLEAR];
+        if (ittype != nullptr && ittype->TilesInSequence > 1) {
+            icon = const_cast<CellClassExt*>(this)->Clear_Icon(ISOTILE_CLEAR, ittype->TilesInSequence);
+        }
+    }
+    if (ittype == nullptr) {
+        return;
+    }
+
+    Point2D drawpoint = xdrawpoint;
+    drawpoint.Y -= LEVEL_PIXEL_H_1 * Height;
+
+    if (ittype->Get_Tile_Data() != nullptr) {
+        Point2D p = drawpoint + Point2D(0, TacticalRect.Y);
+        const bool legacy = (OptionsExtension != nullptr) && OptionsExtension->LegacyRenderer;
+        if (legacy || Vinifera::Gfx::Device == nullptr) {
+            Vanilla_Draw_Tile(ittype, Drawer, subtile, *LogicalSurface, p.X, p.Y,
+                              cliprect, Height, TileBrightness,
+                              true, icon, false, false, false, 0);
+        } else {
+            Submit_Tile_GPU(this, ittype, subtile, p.X, p.Y, cliprect, Height, icon);
+        }
+    }
+
+    if (Smudge != SMUDGE_NONE) {
+        Point2D smudge_pt = drawpoint + Point2D(ISO_TILE_PIXEL_W / 2, TacticalRect.Y) - cliprect.TopLeft;
+        Rect smudge_clip = cliprect;
+        SmudgeTypes[Smudge]->Draw_It(smudge_pt, smudge_clip, SmudgeData,
+                                     LEVEL_LEPTON_H * Height,
+                                     const_cast<Cell&>(CellID));
+    }
+}
+
+
+/**
+ *  Force a full-map redraw on every frame. Was previously installed by the
+ *  CPU tile path; kept here since terrain redraws are still required for
+ *  smudge / shroud overlays under the GPU pipeline.
+ */
 DEFINE_HOOK(0x004B95C6, _GScrenClass_Render_Draw_Flags_Zero, 5)
 {
     Map.DrawFlags = GS_REDRAW_ALL;
@@ -309,14 +289,12 @@ DEFINE_HOOK(0x004B95C6, _GScrenClass_Render_Draw_Flags_Zero, 5)
 
 
 /**
- *  Hook installer. Patch_Call rewrites each CALL 0x004F6630 instruction in
- *  the original binary to land in our proxy. Addresses come from IDA's xrefs
- *  to Draw_Tile.
+ *  Hook installer. Replaces `CellClass::Draw_It`'s function entry with our
+ *  reimpl — no per-callsite `Patch_Call` plumbing, no `Draw_Clear_Tile`
+ *  proxy (z-buffer is cleared per-frame on the GPU side).
  */
 void DrawTile_Hooks()
 {
-    Patch_Call(0x0045635E, &IsoTileTypeClassExt::_Draw_Tile);  // CellClass::Draw_Clear_Tile
-    Patch_Call(0x0045661A, &IsoTileTypeClassExt::_Draw_Tile);  // CellClass::Draw_It
-
-    DEBUG_INFO("DrawTile_Hooks: installed 2 Draw_Tile callsite intercepts.\n");
+    Patch_Jump(0x004564D0, &CellClassExt::_Draw_It);
+    DEBUG_INFO("DrawTile_Hooks: installed CellClass::Draw_It replacement.\n");
 }

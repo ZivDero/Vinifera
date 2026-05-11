@@ -194,7 +194,8 @@ namespace Vinifera::Gfx::Gfx_Debug
                 ImGui::TextUnformatted("Caches:");
                 ImGui::Text("  ShpCache    : %d entries", Stats.ShpCacheSize);
                 ImGui::Text("  IsoTileCache    : %d entries", Stats.IsoTileCacheSize);
-                ImGui::Text("  PaletteCache: %d entries", Stats.PaletteCacheSize);
+                ImGui::Text("  PaletteCache: %d unique (%d aliases)",
+                    Stats.PaletteCacheSize, Stats.PaletteCacheAliases);
 
                 ImGui::Separator();
                 ImGui::TextUnformatted("IsoTileAtlas:");
