@@ -92,8 +92,8 @@ bool TacticalExt::FilterSelection = false;
 
 void TacticalExt::_Render_Objects_Near_Shroud(bool full_redraw, int xoffset, int yoffset, const Rect& bounds)
 {
-    Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::ObjectsNearShroud);
-    Render_Objects_Near_Shroud(full_redraw, xoffset, yoffset, bounds);
+    //Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::ObjectsNearShroud);
+    //Render_Objects_Near_Shroud(full_redraw, xoffset, yoffset, bounds);
 }
 
 
