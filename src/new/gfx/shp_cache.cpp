@@ -17,8 +17,8 @@
 #include "palette_lut.h"
 #include "shapeset.h"
 #include "shp_asset.h"
-#include "tmp_asset.h"
-#include "tmp_atlas.h"
+#include "iso_tile_asset.h"
+#include "iso_tile_atlas.h"
 
 #include <cstdio>
 #include <cstring>
@@ -137,14 +137,14 @@ namespace Vinifera::Gfx
     }
 
 
-    TmpCache& TmpCache::Get()
+    IsoTileCache& IsoTileCache::Get()
     {
-        static TmpCache instance;
+        static IsoTileCache instance;
         return instance;
     }
 
 
-    TmpAsset* TmpCache::Get_Or_Load(GraphicsDevice& device, const void* iso_tileset)
+    IsoTileAsset* IsoTileCache::Get_Or_Load(GraphicsDevice& device, const void* iso_tileset)
     {
         if (iso_tileset == nullptr) {
             return nullptr;
@@ -154,23 +154,23 @@ namespace Vinifera::Gfx
             return it->second.get();
         }
 
-        auto asset = std::make_unique<TmpAsset>();
+        auto asset = std::make_unique<IsoTileAsset>();
         char dbg[64];
         std::snprintf(dbg, sizeof(dbg), "IsoTileSet@%p", iso_tileset);
         if (!asset->Load_From_Memory(device, iso_tileset, dbg)) {
             Map.emplace(iso_tileset, nullptr);
             return nullptr;
         }
-        TmpAsset* raw = asset.get();
+        IsoTileAsset* raw = asset.get();
         Map.emplace(iso_tileset, std::move(asset));
         return raw;
     }
 
 
-    void TmpCache::Clear()
+    void IsoTileCache::Clear()
     {
         Map.clear();
         /* Reset shelf-pack cursor too — re-loaded assets will repopulate. */
-        TmpAtlas::Get().Reset();
+        IsoTileAtlas::Get().Reset();
     }
 }

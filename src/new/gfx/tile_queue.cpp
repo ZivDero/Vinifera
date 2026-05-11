@@ -14,7 +14,7 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
-#include "tmp_atlas.h"
+#include "iso_tile_atlas.h"
 
 #include <algorithm>
 
@@ -112,13 +112,13 @@ namespace Vinifera::Gfx
                 return a.Palette < b.Palette;
             });
 
-        Texture2D& shared_atlas = TmpAtlas::Get().Get_Texture();
+        Texture2D& shared_atlas = IsoTileAtlas::Get().Get_Texture();
 
         TileEffectParams params = {};
         params.AtlasSize[0] = (float)shared_atlas.Width();
         params.AtlasSize[1] = (float)shared_atlas.Height();
         params.ZDataDepthScale = 1.0f / 16000.0f;
-        ID3D11ShaderResourceView* z_atlas_srv = TmpAtlas::Get().Get_Z_Texture().Get_SRV();
+        ID3D11ShaderResourceView* z_atlas_srv = IsoTileAtlas::Get().Get_Z_Texture().Get_SRV();
 
         size_t bucket_start = 0;
         while (bucket_start < pass_commands.size()) {
@@ -174,7 +174,7 @@ namespace Vinifera::Gfx
 
                 for (size_t k = i; k < j; ++k) {
                     const TileDrawCmd& c = pass_commands[k];
-                    const TmpSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
+                    const IsoTileSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
                     if (st == nullptr) continue;
 
                     RectF src;

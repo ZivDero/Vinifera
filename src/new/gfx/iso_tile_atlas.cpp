@@ -1,7 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Shared mega-atlas for all TMP tilesets.
+ *  @brief  Shared mega-atlas for all isometric tilesets.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -9,7 +9,7 @@
 
 #include "always.h"
 
-#include "tmp_atlas.h"
+#include "iso_tile_atlas.h"
 
 #include "debughandler.h"
 #include "graphics_device.h"
@@ -20,37 +20,37 @@ namespace Vinifera::Gfx
     namespace { constexpr int kPad = 1; }
 
 
-    TmpAtlas& TmpAtlas::Get()
+    IsoTileAtlas& IsoTileAtlas::Get()
     {
-        static TmpAtlas instance;
+        static IsoTileAtlas instance;
         return instance;
     }
 
 
-    bool TmpAtlas::Initialize(GraphicsDevice& device, int width, int height)
+    bool IsoTileAtlas::Initialize(GraphicsDevice& device, int width, int height)
     {
         if (Is_Initialized()) {
             return true;
         }
         if (!Atlas.Initialize(device, width, height, DXGI_FORMAT_R8_UINT,
                               D3D11_USAGE_DEFAULT, nullptr, 0)) {
-            DEBUG_ERROR("TmpAtlas: failed to create %dx%d atlas.\n", width, height);
+            DEBUG_ERROR("IsoTileAtlas: failed to create %dx%d atlas.\n", width, height);
             Shutdown();
             return false;
         }
         if (!ZAtlas.Initialize(device, width, height, DXGI_FORMAT_R8_UINT,
                                D3D11_USAGE_DEFAULT, nullptr, 0)) {
-            DEBUG_ERROR("TmpAtlas: failed to create %dx%d Z atlas.\n", width, height);
+            DEBUG_ERROR("IsoTileAtlas: failed to create %dx%d Z atlas.\n", width, height);
             Shutdown();
             return false;
         }
         Reset();
-        DEBUG_INFO("TmpAtlas: %dx%d color+Z atlas ready.\n", width, height);
+        DEBUG_INFO("IsoTileAtlas: %dx%d color+Z atlas ready.\n", width, height);
         return true;
     }
 
 
-    void TmpAtlas::Shutdown()
+    void IsoTileAtlas::Shutdown()
     {
         ZAtlas.Shutdown();
         Atlas.Shutdown();
@@ -58,7 +58,7 @@ namespace Vinifera::Gfx
     }
 
 
-    void TmpAtlas::Reset()
+    void IsoTileAtlas::Reset()
     {
         CursorX = 0;
         CursorY = 0;
@@ -66,7 +66,7 @@ namespace Vinifera::Gfx
     }
 
 
-    bool TmpAtlas::Allocate_Region(int w, int h, int& out_x, int& out_y)
+    bool IsoTileAtlas::Allocate_Region(int w, int h, int& out_x, int& out_y)
     {
         if (w <= 0 || h <= 0 || !Is_Initialized()) {
             return false;
@@ -80,7 +80,7 @@ namespace Vinifera::Gfx
             RowH = 0;
         }
         if (CursorY + h > ah) {
-            DEBUG_ERROR("TmpAtlas: out of space (need %dx%d, cursor at %d,%d, atlas %dx%d).\n",
+            DEBUG_ERROR("IsoTileAtlas: out of space (need %dx%d, cursor at %d,%d, atlas %dx%d).\n",
                 w, h, CursorX, CursorY, aw, ah);
             return false;
         }
@@ -93,21 +93,21 @@ namespace Vinifera::Gfx
     }
 
 
-    bool TmpAtlas::Upload_Region(int x, int y, int w, int h,
+    bool IsoTileAtlas::Upload_Region(int x, int y, int w, int h,
                                  const uint8_t* pixels, int pitch_bytes)
     {
         return Atlas.Set_Sub_Data(x, y, w, h, pixels, pitch_bytes);
     }
 
 
-    bool TmpAtlas::Upload_Z_Region(int x, int y, int w, int h,
+    bool IsoTileAtlas::Upload_Z_Region(int x, int y, int w, int h,
                                    const uint8_t* pixels, int pitch_bytes)
     {
         return ZAtlas.Set_Sub_Data(x, y, w, h, pixels, pitch_bytes);
     }
 
 
-    long long TmpAtlas::Used_Pixels() const
+    long long IsoTileAtlas::Used_Pixels() const
     {
         if (!Is_Initialized()) return 0;
         /**
@@ -120,7 +120,7 @@ namespace Vinifera::Gfx
     }
 
 
-    long long TmpAtlas::Total_Pixels() const
+    long long IsoTileAtlas::Total_Pixels() const
     {
         if (!Is_Initialized()) return 0;
         return (long long)Atlas.Width() * (long long)Atlas.Height();

@@ -1,9 +1,9 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Shared mega-atlas for all TMP tilesets.
+ *  @brief  Shared mega-atlas for all isometric tilesets.
  *
- *          Every TmpAsset allocates regions inside this single R8_UINT
+ *          Every IsoTileAsset allocates regions inside this single R8_UINT
  *          texture pair instead of owning its own atlas. Result: all tile
  *          draws can share one color SRV and one Z SRV, so TileQueue::Flush
  *          groups by palette only — the per-(asset,palette) fragmentation
@@ -25,10 +25,10 @@ namespace Vinifera::Gfx
     class GraphicsDevice;
 
 
-    class TmpAtlas
+    class IsoTileAtlas
     {
     public:
-        static TmpAtlas& Get();
+        static IsoTileAtlas& Get();
 
         bool Initialize(GraphicsDevice& device, int width = 8192, int height = 8192);
         void Shutdown();
@@ -36,8 +36,8 @@ namespace Vinifera::Gfx
         /**
          *  Drop all allocations and start packing from (0, 0) again. The
          *  underlying GPU texture stays alive — its contents are stale but
-         *  will be overwritten as TmpAssets re-upload. Called from
-         *  TmpCache::Clear() on video-mode reset.
+         *  will be overwritten as IsoTileAssets re-upload. Called from
+         *  IsoTileCache::Clear() on video-mode reset.
          */
         void Reset();
 
@@ -72,7 +72,7 @@ namespace Vinifera::Gfx
         long long Total_Pixels() const;
 
     private:
-        TmpAtlas() = default;
+        IsoTileAtlas() = default;
 
         Texture2D Atlas;
         Texture2D ZAtlas;

@@ -1,9 +1,9 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  TMP-tileset loader producing a paletted GPU atlas.
+ *  @brief  Isometric-tileset loader producing a paletted GPU atlas.
  *
- *          Reads the in-memory `IsoTileSet` produced by vanilla's TMP loader,
+ *          Reads the in-memory `IsoTileSet` produced by vanilla's tileset loader,
  *          walks the per-sub-tile `IsoTileRecord` array, and packs every
  *          sub-tile's diamond pixel data into a shared R8_UINT color atlas,
  *          with matching per-pixel `ZData` in a parallel R8_UINT atlas for
@@ -26,10 +26,10 @@ namespace Vinifera::Gfx
     class Texture2D;
 
 
-    struct TmpSubTileInfo
+    struct IsoTileSubTileInfo
     {
-        int  X = 0;             // pixel origin within the full multi-cell TMP
-        int  Y = 0;             // pixel origin within the full multi-cell TMP
+        int  X = 0;             // pixel origin within the full multi-cell tile
+        int  Y = 0;             // pixel origin within the full multi-cell tile
         int  W = 0;             // diamond width (pixels)
         int  H = 0;             // diamond height (pixels)
         int  AtlasX = 0;        // global mega-atlas pixel offset
@@ -52,19 +52,19 @@ namespace Vinifera::Gfx
     };
 
 
-    class TmpAsset
+    class IsoTileAsset
     {
     public:
-        TmpAsset() = default;
-        ~TmpAsset() = default;
+        IsoTileAsset() = default;
+        ~IsoTileAsset() = default;
 
-        TmpAsset(const TmpAsset&) = delete;
-        TmpAsset& operator=(const TmpAsset&) = delete;
+        IsoTileAsset(const IsoTileAsset&) = delete;
+        IsoTileAsset& operator=(const IsoTileAsset&) = delete;
 
         /**
          *  Decompress every sub-tile from the in-memory IsoTileSet into the
-         *  shared `TmpAtlas` (allocates one region per sub-tile + extras).
-         *  All TmpAssets share the same atlas SRV — only sub-tile UV rects
+         *  shared `IsoTileAtlas` (allocates one region per sub-tile + extras).
+         *  All IsoTileAssets share the same atlas SRV — only sub-tile UV rects
          *  differ between assets.
          */
         bool Load_From_Memory(GraphicsDevice& device, const void* iso_tileset,
@@ -77,10 +77,10 @@ namespace Vinifera::Gfx
         int                       Sub_Tile_Count() const { return (int)SubTiles.size(); }
         int                       Tile_Pixel_Width() const { return TilePixelWidth; }
         int                       Tile_Pixel_Height() const { return TilePixelHeight; }
-        const TmpSubTileInfo*     Get_Sub_Tile(int index) const;
+        const IsoTileSubTileInfo*     Get_Sub_Tile(int index) const;
 
     private:
-        std::vector<TmpSubTileInfo> SubTiles;
+        std::vector<IsoTileSubTileInfo> SubTiles;
         int                         TilePixelWidth = 0;
         int                         TilePixelHeight = 0;
         std::string                 SourceName;

@@ -30,7 +30,7 @@
 #include "surface_target_registry.h"
 #include "tile_queue.h"
 #include "voxel_composite_queue.h"
-#include "tmp_atlas.h"
+#include "iso_tile_atlas.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -508,8 +508,8 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::FontQueue::Get().Shutdown();
     Vinifera::Gfx::TacticalLineQueue::Get().Shutdown();
     Vinifera::Gfx::VoxelCompositeQueue::Get().Shutdown();
-    Vinifera::Gfx::TmpCache::Get().Clear();
-    Vinifera::Gfx::TmpAtlas::Get().Shutdown();
+    Vinifera::Gfx::IsoTileCache::Get().Clear();
+    Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
     Vinifera::Gfx::PaletteCache::Get().Clear();
     Vinifera::Gfx::FontCache::Get().Clear();
@@ -891,7 +891,7 @@ bool SDL_Update_Screen(Surface* surface)
     Vinifera::Gfx::PerfMonitor::Get().Begin_Frame();
     Vinifera::Gfx::PerfMonitor::Get().Set_Cache_Sizes(
         Vinifera::Gfx::ShpCache::Get().Size(),
-        Vinifera::Gfx::TmpCache::Get().Size(),
+        Vinifera::Gfx::IsoTileCache::Get().Size(),
         Vinifera::Gfx::PaletteCache::Get().Size());
 
     Vinifera::Gfx::Device->Set_VSync(OptionsExtension->IsVSync);

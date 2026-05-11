@@ -17,7 +17,7 @@
 #include "render_target_2d.h"
 #include "sdl_functions.h"
 #include "tibsun_globals.h"
-#include "tmp_atlas.h"
+#include "iso_tile_atlas.h"
 #include "vinifera_globals.h"
 
 #include <algorithm>
@@ -193,12 +193,12 @@ namespace Vinifera::Gfx::Gfx_Debug
                 ImGui::Separator();
                 ImGui::TextUnformatted("Caches:");
                 ImGui::Text("  ShpCache    : %d entries", Stats.ShpCacheSize);
-                ImGui::Text("  TmpCache    : %d entries", Stats.TmpCacheSize);
+                ImGui::Text("  IsoTileCache    : %d entries", Stats.IsoTileCacheSize);
                 ImGui::Text("  PaletteCache: %d entries", Stats.PaletteCacheSize);
 
                 ImGui::Separator();
-                ImGui::TextUnformatted("TmpAtlas:");
-                const TmpAtlas& atlas = TmpAtlas::Get();
+                ImGui::TextUnformatted("IsoTileAtlas:");
+                const IsoTileAtlas& atlas = IsoTileAtlas::Get();
                 const long long used = atlas.Used_Pixels();
                 const long long total = atlas.Total_Pixels();
                 const double pct = total > 0 ? 100.0 * (double)used / (double)total : 0.0;

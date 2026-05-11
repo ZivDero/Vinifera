@@ -78,10 +78,10 @@ namespace Vinifera::Gfx
     }
 
 
-    void PerfMonitor::Set_Cache_Sizes(int shp, int tmp, int pal)
+    void PerfMonitor::Set_Cache_Sizes(int shp, int iso_tile, int pal)
     {
         Stats.ShpCacheSize = shp;
-        Stats.TmpCacheSize = tmp;
+        Stats.IsoTileCacheSize = iso_tile;
         Stats.PaletteCacheSize = pal;
     }
 

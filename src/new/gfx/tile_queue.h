@@ -22,7 +22,7 @@
 #include "render_pass.h"
 #include "sprite_batch.h"
 #include "tile_effect.h"
-#include "tmp_asset.h"
+#include "iso_tile_asset.h"
 
 
 namespace Vinifera::Gfx
@@ -32,7 +32,7 @@ namespace Vinifera::Gfx
 
     struct TileDrawCmd
     {
-        TmpAsset*    Asset;
+        IsoTileAsset*    Asset;
         PaletteLUT*  Palette;
         int          SubTileIndex;
         RectF        Dst;             // backbuffer-pixel space

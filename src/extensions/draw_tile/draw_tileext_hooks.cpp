@@ -34,7 +34,7 @@
 #include "syringe.h"
 #include "tibsun_globals.h"
 #include "tile_queue.h"
-#include "tmp_asset.h"
+#include "iso_tile_asset.h"
 #include "vinifera_globals.h"
 
 
@@ -188,7 +188,7 @@ void IsoTileTypeClassExt::_Draw_Tile(
     GraphicsDevice& device = *Vinifera::Gfx::Device;
     IsometricTileTypeClass* draw_type = Resolve_Tile_Variation(this, cell_variation);
     const void* iso_tileset = static_cast<const void*>(draw_type->Get_Tile_Data());
-    TmpAsset* asset = TmpCache::Get().Get_Or_Load(device, iso_tileset);
+    IsoTileAsset* asset = IsoTileCache::Get().Get_Or_Load(device, iso_tileset);
     PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(device, drawer);
     if (asset == nullptr || palette == nullptr) {
         Vanilla_Draw_Tile(this, drawer, tile_num, surface, x_off, y_off, cliprect,
@@ -207,7 +207,7 @@ void IsoTileTypeClassExt::_Draw_Tile(
     } else if (asset->Sub_Tile_Count() > 0) {
         sub_index %= asset->Sub_Tile_Count();
     }
-    const TmpSubTileInfo* st = asset->Get_Sub_Tile(sub_index);
+    const IsoTileSubTileInfo* st = asset->Get_Sub_Tile(sub_index);
     if (st == nullptr || st->W <= 0 || st->H <= 0) {
         return;
     }

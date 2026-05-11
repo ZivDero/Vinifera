@@ -1,7 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  TMP loader producing a paletted GPU atlas.
+ *  @brief  Isometric-tileset loader producing a paletted GPU atlas.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -9,11 +9,11 @@
 
 #include "always.h"
 
-#include "tmp_asset.h"
+#include "iso_tile_asset.h"
 
 #include "debughandler.h"
 #include "graphics_device.h"
-#include "tmp_atlas.h"
+#include "iso_tile_atlas.h"
 
 #include <algorithm>
 #include <cstring>
@@ -76,7 +76,7 @@ namespace Vinifera::Gfx
     }
 
 
-    const TmpSubTileInfo* TmpAsset::Get_Sub_Tile(int index) const
+    const IsoTileSubTileInfo* IsoTileAsset::Get_Sub_Tile(int index) const
     {
         if (index < 0 || index >= (int)SubTiles.size()) {
             return nullptr;
@@ -85,7 +85,7 @@ namespace Vinifera::Gfx
     }
 
 
-    bool TmpAsset::Load_From_Memory(GraphicsDevice& device, const void* iso_tileset,
+    bool IsoTileAsset::Load_From_Memory(GraphicsDevice& device, const void* iso_tileset,
                                     const char* debug_name)
     {
         Unload();
@@ -95,7 +95,7 @@ namespace Vinifera::Gfx
         if (debug_name == nullptr) debug_name = "<memory>";
         SourceName = debug_name;
 
-        TmpAtlas& atlas = TmpAtlas::Get();
+        IsoTileAtlas& atlas = IsoTileAtlas::Get();
         if (!atlas.Initialize(device)) {
             return false;
         }
@@ -103,7 +103,7 @@ namespace Vinifera::Gfx
         const IsoTileSet* set = static_cast<const IsoTileSet*>(iso_tileset);
         const int sub_count = set->MapWidth * set->MapHeight;
         if (sub_count <= 0 || sub_count > 8192) {
-            DEBUG_ERROR("TmpAsset: '%s' has bad sub-tile count %d.\n", debug_name, sub_count);
+            DEBUG_ERROR("IsoTileAsset: '%s' has bad sub-tile count %d.\n", debug_name, sub_count);
             return false;
         }
 
@@ -115,7 +115,7 @@ namespace Vinifera::Gfx
          *  The bounding box is 48×24 (NOT 48×23) — the empty 24th row is
          *  required for adjacent cells to stack without 1-pixel seams in
          *  multi-subtile tiles. TS terrain cells are 48×24; record->X/Y are
-         *  only for composing all sub-tiles into a full multi-cell TMP image.
+         *  only for composing all sub-tiles into a full multi-cell tile image.
          */
         constexpr int kDiamondW = 48;
         constexpr int kDiamondH = 24;
@@ -126,7 +126,7 @@ namespace Vinifera::Gfx
 
         for (int i = 0; i < sub_count; ++i) {
             const IsoTileRecord* record = set->Tiles[i];
-            TmpSubTileInfo& s = SubTiles[i];
+            IsoTileSubTileInfo& s = SubTiles[i];
 
             if (record == nullptr) {
                 continue;
@@ -172,7 +172,7 @@ namespace Vinifera::Gfx
             }
 
             if (!atlas.Allocate_Region(s.W, s.H, s.AtlasX, s.AtlasY)) {
-                DEBUG_ERROR("TmpAsset: '%s' atlas full at sub-tile %d.\n", debug_name, i);
+                DEBUG_ERROR("IsoTileAsset: '%s' atlas full at sub-tile %d.\n", debug_name, i);
                 s.W = s.H = 0;
                 continue;
             }
@@ -214,18 +214,18 @@ namespace Vinifera::Gfx
             s.HasExtraData = extra_uploaded;
         }
 
-        DEBUG_INFO("TmpAsset: '%s' loaded — %d sub-tiles into shared atlas.\n",
+        DEBUG_INFO("IsoTileAsset: '%s' loaded — %d sub-tiles into shared atlas.\n",
             debug_name, sub_count);
         return true;
     }
 
 
-    void TmpAsset::Unload()
+    void IsoTileAsset::Unload()
     {
         SubTiles.clear();
         TilePixelWidth = 0;
         TilePixelHeight = 0;
         SourceName.clear();
-        /* The shared atlas is not freed here — TmpCache::Clear handles it. */
+        /* The shared atlas is not freed here — IsoTileCache::Clear handles it. */
     }
 }

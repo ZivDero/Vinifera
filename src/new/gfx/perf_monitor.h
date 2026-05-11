@@ -47,7 +47,7 @@ namespace Vinifera::Gfx
 
         /* Cache size snapshot (refreshed each frame). */
         int  ShpCacheSize     = 0;
-        int  TmpCacheSize     = 0;
+        int  IsoTileCacheSize     = 0;
         int  PaletteCacheSize = 0;
 
         /* Frame timing in milliseconds. */
@@ -97,7 +97,7 @@ namespace Vinifera::Gfx
         void Set_Shroud_Fog_Draws(int n) { Stats.ShroudFogDraws = n; }
 
         /* Cache snapshots — called by Begin_Frame; queues update separately. */
-        void Set_Cache_Sizes(int shp, int tmp, int pal);
+        void Set_Cache_Sizes(int shp, int iso_tile, int pal);
 
         const PerfStats& Get_Stats() const { return Stats; }
 
