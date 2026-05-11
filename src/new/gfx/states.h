@@ -31,6 +31,11 @@ namespace Vinifera::Gfx
         DualSourceBlend,    // result = src0 + src1 * dest. Shader emits per-pixel
                             // (src0, src1); used by SpriteEffect to express both
                             // Premultiplied and SHAPE_DARKEN without a state switch.
+        MinSrcDest,         // result = min(src, dest). Idempotent darken: writing
+                            // the same src color multiple times to a pixel produces
+                            // the same result. Used by voxel shadow rendering so
+                            // overlapping shadow columns at cardinal facings don't
+                            // compound-darken into bands.
 
         Count
     };
@@ -56,6 +61,10 @@ namespace Vinifera::Gfx
         None,                   // depth & stencil off (default for 2D)
         WriteLessEqual,         // depth-test LessEqual + depth-write enabled (terrain tiles)
         TestLessEqual_NoWrite,  // depth-test LessEqual, depth-write disabled (sprites)
+        WriteLess,              // depth-test Less + depth-write enabled. Used by voxel
+                                // shadow rendering so multiple shadow voxels projecting to
+                                // the same pixel only land once — the first write sets the
+                                // depth, subsequent equal-depth writes are rejected.
 
         Count
     };

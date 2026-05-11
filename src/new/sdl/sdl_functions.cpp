@@ -29,7 +29,8 @@
 #include "sprite_queue.h"
 #include "surface_target_registry.h"
 #include "tile_queue.h"
-#include "voxel_composite_queue.h"
+#include "voxel_asset.h"
+#include "voxel_queue.h"
 #include "iso_tile_atlas.h"
 #include "palette_array.h"
 #include "shp_atlas.h"
@@ -493,7 +494,7 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     }
 
     /**
-     *  PaletteArray must come up before SpriteQueue / VoxelCompositeQueue
+     *  PaletteArray must come up before SpriteQueue / VoxelQueue
      *  because PaletteLUT::Update_Palette (called lazily on first cache hit)
      *  allocates layers in the array.
      */
@@ -525,8 +526,8 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera TacticalLineQueue could not be initialized.\n");
     }
 
-    if (!Vinifera::Gfx::VoxelCompositeQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
-        DEBUG_ERROR("Vinifera VoxelCompositeQueue could not be initialized.\n");
+    if (!Vinifera::Gfx::VoxelQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera VoxelQueue could not be initialized.\n");
     }
 
     return true;
@@ -551,7 +552,8 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::PrimitiveQueue::Get().Shutdown();
     Vinifera::Gfx::FontQueue::Get().Shutdown();
     Vinifera::Gfx::TacticalLineQueue::Get().Shutdown();
-    Vinifera::Gfx::VoxelCompositeQueue::Get().Shutdown();
+    Vinifera::Gfx::VoxelQueue::Get().Shutdown();
+    Vinifera::Gfx::VoxelAssetCache::Get().Shutdown();
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -1023,14 +1025,14 @@ bool SDL_Update_Screen(Surface* surface)
             const auto render_pass = (Vinifera::Gfx::RenderPass)pass;
             Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
-            Vinifera::Gfx::VoxelCompositeQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::VoxelQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
         }
         Vinifera::Gfx::TileQueue::Get().Clear();
         Vinifera::Gfx::SpriteQueue::Get().Clear();
-        Vinifera::Gfx::VoxelCompositeQueue::Get().Clear();
+        Vinifera::Gfx::VoxelQueue::Get().Clear();
         Vinifera::Gfx::PrimitiveQueue::Get().Clear();
         Vinifera::Gfx::TacticalLineQueue::Get().Clear();
         Vinifera::Gfx::FontQueue::Get().Clear();

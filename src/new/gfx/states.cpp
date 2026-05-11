@@ -111,6 +111,22 @@ namespace Vinifera::Gfx
             bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_SRC1_ALPHA;
             bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
             break;
+        case EBlend::MinSrcDest:
+            /**
+             *  output = min(src, dest). Idempotent darken — writing the same
+             *  src color multiple times to a pixel produces the same result.
+             *  Used by voxel shadow rendering: at cardinal facings multiple
+             *  shadow columns project to the same screen pixel, and we want
+             *  the pixel darkened ONCE not compounded.
+             */
+            bd.RenderTarget[0].BlendEnable    = TRUE;
+            bd.RenderTarget[0].SrcBlend       = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].DestBlend      = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].BlendOp        = D3D11_BLEND_OP_MIN;
+            bd.RenderTarget[0].SrcBlendAlpha  = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_MIN;
+            break;
         default:
             return nullptr;
         }
@@ -201,6 +217,17 @@ namespace Vinifera::Gfx
             dsd.DepthEnable = TRUE;
             dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
             dsd.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+            dsd.StencilEnable = FALSE;
+            break;
+        case EDepthStencil::WriteLess:
+            // Strict LESS comparison: equal-depth writes are rejected. Used for
+            // voxel shadow dedup — multiple shadow voxels at the same pixel
+            // share the same fixed depth value, so the first write wins and
+            // subsequent are skipped (preventing compound darken at cardinal
+            // facings).
+            dsd.DepthEnable = TRUE;
+            dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+            dsd.DepthFunc = D3D11_COMPARISON_LESS;
             dsd.StencilEnable = FALSE;
             break;
         default: return nullptr;
