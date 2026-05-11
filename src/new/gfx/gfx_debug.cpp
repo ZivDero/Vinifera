@@ -18,6 +18,7 @@
 #include "sdl_functions.h"
 #include "tibsun_globals.h"
 #include "iso_tile_atlas.h"
+#include "palette_array.h"
 #include "shp_atlas.h"
 #include "vinifera_globals.h"
 
@@ -240,6 +241,13 @@ namespace Vinifera::Gfx::Gfx_Debug
                     shp_atlas.Page_Width(), shp_atlas.Page_Height(),
                     (double)shp_total / (1024.0 * 1024.0));
                 ImGui::Text("  fill : %.2f%% (%lld / %lld px)", shp_pct, shp_used, shp_total);
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("PaletteArray:");
+                const PaletteArray& pal_arr = PaletteArray::Get();
+                ImGui::Text("  layers: %d / %d (%.1f KB)",
+                    pal_arr.Layer_Count(), pal_arr.Capacity(),
+                    (double)(pal_arr.Capacity() * 256 * 4) / 1024.0);
 
                 if (Vinifera::Gfx::Device != nullptr) {
                     ImGui::Separator();

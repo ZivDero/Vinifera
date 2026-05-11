@@ -45,6 +45,8 @@ namespace Vinifera::Gfx
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,       0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 28, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 2, DXGI_FORMAT_R32_UINT,           0, 44, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 3, DXGI_FORMAT_R32_UINT,           0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
     }
 
@@ -225,6 +227,15 @@ namespace Vinifera::Gfx
                            const float tint[4], float z_top, float z_bottom,
                            const RectF* z_uv, const RectF* clip)
     {
+        Draw(texture, dst, src, tint, z_top, z_bottom, z_uv, clip, /*layer*/ 0, /*flags*/ 0);
+    }
+
+
+    void SpriteBatch::Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                           const float tint[4], float z_top, float z_bottom,
+                           const RectF* z_uv, const RectF* clip,
+                           uint32_t layer, uint32_t flags)
+    {
         if (!BatchOpen || texture == nullptr || !dst.Is_Valid() || (clip != nullptr && !clip->Is_Valid())) {
             return;
         }
@@ -256,10 +267,10 @@ namespace Vinifera::Gfx
 
         const float t[4] = { tint[0], tint[1], tint[2], tint[3] };
 
-        s.V[0] = { { dst.X,         dst.Y,         z_top    }, { u0, v0 }, { zu0, zv0 }, { t[0], t[1], t[2], t[3] } };
-        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top    }, { u1, v0 }, { zu1, zv0 }, { t[0], t[1], t[2], t[3] } };
-        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, { zu1, zv1 }, { t[0], t[1], t[2], t[3] } };
-        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, { zu0, zv1 }, { t[0], t[1], t[2], t[3] } };
+        s.V[0] = { { dst.X,         dst.Y,         z_top    }, { u0, v0 }, { zu0, zv0 }, { t[0], t[1], t[2], t[3] }, layer, flags };
+        s.V[1] = { { dst.X + dst.W, dst.Y,         z_top    }, { u1, v0 }, { zu1, zv0 }, { t[0], t[1], t[2], t[3] }, layer, flags };
+        s.V[2] = { { dst.X + dst.W, dst.Y + dst.H, z_bottom }, { u1, v1 }, { zu1, zv1 }, { t[0], t[1], t[2], t[3] }, layer, flags };
+        s.V[3] = { { dst.X,         dst.Y + dst.H, z_bottom }, { u0, v1 }, { zu0, zv1 }, { t[0], t[1], t[2], t[3] }, layer, flags };
 
         Pending.push_back(s);
     }

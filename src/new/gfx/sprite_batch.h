@@ -40,6 +40,8 @@ namespace Vinifera::Gfx
         float    UV[2];
         float    ZUV[2];        // normalized UV into optional z-shape atlas
         float    Tint[4];       // RGBA float, 1.0 = neutral, >1.0 = overbright
+        uint32_t Layer;         // palette layer in the shared PaletteArray (0 = default)
+        uint32_t Flags;         // per-vertex effect flags (SEF_DARKEN, SEF_USE_ZSHAPE, ...)
     };
 
 
@@ -114,6 +116,11 @@ namespace Vinifera::Gfx
          *  by the brightness pipeline (vanilla 0..2000 brightness → 0..2.0
          *  RGB multiplier) so overbright values can pass through the vertex
          *  shader before the RT format saturates.
+         *
+         *  `layer` is the palette index in the shared `PaletteArray`; effects
+         *  that don't sample the palette ignore it. `flags` is a bitmask of
+         *  `SpriteEffectFlag` values applied per-pixel by the SpriteEffect
+         *  shader (SEF_DARKEN, SEF_USE_ZSHAPE).
          */
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                   const float tint[4], float z_top, float z_bottom);
@@ -122,6 +129,10 @@ namespace Vinifera::Gfx
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
                   const float tint[4], float z_top, float z_bottom,
                   const RectF* z_uv, const RectF* clip);
+        void Draw(Texture2D* texture, const RectF& dst, const RectF* src,
+                  const float tint[4], float z_top, float z_bottom,
+                  const RectF* z_uv, const RectF* clip,
+                  uint32_t layer, uint32_t flags);
 
         /**
          *  Convenience: draw at (x, y) with the texture's natural size.

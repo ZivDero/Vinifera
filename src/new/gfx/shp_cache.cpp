@@ -15,6 +15,7 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "palette.h"
+#include "palette_array.h"
 #include "palette_lut.h"
 #include "shapeset.h"
 #include "shp_asset.h"
@@ -166,6 +167,12 @@ namespace Vinifera::Gfx
     {
         ByConvert.clear();
         ByPalette.clear();
+        /**
+         *  Drop all layers in the shared PaletteArray too — every layer was
+         *  owned by one of the PaletteLUT instances we just released, and
+         *  re-loaded palettes will allocate fresh layers.
+         */
+        PaletteArray::Get().Reset();
     }
 
 

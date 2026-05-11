@@ -96,6 +96,21 @@ namespace Vinifera::Gfx
             bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
             bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
             break;
+        case EBlend::DualSourceBlend:
+            /**
+             *  result = src0 + src1 * dest. Shader emits src0 in SV_Target0
+             *  and src1 in SV_Target1, and chooses the values per-pixel so a
+             *  single batch can mix what would otherwise be Premultiplied
+             *  and DestMultiplyHalf state. See sprite_effect.cpp.
+             */
+            bd.RenderTarget[0].BlendEnable    = TRUE;
+            bd.RenderTarget[0].SrcBlend       = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].DestBlend      = D3D11_BLEND_SRC1_COLOR;
+            bd.RenderTarget[0].BlendOp        = D3D11_BLEND_OP_ADD;
+            bd.RenderTarget[0].SrcBlendAlpha  = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_SRC1_ALPHA;
+            bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
+            break;
         default:
             return nullptr;
         }

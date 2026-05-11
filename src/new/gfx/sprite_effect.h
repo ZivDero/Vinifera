@@ -10,12 +10,17 @@
  *
  *          Bind layout:
  *            t0 — paletted atlas (R8_UINT)
- *            t1 — palette LUT (RGBA8, 256x1)
- *            t3 — z-shape atlas (R8_UINT, optional)
+ *            t1 — palette array (Texture2DArray, RGBA8, 256x1xN), shared
+ *            t3 — z-shape atlas (R8_UINT)
  *            t4 — alpha buffer (R8_UNORM)
- *            s0 — point-clamp sampler (atlas is loaded, not sampled, but UVs use s0 for the LUTs)
+ *            s0 — point-clamp sampler (atlas is loaded, not sampled)
  *            b0 — SpriteBatch ProjMtx
  *            b1 — palette-effect parameters (SpriteEffectParams)
+ *
+ *          Per-vertex inputs carry palette layer + per-quad SEF_* flags so
+ *          the SpriteQueue can mix palettes and SHAPE_DARKEN inside a single
+ *          batch. Dual-source blend (EBlend::DualSourceBlend) expresses both
+ *          Premultiplied and DARKEN compositing without a state change.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -43,15 +48,14 @@ namespace Vinifera::Gfx
     enum SpriteEffectFlag : uint32_t
     {
         SEF_NONE             = 0,
-        SEF_DARKEN           = 1u << 1,
-        SEF_USE_ZSHAPE       = 1u << 5,
+        SEF_DARKEN           = 1u << 1,     // per-vertex: shape used as DARKEN mask
+        SEF_USE_ZSHAPE       = 1u << 5,     // per-vertex: sample z-shape atlas for depth
         /**
-         *  Skip the alpha-buffer modulation. The shared `AlphaTex` is sized
-         *  to the scene (backbuffer) and contains tactical alpha-light /
-         *  shroud data; sampling it from non-Scene render targets (sidebar
-         *  cameos, future menu sprites) bleeds tactical lighting and shroud
-         *  through. Set this flag for any bucket whose `OutputTarget` is not
-         *  `Scene`.
+         *  Skip the alpha-buffer modulation. Set per-batch (in the CB Flags
+         *  uniform) when the bucket isn't `Scene`: the shared `AlphaTex` is
+         *  sized to the backbuffer and holds tactical alpha-light / shroud
+         *  data, so sampling it from sidebar cameos would bleed the tactical
+         *  view through.
          */
         SEF_NO_ALPHA_BUFFER  = 1u << 6,
     };
@@ -77,10 +81,11 @@ namespace Vinifera::Gfx
         void Shutdown();
 
         /**
-         *  Bind the palette LUT to t1 on both VS and PS slots. Call after
+         *  Bind the shared PaletteArray (Texture2DArray) at t1. Call after
          *  SpriteBatch::Begin (which sets up t0) but before SpriteBatch::End.
+         *  Palette layer is supplied per-vertex by the caller.
          */
-        void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);
+        void Bind_Palette_Array(GraphicsDevice& device);
 
         /**
          *  Update per-draw effect parameters in the b1 CB. Call before

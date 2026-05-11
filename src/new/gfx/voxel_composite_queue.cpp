@@ -194,21 +194,14 @@ namespace Vinifera::Gfx
                 params.ZShapeAtlasSize[0] = (float)kVoxelAtlasSize;
                 params.ZShapeAtlasSize[1] = (float)kVoxelAtlasSize;
                 params.ZShapeDepthScale = 1.0f / 16000.0f;
-                params.Flags = cmd.EffectFlags;
-                if (has_z) {
-                    params.Flags |= SEF_USE_ZSHAPE;
-                }
+                /**
+                 *  Per-vertex flags (DARKEN, USE_ZSHAPE) are now passed via
+                 *  SpriteBatch::Draw. Only NO_ALPHA_BUFFER stays in the CB.
+                 */
+                params.Flags = 0;
                 if (is_sidebar) {
-                    /**
-                     *  No voxel should ever render on the sidebar, but guard
-                     *  against AlphaTex leakage just in case.
-                     */
                     params.Flags |= SEF_NO_ALPHA_BUFFER;
                 }
-
-                const EBlend blend = (cmd.EffectFlags & SEF_DARKEN)
-                    ? EBlend::DestMultiplyHalf
-                    : EBlend::Premultiplied;
 
                 EDepthStencil depth_state;
                 if (is_sidebar) {
@@ -221,12 +214,12 @@ namespace Vinifera::Gfx
                             : EDepthStencil::TestLessEqual_NoWrite);
                 }
 
-                Batch.Begin(device, blend, ESampler::PointClamp, &Effect,
+                Batch.Begin(device, EBlend::DualSourceBlend, ESampler::PointClamp, &Effect,
                             target_w, target_h, depth_state);
-                Effect.Bind_Palette(device, *cmd.Palette);
+                Effect.Bind_Palette_Array(device);
                 Effect.Set_Params(device, params);
 
-                ID3D11ShaderResourceView* z_srv = has_z ? ZAtlas.Get_SRV() : nullptr;
+                ID3D11ShaderResourceView* z_srv = has_z ? ZAtlas.Get_SRV() : ColorAtlas.Get_SRV();
                 device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
 
                 ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
@@ -243,10 +236,16 @@ namespace Vinifera::Gfx
                     (float)cmd.SourceH / (float)kVoxelAtlasSize
                 };
 
+                const uint32_t layer = (cmd.Palette != nullptr && cmd.Palette->Layer() >= 0)
+                                     ? (uint32_t)cmd.Palette->Layer() : 0u;
+                uint32_t flags = cmd.EffectFlags;
+                if (has_z) flags |= SEF_USE_ZSHAPE;
+
                 Batch.Draw(&ColorAtlas, cmd.Dst, &src, cmd.Tint,
                            cmd.DepthBaseline, cmd.DepthBaseline,
                            has_z ? &z_uv : nullptr,
-                           cmd.Clip.Is_Valid() ? &cmd.Clip : nullptr);
+                           cmd.Clip.Is_Valid() ? &cmd.Clip : nullptr,
+                           layer, flags);
                 Batch.End(device);
                 PerfMonitor::Get().Note_Voxel_Composite_Draw_Call();
             }

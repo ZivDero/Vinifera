@@ -12,6 +12,7 @@
 #include "palette_lut.h"
 
 #include "graphics_device.h"
+#include "palette_array.h"
 
 
 namespace Vinifera::Gfx
@@ -29,6 +30,7 @@ namespace Vinifera::Gfx
     void PaletteLUT::Shutdown()
     {
         PaletteTex.Shutdown();
+        ArrayLayer = -1;
     }
 
 
@@ -63,5 +65,19 @@ namespace Vinifera::Gfx
         }
 
         PaletteTex.Set_Data(lut, 256 * 4);
+
+        /**
+         *  Dual-write into the shared PaletteArray so the SpriteEffect can
+         *  sample this palette by layer index without rebinding a texture.
+         *  Allocates a fresh layer the first time; subsequent Update_Palette
+         *  calls (rare — PaletteCache is keyed on stable vanilla pointers,
+         *  but `PaletteCache::Clear` then a re-load will replay this path)
+         *  in-place update the same layer.
+         */
+        if (ArrayLayer < 0) {
+            ArrayLayer = PaletteArray::Get().Allocate_And_Upload(lut);
+        } else {
+            PaletteArray::Get().Update_Layer(ArrayLayer, lut);
+        }
     }
 }

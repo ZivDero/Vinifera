@@ -28,6 +28,9 @@ namespace Vinifera::Gfx
         Premultiplied,      // One     / InvSrcAlpha (matches RmlUi/many sprite paths)
         Additive,           // SrcAlpha / One
         DestMultiplyHalf,   // dest *= 0.5 (vanilla SHAPE_DARKEN; src color irrelevant)
+        DualSourceBlend,    // result = src0 + src1 * dest. Shader emits per-pixel
+                            // (src0, src1); used by SpriteEffect to express both
+                            // Premultiplied and SHAPE_DARKEN without a state switch.
 
         Count
     };

@@ -50,7 +50,16 @@ namespace Vinifera::Gfx
 
         Texture2D& Get_Palette_Texture() { return PaletteTex; }
 
+        /**
+         *  Layer index into the global `PaletteArray` (assigned on first
+         *  `Update_Palette`). -1 until populated. The SpriteEffect samples
+         *  the array with this index per-quad so palette-bind state changes
+         *  drop out of the SpriteQueue batch key.
+         */
+        int Layer() const { return ArrayLayer; }
+
     private:
-        Texture2D PaletteTex;   // 256x1 RGBA8
+        Texture2D PaletteTex;   // 256x1 RGBA8 (used by Tile/Font/Shroud/AlphaWrite effects)
+        int       ArrayLayer = -1;
     };
 }

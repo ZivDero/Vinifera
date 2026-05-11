@@ -31,6 +31,7 @@
 #include "tile_queue.h"
 #include "voxel_composite_queue.h"
 #include "iso_tile_atlas.h"
+#include "palette_array.h"
 #include "shp_atlas.h"
 #include "debughandler.h"
 #include "mouse.h"
@@ -455,6 +456,15 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
     }
 
+    /**
+     *  PaletteArray must come up before SpriteQueue / VoxelCompositeQueue
+     *  because PaletteLUT::Update_Palette (called lazily on first cache hit)
+     *  allocates layers in the array.
+     */
+    if (!Vinifera::Gfx::PaletteArray::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera PaletteArray could not be initialized.\n");
+    }
+
     if (!Vinifera::Gfx::SpriteQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
         DEBUG_ERROR("Vinifera SpriteQueue could not be initialized.\n");
     }
@@ -511,6 +521,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::ShpCache::Get().Clear();
     Vinifera::Gfx::ShpAtlas::Get().Shutdown();
     Vinifera::Gfx::PaletteCache::Get().Clear();
+    Vinifera::Gfx::PaletteArray::Get().Shutdown();
     Vinifera::Gfx::FontCache::Get().Clear();
 
     ViniferaImGui::Shutdown();

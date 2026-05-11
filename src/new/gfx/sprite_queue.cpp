@@ -239,12 +239,19 @@ namespace Vinifera::Gfx
          *  DrawIndexed calls to `End()`.
          */
         const auto state_eq = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
+            /**
+             *  Palette, ZAsset page, and EffectFlags (DARKEN) are all per-
+             *  vertex now: palette layer rides the vertex stream into the
+             *  shared PaletteArray; DARKEN is encoded as a per-vertex SEF_*
+             *  flag handled by the dual-source-blend shader; and the z-shape
+             *  atlas is the same texture as the color atlas (so binding the
+             *  same SRV at t3 is harmless when no z-shape is in use).
+             *
+             *  What remains as real pipeline state: SHP atlas page (still
+             *  may span multiple pages on heavy content) and depth-stencil
+             *  state (WriteDepth / DisableDepth).
+             */
             if (a.Asset->Atlas_Page() != b.Asset->Atlas_Page()) return false;
-            const int az = a.ZAsset ? a.ZAsset->Atlas_Page() : -1;
-            const int bz = b.ZAsset ? b.ZAsset->Atlas_Page() : -1;
-            if (az != bz) return false;
-            if (a.Palette != b.Palette) return false;
-            if (a.EffectFlags != b.EffectFlags) return false;
             if (a.WriteDepth != b.WriteDepth) return false;
             if (a.DisableDepth != b.DisableDepth) return false;
             return true;
@@ -259,20 +266,6 @@ namespace Vinifera::Gfx
         const auto classify_break = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
             if (a.Asset->Atlas_Page() != b.Asset->Atlas_Page()) {
                 PerfMonitor::Get().Note_Sprite_Break_Page();
-                return;
-            }
-            const int az = a.ZAsset ? a.ZAsset->Atlas_Page() : -1;
-            const int bz = b.ZAsset ? b.ZAsset->Atlas_Page() : -1;
-            if (az != bz) {
-                PerfMonitor::Get().Note_Sprite_Break_ZPage();
-                return;
-            }
-            if (a.Palette != b.Palette) {
-                PerfMonitor::Get().Note_Sprite_Break_Palette();
-                return;
-            }
-            if (a.EffectFlags != b.EffectFlags) {
-                PerfMonitor::Get().Note_Sprite_Break_Flags();
                 return;
             }
             if (a.WriteDepth != b.WriteDepth || a.DisableDepth != b.DisableDepth) {
@@ -336,37 +329,22 @@ namespace Vinifera::Gfx
                 const SpriteDrawCmd& head = pass_commands[i];
 
                 /**
-                 *  All pages share a single PageSize, so AtlasSize is
-                 *  constant across all batches once the atlas is up; we
-                 *  still write it into the per-batch CB to avoid a
-                 *  bind-state divergence between TileEffect (which actually
-                 *  does vary atlas size) and SpriteEffect.
+                 *  Atlas size is constant (all pages share PageSize); we
+                 *  still write it into the per-batch CB. Z-shape uses the
+                 *  same shared atlas, so ZShapeAtlasSize is the same value.
+                 *  USE_ZSHAPE / DARKEN flags are per-vertex now; only
+                 *  NO_ALPHA_BUFFER stays in the CB (per-bucket).
                  */
                 SpriteEffectParams params = {};
                 params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
                 params.AtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
-                if (head.ZAsset != nullptr) {
-                    params.ZShapeAtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
-                    params.ZShapeAtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
-                    params.ZShapeDepthScale = 1.0f / 16000.0f;
-                }
-                params.Flags = head.EffectFlags;
+                params.ZShapeAtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+                params.ZShapeAtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
+                params.ZShapeDepthScale = 1.0f / 16000.0f;
+                params.Flags = 0;
                 if (is_sidebar) {
-                    /**
-                     *  Sidebar (and any future non-Scene bucket) must not
-                     *  sample the scene-relative AlphaTex — its contents are
-                     *  tactical alpha-light + shroud at backbuffer coords and
-                     *  would leak through onto cameos / build-slot frames.
-                     */
                     params.Flags |= SEF_NO_ALPHA_BUFFER;
                 }
-                if (head.ZAsset != nullptr) {
-                    params.Flags |= SEF_USE_ZSHAPE;
-                }
-
-                const EBlend blend = (head.EffectFlags & SEF_DARKEN)
-                    ? EBlend::DestMultiplyHalf
-                    : EBlend::Premultiplied;
 
                 /**
                  *  SidebarRT has no DSV (Bind_Sidebar_Target uses
@@ -386,19 +364,22 @@ namespace Vinifera::Gfx
                             : EDepthStencil::TestLessEqual_NoWrite);
                 }
 
-                Batch.Begin(device, blend, ESampler::PointClamp, &PalEffect, target_w, target_h,
-                            depth_state);
-                PalEffect.Bind_Palette(device, *head.Palette);
+                Batch.Begin(device, EBlend::DualSourceBlend, ESampler::PointClamp, &PalEffect,
+                            target_w, target_h, depth_state);
+                PalEffect.Bind_Palette_Array(device);
                 PalEffect.Set_Params(device, params);
-                ID3D11ShaderResourceView* z_srv = head.ZAsset != nullptr
-                    ? ShpAtlas::Get().Get_Page(head.ZAsset->Atlas_Page()).Get_SRV()
-                    : nullptr;
+
+                /**
+                 *  Always bind the shared atlas at t3 (the z-shape SRV);
+                 *  the shader gates the sample on per-vertex SEF_USE_ZSHAPE,
+                 *  so binding it when nothing in the batch needs z is free.
+                 */
+                Texture2D& page_tex = ShpAtlas::Get().Get_Page(head.Asset->Atlas_Page());
+                ID3D11ShaderResourceView* z_srv = page_tex.Get_SRV();
                 device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
 
                 ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
                 device.Get_Context()->PSSetShaderResources(4, 1, &alpha_srv);
-
-                Texture2D& page_tex = ShpAtlas::Get().Get_Page(head.Asset->Atlas_Page());
 
                 for (size_t k = i; k < j; ++k) {
                     const SpriteDrawCmd& c = pass_commands[k];
@@ -407,10 +388,15 @@ namespace Vinifera::Gfx
                         continue;
                     }
                     const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
+                    const uint32_t layer = (c.Palette != nullptr && c.Palette->Layer() >= 0)
+                                         ? (uint32_t)c.Palette->Layer() : 0u;
+                    uint32_t flags = c.EffectFlags;
+                    if (c.ZAsset != nullptr) flags |= SEF_USE_ZSHAPE;
                     Batch.Draw(&page_tex, c.Dst, &src, c.Tint,
                                c.DstZTop, c.DstZBottom,
                                c.ZAsset != nullptr ? &c.ZSrcUV : nullptr,
-                               c.Clip.Is_Valid() ? &c.Clip : nullptr);
+                               c.Clip.Is_Valid() ? &c.Clip : nullptr,
+                               layer, flags);
                 }
 
                 Batch.End(device);
