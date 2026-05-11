@@ -303,7 +303,7 @@ void IsoTileTypeClassExt::_Draw_Tile(
 
 DEFINE_HOOK(0x004B95C6, _GScrenClass_Render_Draw_Flags_Zero, 5)
 {
-    Map.DrawFlags = Map.DrawFlags == GS_REDRAW_NONE ? GS_REDRAW_TACTICAL : GS_REDRAW_ALL;
+    Map.DrawFlags = GS_REDRAW_ALL;
     return 0;
 }
 
