@@ -14,6 +14,7 @@
 #include "clipline.h"
 #include "debughandler.h"
 #include "dsurface.h"
+#include "graphics_device.h"
 #include "tibsun_functions.h"
 #include "tibsun_globals.h"
 
@@ -179,8 +180,30 @@ SDLSurface* SDLSurface::Create_Primary(void*)
     AllowStretchBlits = true;
     AllowHWFill = false;
 
-    DEBUG_INFO("SDLSurface::Create_Primary - Creating surface\n");
-    SDLSurface* surface = new SDLSurface(VideoWidth, VideoHeight);
+    /**
+     *  CPU surfaces (`HiddenSurface`, `AlternateSurface`, `VisibleSurface`)
+     *  are sized to the *backbuffer* (display) resolution rather than the
+     *  vanilla video-mode logical resolution. The tactical scene no longer
+     *  rounds through them (the GPU pipeline writes directly to `SceneRT`
+     *  at logical res and upscales on present), so they exist purely for
+     *  menus, VQA, dialogs, and the score/escape overlays. Allocating them
+     *  at backbuffer dims means WinAPI dialogs render crisply at the
+     *  display's true pixel size and present 1:1, with no upscale-induced
+     *  blockiness.
+     */
+    int width = VideoWidth;
+    int height = VideoHeight;
+    if (Vinifera::Gfx::Device != nullptr) {
+        const int bb_w = Vinifera::Gfx::Device->Get_Backbuffer_Width();
+        const int bb_h = Vinifera::Gfx::Device->Get_Backbuffer_Height();
+        if (bb_w > 0 && bb_h > 0) {
+            width = bb_w;
+            height = bb_h;
+        }
+    }
+
+    DEBUG_INFO("SDLSurface::Create_Primary - Creating surface (%dx%d)\n", width, height);
+    SDLSurface* surface = new SDLSurface(width, height);
 
     /**
      *  If this is a hicolor surface, then build the shift values for

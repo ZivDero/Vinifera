@@ -250,8 +250,25 @@ namespace
         Rect temp = SDL_Get_Display_View_Rect(visible_rect);
 
         VisibleRect = visible_rect;
-        VideoWidth = visible_rect.Width;
-        VideoHeight = visible_rect.Height;
+
+        /**
+         *  `VideoWidth/Height` advertise the backbuffer (display) resolution
+         *  now that the CPU surfaces all live at backbuffer dims. Vanilla
+         *  drawing code that sizes against `VideoWidth/Height` (dialogs,
+         *  full-screen clears, mouse-cursor positioning) now matches the
+         *  surface it's drawing into. The GPU scene retains its own logical
+         *  resolution via `Set_Logical_Resolution` and is decoupled from
+         *  this.
+         */
+        if (Vinifera::Gfx::Device != nullptr
+            && Vinifera::Gfx::Device->Get_Backbuffer_Width() > 0
+            && Vinifera::Gfx::Device->Get_Backbuffer_Height() > 0) {
+            VideoWidth  = Vinifera::Gfx::Device->Get_Backbuffer_Width();
+            VideoHeight = Vinifera::Gfx::Device->Get_Backbuffer_Height();
+        } else {
+            VideoWidth  = visible_rect.Width;
+            VideoHeight = visible_rect.Height;
+        }
 
         VisibleSurface = SDLSurface::Create_Primary();
 
@@ -287,6 +304,23 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
     DEBUG_INFO("Allocating new surfaces\n");
     Vinifera::Gfx::SurfaceTargetRegistry::Get().Clear();
 
+    /**
+     *  HiddenSurface / AlternateSurface are presented as fullscreen quads to
+     *  the backbuffer; they no longer back the tactical scene (the GPU
+     *  pipeline writes directly to SceneRT at logical res). Allocate them at
+     *  the backbuffer's display resolution so WinAPI dialogs, menus, movies,
+     *  and the score / escape overlays render at the display's true pixel
+     *  size with a 1:1 present (no nearest-upscale blockiness).
+     */
+    Rect cpu_surface_rect = hidden_rect;
+    if (Vinifera::Gfx::Device != nullptr) {
+        const int bb_w = Vinifera::Gfx::Device->Get_Backbuffer_Width();
+        const int bb_h = Vinifera::Gfx::Device->Get_Backbuffer_Height();
+        if (bb_w > 0 && bb_h > 0) {
+            cpu_surface_rect = Rect(0, 0, bb_w, bb_h);
+        }
+    }
+
     if (AlternateSurface != nullptr) {
         DEBUG_INFO("Deleting AlternateSurface\n");
         delete AlternateSurface;
@@ -317,10 +351,10 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
         SidebarSurface = nullptr;
     }
 
-    if (hidden_first && hidden_rect.Is_Valid()) {
-        HiddenSurface = new SDLSurface(hidden_rect.Width, hidden_rect.Height);
+    if (hidden_first && cpu_surface_rect.Is_Valid()) {
+        HiddenSurface = new SDLSurface(cpu_surface_rect.Width, cpu_surface_rect.Height);
         HiddenSurface->Fill(0);
-        DEBUG_INFO("HiddenSurface (%dx%d)\n", hidden_rect.Width, hidden_rect.Height);
+        DEBUG_INFO("HiddenSurface (%dx%d)\n", cpu_surface_rect.Width, cpu_surface_rect.Height);
     }
 
     if (composite_rect.Is_Valid()) {
@@ -366,16 +400,16 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
         DEBUG_INFO("SidebarSurface (%dx%d) [GpuSurface]\n", sidebar_rect.Width, sidebar_rect.Height);
     }
 
-    if (!hidden_first && hidden_rect.Is_Valid()) {
-        HiddenSurface = new SDLSurface(hidden_rect.Width, hidden_rect.Height);
+    if (!hidden_first && cpu_surface_rect.Is_Valid()) {
+        HiddenSurface = new SDLSurface(cpu_surface_rect.Width, cpu_surface_rect.Height);
         HiddenSurface->Fill(0);
-        DEBUG_INFO("HiddenSurface (%dx%d)\n", hidden_rect.Width, hidden_rect.Height);
+        DEBUG_INFO("HiddenSurface (%dx%d)\n", cpu_surface_rect.Width, cpu_surface_rect.Height);
     }
 
-    if (hidden_rect.Is_Valid()) {
-        AlternateSurface = new SDLSurface(hidden_rect.Width, hidden_rect.Height);
+    if (cpu_surface_rect.Is_Valid()) {
+        AlternateSurface = new SDLSurface(cpu_surface_rect.Width, cpu_surface_rect.Height);
         AlternateSurface->Fill(0);
-        DEBUG_INFO("AlternateSurface (%dx%d)\n", hidden_rect.Width, hidden_rect.Height);
+        DEBUG_INFO("AlternateSurface (%dx%d)\n", cpu_surface_rect.Width, cpu_surface_rect.Height);
     }
 
     SDL_Register_Surface_Targets();
@@ -426,9 +460,11 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     }
 
     /**
-     *  Allocate the streaming texture used to upload the game surface each frame.
+     *  Allocate the streaming texture used to upload the CPU surface each
+     *  frame (menus, dialogs, score, escape, VQA). Sized to the backbuffer,
+     *  matching the CPU `SDLSurface`s, so present is a 1:1 copy.
      */
-    if (!Vinifera::Gfx::Device->Set_Surface_Format(width, height)) {
+    if (!Vinifera::Gfx::Device->Set_Surface_Format(SDLWindowWidth, SDLWindowHeight)) {
         DEBUG_ERROR("GraphicsDevice surface texture creation failed.\n");
         return false;
     }
@@ -445,10 +481,11 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     }
 
     /**
-     *  Save video mode information.
+     *  Save video mode information. `VideoWidth/Height` advertise the
+     *  backbuffer (display) resolution to match the CPU `SDLSurface`s.
      */
-    VideoWidth = width;
-    VideoHeight = height;
+    VideoWidth = SDLWindowWidth;
+    VideoHeight = SDLWindowHeight;
     VideoBitsPerPixel = bits_per_pixel;
 
     if (!ViniferaImGui::Initialize(MainWindow, Vinifera::Gfx::Device->Get_Device(), Vinifera::Gfx::Device->Get_Context())) {
@@ -904,12 +941,7 @@ bool SDL_Update_Screen(Surface* surface)
         Vinifera::Gfx::PaletteCache::Get().Size());
 
     Vinifera::Gfx::Device->Set_VSync(OptionsExtension->IsVSync);
-    Vinifera::Gfx::Device->Begin_Frame();
-    Vinifera::Gfx::Device->Bind_Scene_Target();
 
-    /**
-     *  Blit game's surface to the scene target via the present quad.
-     */
     static bool scaled = SDL_Should_Scale();
     SDL_ScaleMode scale_mode = OptionsExtension->ScaleMode;
     if (scale_mode == SDL_SCALEMODE_INVALID) {
@@ -927,90 +959,123 @@ bool SDL_Update_Screen(Surface* surface)
     }
 
     /**
-     *  Stage 7 Step 2: `CompositeSurface` is `GpuSurface`. There is no CPU
-     *  buffer to upload — the entire tactical scene + HUD comes from the
-     *  GPU queue flushes below, drawing into `SceneRT`. Known sacrifices in
-     *  this state, to be recovered in Steps 5–8:
+     *  Routing: `CompositeSurface` (and nullptr fallback) take the GPU
+     *  pipeline — queue flushes into SceneRT then upscale-present. Any
+     *  other surface is a CPU `SDLSurface` (VisibleSurface for menus /
+     *  score / escape / VQA); we upload its pixels and present them as a
+     *  fullscreen quad against a black backbuffer (no "last battle frame"
+     *  preserved behind the dialog — score / escape menus draw against the
+     *  clear-color backdrop).
      *
-     *      - Voxel rendering (vehicles + aircraft) — vanilla locks the
-     *        composite/tile surface and writes pixels directly.
-     *      - `WaveClass::Draw_Sonic` — sonic-wave refractive distortion.
-     *      - `WaveClass::Draw_Laser` — laser red-channel boost.
-     *      - Sidebar text + radar (still on `SDLSurface` until Step 3,
-     *        recovered by Steps 5–6 once `GpuSurface`-routed).
-     *      - Anything else surfaced by `GpuSurface`'s warn-stub log lines.
+     *  `Is_Direct_Draw()` returns true only for `SDLSurface`; `GpuSurface`
+     *  (CompositeSurface, TileSurface, SidebarSurface) returns false. Any
+     *  non-SDL surface routes to the GPU pipeline rather than risking a
+     *  bogus static_cast.
      */
+    const bool is_gpu = (surface == nullptr
+                       || surface == CompositeSurface
+                       || !surface->Is_Direct_Draw());
 
-    /**
-     *  Shroud / fog alpha writes — vanilla's `Draw_Shroud_Or_Fog_Shape` and
-     *  `Draw_Fog_Shape` were patched to enqueue commands here instead of
-     *  blitting into the CPU AlphaBuffer. Must run before alpha lights so
-     *  the multiplicative light formula composes over the shroud baseline
-     *  (alpha = 0 at shrouded cells → light × 0 = 0, which is correct).
-     */
-    Vinifera::Gfx::ShroudFogQueue::Get().Flush(*Vinifera::Gfx::Device);
+    Vinifera::Gfx::Device->Begin_Frame();
 
-    /**
-     *  Replay vanilla's `AlphaShapeClass::Draw_In_Area` blits onto the GPU
-     *  alpha buffer (the CPU paths were no-op'd by `AlphaShape_Hooks`). Runs
-     *  once before the pass loop so every subsequent tile/sprite shader
-     *  samples the up-to-date alpha state.
-     */
-    Vinifera::Gfx::SpriteQueue::Get().Flush_Alpha_Lights(*Vinifera::Gfx::Device);
+    if (is_gpu) {
+        Vinifera::Gfx::Device->Bind_Scene_Target();
 
-    /**
-     *  Size + bind + clear `SidebarRT` so the queue passes below can paint
-     *  the sidebar's Sidebar-bucketed commands (cameos, frames, primitives)
-     *  directly into it. No CPU upload — sidebar pixels are GPU-authoritative
-     *  after Step 3. The Compose call after the queue flushes blits
-     *  `SidebarRT` onto `SceneRT` at the sidebar's screen position.
-     */
-    SDL_Prepare_Sidebar_RT(scale_mode);
+        /**
+         *  Stage 7 Step 2: `CompositeSurface` is `GpuSurface`. There is no
+         *  CPU buffer to upload — the entire tactical scene + HUD comes
+         *  from the GPU queue flushes below, drawing into `SceneRT`.
+         */
 
-    /**
-     *  Flush GPU queues populated by patched Draw_Tile / Draw_Shape callsites
-     *  during the game's render pass. Replay them in vanilla Tactical::Render
-     *  pass order so overlays, cell shadows, buildings, units, and UI keep
-     *  their old layer relationships. Each queue's Flush_Pass buckets its
-     *  commands by `OutputTarget` and binds Scene or Sidebar RT per bucket.
-     */
-    for (int pass = 0; pass < (int)Vinifera::Gfx::RenderPass::Count; ++pass) {
-        const auto render_pass = (Vinifera::Gfx::RenderPass)pass;
-        Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
-        Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
-        Vinifera::Gfx::VoxelCompositeQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
-        Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
-        Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
-        Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+        /**
+         *  Shroud / fog alpha writes — vanilla's `Draw_Shroud_Or_Fog_Shape`
+         *  and `Draw_Fog_Shape` were patched to enqueue commands here
+         *  instead of blitting into the CPU AlphaBuffer. Must run before
+         *  alpha lights so the multiplicative light formula composes over
+         *  the shroud baseline (alpha = 0 at shrouded cells → light × 0
+         *  = 0, which is correct).
+         */
+        Vinifera::Gfx::ShroudFogQueue::Get().Flush(*Vinifera::Gfx::Device);
+
+        /**
+         *  Replay vanilla's `AlphaShapeClass::Draw_In_Area` blits onto the
+         *  GPU alpha buffer (the CPU paths were no-op'd by
+         *  `AlphaShape_Hooks`). Runs once before the pass loop so every
+         *  subsequent tile/sprite shader samples the up-to-date alpha
+         *  state.
+         */
+        Vinifera::Gfx::SpriteQueue::Get().Flush_Alpha_Lights(*Vinifera::Gfx::Device);
+
+        /**
+         *  Size + bind + clear `SidebarRT` so the queue passes below can
+         *  paint the sidebar's Sidebar-bucketed commands (cameos, frames,
+         *  primitives) directly into it. The Compose call after the queue
+         *  flushes blits `SidebarRT` onto `SceneRT` at the sidebar's screen
+         *  position.
+         */
+        SDL_Prepare_Sidebar_RT(scale_mode);
+
+        /**
+         *  Flush GPU queues populated by patched Draw_Tile / Draw_Shape
+         *  callsites during the game's render pass.
+         */
+        for (int pass = 0; pass < (int)Vinifera::Gfx::RenderPass::Count; ++pass) {
+            const auto render_pass = (Vinifera::Gfx::RenderPass)pass;
+            Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::VoxelCompositeQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+        }
+        Vinifera::Gfx::TileQueue::Get().Clear();
+        Vinifera::Gfx::SpriteQueue::Get().Clear();
+        Vinifera::Gfx::VoxelCompositeQueue::Get().Clear();
+        Vinifera::Gfx::PrimitiveQueue::Get().Clear();
+        Vinifera::Gfx::TacticalLineQueue::Get().Clear();
+        Vinifera::Gfx::FontQueue::Get().Clear();
+        Vinifera::Gfx::Reset_Current_Render_Pass();
+
+        SDL_Draw_Sidebar_RT_Compose(scale_mode);
+
+        /**
+         *  SceneRT is at vanilla's logical render resolution; Draw_Texture
+         *  sets the viewport to the backbuffer rect and the point-clamp
+         *  sampler upscales to display size.
+         */
+        Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
+        Rect scene_dst(0, 0,
+            Vinifera::Gfx::Device->Get_Backbuffer_Width(),
+            Vinifera::Gfx::Device->Get_Backbuffer_Height());
+        Vinifera::Gfx::Device->Draw_Texture(
+            Vinifera::Gfx::Device->Get_Scene_SRV(),
+            scene_dst,
+            SDL_SCALEMODE_NEAREST);
+    } else {
+        /**
+         *  CPU presentation path: VQA, main menu, map selection, score
+         *  screen, escape menu, generic dialogs. Vanilla has already
+         *  composed the final RGB565 pixels into the passed surface (its
+         *  `Update_Visible_Surface` blits source → VisibleSurface before
+         *  the present hook fires). We just upload it and present as a
+         *  fullscreen quad over the backbuffer.
+         */
+        SDLSurface* sdl_surface = static_cast<SDLSurface*>(surface);
+        void* pixels = sdl_surface->Lock();
+        if (pixels != nullptr) {
+            Vinifera::Gfx::Device->Upload_Surface(pixels, sdl_surface->Stride());
+            sdl_surface->Unlock();
+        }
+        Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
+        Rect cpu_dst(0, 0,
+            Vinifera::Gfx::Device->Get_Backbuffer_Width(),
+            Vinifera::Gfx::Device->Get_Backbuffer_Height());
+        Vinifera::Gfx::Device->Draw_Surface(cpu_dst, scale_mode);
     }
-    Vinifera::Gfx::TileQueue::Get().Clear();
-    Vinifera::Gfx::SpriteQueue::Get().Clear();
-    Vinifera::Gfx::VoxelCompositeQueue::Get().Clear();
-    Vinifera::Gfx::PrimitiveQueue::Get().Clear();
-    Vinifera::Gfx::TacticalLineQueue::Get().Clear();
-    Vinifera::Gfx::FontQueue::Get().Clear();
-    Vinifera::Gfx::Reset_Current_Render_Pass();
-
-    SDL_Draw_Sidebar_RT_Compose(scale_mode);
 
     /**
-     *  SceneRT is at vanilla's logical render resolution; Draw_Texture sets
-     *  the viewport to the backbuffer rect and the point-clamp sampler
-     *  upscales to display size on a 4K backbuffer. Visually identical to a
-     *  same-res copy; saves ~4× pixel-shader work on all the scene-side
-     *  passes that ran before this point.
-     */
-    Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
-    Rect scene_dst(0, 0,
-        Vinifera::Gfx::Device->Get_Backbuffer_Width(),
-        Vinifera::Gfx::Device->Get_Backbuffer_Height());
-    Vinifera::Gfx::Device->Draw_Texture(
-        Vinifera::Gfx::Device->Get_Scene_SRV(),
-        scene_dst,
-        SDL_SCALEMODE_NEAREST);
-
-    /**
-     *  Draw overlays, then present.
+     *  Draw overlays, then present. ImGui runs last in both paths so perf
+     *  and debug panels stay visible across tactical, menus, and dialogs.
      */
     ViniferaImGui::Render();
 

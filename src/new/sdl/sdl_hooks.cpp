@@ -29,11 +29,22 @@
 /**
  *  Update the window after updating the visible surface.
  *
- *  @author: CCHyper
+ *  The hook fires near the end of `Update_Visible_Surface(flip_mouse, surface,
+ *  rect)`, right after vanilla has blitted `surface → VisibleSurface`. We need
+ *  to pass the *original* `surface` argument (not `VisibleSurface`) to
+ *  `SDL_Update_Screen` so its routing can tell tactical (`CompositeSurface`)
+ *  from menu/dialog presents.
+ *
+ *  In the function's calling convention `surface` arrives in EDX and is
+ *  copied to ESI in the prologue (`mov esi, edx`). ESI is callee-saved and
+ *  still holds the surface pointer at the hook site, so we just read it.
+ *
+ *  @author: CCHyper, ZivDero
  */
 DEFINE_HOOK(0x004B9A42, _Update_Visible_Surface_SDL_Update_Window_Patch, 5)
 {
-    SDL_Update_Screen(VisibleSurface);
+    GET(Surface*, source, ESI);
+    SDL_Update_Screen(source);
 
     return 0;
 }

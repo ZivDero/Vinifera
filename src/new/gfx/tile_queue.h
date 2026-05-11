@@ -76,6 +76,14 @@ namespace Vinifera::Gfx
 
         void Clear();
 
+        /**
+         *  True if any cmd is pending. Used by `SDL_Update_Screen` to detect
+         *  that a tactical render actually ran this frame (tiles are submitted
+         *  by `CellClassExt::_Draw_It` on every active cell), so it can skip
+         *  invalidating the captured-scene snapshot on empty frames.
+         */
+        bool Has_Commands() const { return !Commands.empty(); }
+
     private:
         TileQueue() = default;
 
