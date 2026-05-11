@@ -69,19 +69,15 @@ namespace Vinifera::Gfx
             Shutdown();
             return false;
         }
-        if (!Create_Depth_Buffer(backbuffer_width, backbuffer_height)) {
-            Shutdown();
-            return false;
-        }
-        if (!Create_Scene_Target(backbuffer_width, backbuffer_height)) {
-            Shutdown();
-            return false;
-        }
-        if (!Create_Alpha_Buffer(backbuffer_width, backbuffer_height)) {
-            Shutdown();
-            return false;
-        }
 
+        /**
+         *  SceneTarget / DepthBuffer / AlphaBuffer are sized to vanilla's
+         *  logical render resolution, not the backbuffer. They're created on
+         *  the first `Set_Logical_Resolution` call (driven from
+         *  `SDL_Set_Video_Mode` once vanilla knows its video mode dims).
+         *  Bind_Scene_Target falls back to Bind_Backbuffer when SceneTarget
+         *  is null, so pre-video-mode frames still present cleanly.
+         */
         StateCacheInstance.Initialize(Device);
 
         if (!Create_Present_Pipeline()) {
@@ -116,6 +112,8 @@ namespace Vinifera::Gfx
         Safe_Release(Device);
         BackbufferWidth = 0;
         BackbufferHeight = 0;
+        LogicalWidth = 0;
+        LogicalHeight = 0;
         SurfaceWidth = 0;
         SurfaceHeight = 0;
         SidebarSurfaceWidth = 0;
@@ -426,11 +424,14 @@ namespace Vinifera::Gfx
             return true;
         }
 
+        /**
+         *  Only the swap-chain backbuffer follows the window/display size.
+         *  Scene-side render targets (SceneTarget, depth, alpha) track the
+         *  logical render resolution and are managed by
+         *  `Set_Logical_Resolution`. They're untouched here.
+         */
         Context->OMSetRenderTargets(0, nullptr, nullptr);
-        Release_Scene_Target();
         Release_Backbuffer_RTV();
-        Release_Depth_Buffer();
-        Release_Alpha_Buffer();
 
         UINT flags = TearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
         if (FAILED(SwapChain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, flags))) {
@@ -439,9 +440,47 @@ namespace Vinifera::Gfx
         BackbufferWidth = width;
         BackbufferHeight = height;
         if (!Create_Backbuffer_RTV()) return false;
-        if (!Create_Depth_Buffer(width, height)) return false;
-        if (!Create_Scene_Target(width, height)) return false;
-        if (!Create_Alpha_Buffer(width, height)) return false;
+        return true;
+    }
+
+
+    bool GraphicsDevice::Set_Logical_Resolution(int width, int height)
+    {
+        if (Device == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+        if (width == LogicalWidth && height == LogicalHeight
+            && SceneTarget != nullptr && DepthTex != nullptr && AlphaTex != nullptr) {
+            return true;
+        }
+
+        /**
+         *  Detach any RTVs that might still reference the old DSV / SceneRT
+         *  before releasing them.
+         */
+        Context->OMSetRenderTargets(0, nullptr, nullptr);
+        Release_Alpha_Buffer();
+        Release_Scene_Target();
+        Release_Depth_Buffer();
+
+        if (!Create_Depth_Buffer(width, height)) {
+            return false;
+        }
+        if (!Create_Scene_Target(width, height)) {
+            Release_Depth_Buffer();
+            return false;
+        }
+        if (!Create_Alpha_Buffer(width, height)) {
+            Release_Scene_Target();
+            Release_Depth_Buffer();
+            return false;
+        }
+
+        LogicalWidth = width;
+        LogicalHeight = height;
+        DEBUG_INFO("Gfx::GraphicsDevice: logical render resolution set to %dx%d "
+                   "(backbuffer %dx%d).\n",
+            width, height, BackbufferWidth, BackbufferHeight);
         return true;
     }
 

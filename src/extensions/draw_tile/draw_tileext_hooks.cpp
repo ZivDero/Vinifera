@@ -126,8 +126,13 @@ static void Submit_Tile_GPU(const CellClass* cell, IsometricTileTypeClass* ittyp
         return;
     }
 
-    const float xscale = (VideoWidth > 0) ? (float)device.Get_Backbuffer_Width()  / (float)VideoWidth  : 1.0f;
-    const float yscale = (VideoHeight > 0) ? (float)device.Get_Backbuffer_Height() / (float)VideoHeight : 1.0f;
+    /**
+     *  Tiles are drawn into SceneRT which is sized to vanilla's logical
+     *  resolution, so logical coords pass through unscaled. The present
+     *  quad upscales SceneRT → Backbuffer for the display.
+     */
+    const float xscale = 1.0f;
+    const float yscale = 1.0f;
 
     const Surface* surface = LogicalSurface;
     const Rect surface_rect = (surface != nullptr) ? surface->Get_Rect() : Rect(0, 0, VideoWidth, VideoHeight);

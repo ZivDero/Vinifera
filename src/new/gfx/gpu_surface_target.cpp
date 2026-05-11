@@ -27,7 +27,21 @@ namespace Vinifera::Gfx
     {
         switch (target) {
         case GpuRenderTarget::Scene:
+            /**
+             *  SceneRT is now sized to vanilla's logical resolution
+             *  (`Set_Logical_Resolution` at video-mode init), so logical
+             *  coords map 1:1 to scene-RT pixels. The present quad upscales
+             *  SceneRT → Backbuffer at frame end.
+             */
+            xscale = 1.0f;
+            yscale = 1.0f;
+            return true;
+
         case GpuRenderTarget::Backbuffer:
+            /**
+             *  Direct-to-backbuffer rendering (rare — only the present quad
+             *  itself today) still needs the logical → display upscale.
+             */
             xscale = 1.0f;
             yscale = 1.0f;
             if (VideoWidth <= 0 || VideoHeight <= 0) {

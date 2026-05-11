@@ -226,24 +226,12 @@ namespace
 
         Vinifera::Gfx::Device->Bind_Scene_Target();
 
+        /**
+         *  SceneRT is now at vanilla's logical resolution, so the sidebar
+         *  rect lands 1:1 at its logical coords. The present quad upscales
+         *  SceneRT → Backbuffer at frame end.
+         */
         Rect dst(SidebarRect.X, 0, sidebar_width, sidebar_height);
-        if (SDL_Should_Scale()) {
-            /**
-             *  Scaling here places the sidebar rect on `SceneRT`, which is
-             *  backbuffer-sized — independent of `Logical_To_Render_Target`
-             *  (identity for Sidebar). Inline logical → backbuffer.
-             */
-            const float xscale = (float)Vinifera::Gfx::Device->Get_Backbuffer_Width() / (float)VideoWidth;
-            const float yscale = (float)Vinifera::Gfx::Device->Get_Backbuffer_Height() / (float)VideoHeight;
-            if (xscale <= 0.0f || yscale <= 0.0f) {
-                return;
-            }
-            dst = Rect(
-                (int)((float)dst.X * xscale),
-                (int)((float)dst.Y * yscale),
-                (int)((float)dst.Width * xscale),
-                (int)((float)dst.Height * yscale));
-        }
 
         Vinifera::Gfx::Device->Draw_Texture(
             Vinifera::Gfx::Device->Get_Sidebar_Target_SRV(),
@@ -442,6 +430,17 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
      */
     if (!Vinifera::Gfx::Device->Set_Surface_Format(width, height)) {
         DEBUG_ERROR("GraphicsDevice surface texture creation failed.\n");
+        return false;
+    }
+
+    /**
+     *  Size the scene-side render targets (SceneRT, depth buffer, alpha buffer)
+     *  to vanilla's logical render resolution. The present quad upscales
+     *  SceneRT → Backbuffer on a borderless 4K display, so the heavy
+     *  per-sprite pixel work happens at logical res rather than at display res.
+     */
+    if (!Vinifera::Gfx::Device->Set_Logical_Resolution(width, height)) {
+        DEBUG_ERROR("GraphicsDevice logical-resolution targets failed (%dx%d).\n", width, height);
         return false;
     }
 
@@ -995,8 +994,11 @@ bool SDL_Update_Screen(Surface* surface)
     SDL_Draw_Sidebar_RT_Compose(scale_mode);
 
     /**
-     *  SceneRT is already backbuffer-sized; copy it 1:1 to the swapchain
-     *  backbuffer before drawing debug/UI overlays.
+     *  SceneRT is at vanilla's logical render resolution; Draw_Texture sets
+     *  the viewport to the backbuffer rect and the point-clamp sampler
+     *  upscales to display size on a 4K backbuffer. Visually identical to a
+     *  same-res copy; saves ~4× pixel-shader work on all the scene-side
+     *  passes that ran before this point.
      */
     Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
     Rect scene_dst(0, 0,

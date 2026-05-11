@@ -51,6 +51,18 @@ namespace Vinifera::Gfx
         void Set_VSync(bool enable) { VSync = enable; }
         bool Get_VSync() const { return VSync; }
 
+        /**
+         *  Size the scene-side render targets (SceneRT, depth buffer, alpha
+         *  buffer) to (width, height). This is vanilla's logical render
+         *  resolution — `VideoWidth × VideoHeight` — *not* the backbuffer.
+         *  Decoupling the two means a 4K display draws sprites at logical
+         *  res and the present-time `SceneRT → Backbuffer` blit handles the
+         *  upscale, saving most of the pixel-shader fillrate. Idempotent.
+         */
+        bool Set_Logical_Resolution(int width, int height);
+        int  Get_Logical_Width() const  { return LogicalWidth; }
+        int  Get_Logical_Height() const { return LogicalHeight; }
+
         bool Set_Surface_Format(int width, int height);
         bool Upload_Surface(const void* pixels, int pitch_bytes);
         bool Set_Sidebar_Surface_Format(int width, int height);
@@ -150,6 +162,8 @@ namespace Vinifera::Gfx
 
         int                      BackbufferWidth = 0;
         int                      BackbufferHeight = 0;
+        int                      LogicalWidth = 0;
+        int                      LogicalHeight = 0;
         bool                     VSync = false;
         bool                     TearingSupported = false;
 

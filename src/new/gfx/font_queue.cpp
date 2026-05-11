@@ -130,8 +130,8 @@ namespace Vinifera::Gfx
             Bind_Render_Target(device, bucket_target);
 
             const bool is_sidebar = (bucket_target == GpuRenderTarget::Sidebar);
-            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Backbuffer_Width();
-            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Backbuffer_Height();
+            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Logical_Width();
+            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Logical_Height();
             const EDepthStencil depth_state = EDepthStencil::None;   // text is UI overlay; no depth
 
             size_t i = bucket_start;

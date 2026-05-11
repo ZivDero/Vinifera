@@ -109,10 +109,15 @@ namespace Vinifera::Gfx
         }
 
         ID3D11DeviceContext* ctx = device.Get_Context();
-        const int bb_w = device.Get_Backbuffer_Width();
-        const int bb_h = device.Get_Backbuffer_Height();
-        const float xscale = (VideoWidth > 0) ? (float)bb_w / (float)VideoWidth  : 1.0f;
-        const float yscale = (VideoHeight > 0) ? (float)bb_h / (float)VideoHeight : 1.0f;
+        /**
+         *  AlphaBuffer is sized to vanilla's logical render resolution
+         *  (matches SceneRT). Dst coords here are in vanilla's screen-pixel
+         *  space which is already logical-res, so no scale is needed.
+         */
+        const int target_w = device.Get_Logical_Width();
+        const int target_h = device.Get_Logical_Height();
+        const float xscale = 1.0f;
+        const float yscale = 1.0f;
 
         /**
          *  TacPixelX/TacPixelY live at offset 0x5C/0x60 in `Tactical` (verified
@@ -172,7 +177,7 @@ namespace Vinifera::Gfx
              *  (<50) so the per-shape state-set overhead is negligible.
              */
             Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
-                        &AlphaEffect, bb_w, bb_h, EDepthStencil::None);
+                        &AlphaEffect, target_w, target_h, EDepthStencil::None);
 
             AlphaWriteEffectParams params = {};
             params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
@@ -307,8 +312,8 @@ namespace Vinifera::Gfx
             Bind_Render_Target(device, bucket_target);
 
             const bool is_sidebar = (bucket_target == GpuRenderTarget::Sidebar);
-            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Backbuffer_Width();
-            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Backbuffer_Height();
+            const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Logical_Width();
+            const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Logical_Height();
 
             size_t i = bucket_start;
             while (i < bucket_end) {

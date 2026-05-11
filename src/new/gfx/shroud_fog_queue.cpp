@@ -91,17 +91,15 @@ namespace Vinifera::Gfx
         }
 
         ID3D11DeviceContext* ctx = device.Get_Context();
-        const int bb_w = device.Get_Backbuffer_Width();
-        const int bb_h = device.Get_Backbuffer_Height();
-
         /**
-         *  Logical → backbuffer-pixel scale, applied uniformly to dst
-         *  position and extents so the GPU quad covers the same pixel
-         *  rect the CPU blitter would have written. Matches the math
-         *  used by `Flush_Alpha_Lights` and `Draw_Shape_Proxy_DX11`.
+         *  AlphaBuffer is sized to vanilla's logical render resolution
+         *  (matches SceneRT), so dst coords pass through unscaled. Was a
+         *  bb→logical scale before the SceneRT/AlphaBuffer move to logical.
          */
-        const float xscale = (VideoWidth > 0)  ? (float)bb_w / (float)VideoWidth  : 1.0f;
-        const float yscale = (VideoHeight > 0) ? (float)bb_h / (float)VideoHeight : 1.0f;
+        const int target_w = device.Get_Logical_Width();
+        const int target_h = device.Get_Logical_Height();
+        const float xscale = 1.0f;
+        const float yscale = 1.0f;
 
         /**
          *  Sort by (Mode, Asset) so contiguous draws share the same
@@ -144,7 +142,7 @@ namespace Vinifera::Gfx
             const ShroudFogDrawCmd& head = Commands[i];
 
             Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
-                        &Effect, bb_w, bb_h, EDepthStencil::None);
+                        &Effect, target_w, target_h, EDepthStencil::None);
 
             ShroudFogEffectParams params = {};
             params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
