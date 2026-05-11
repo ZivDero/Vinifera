@@ -33,6 +33,12 @@ namespace Vinifera::Gfx
         Stats.SpriteCmds = 0;
         Stats.SpriteBatches = 0;
         Stats.SpriteDrawCalls = 0;
+        Stats.SpriteBreakBucket = 0;
+        Stats.SpriteBreakPage = 0;
+        Stats.SpriteBreakZPage = 0;
+        Stats.SpriteBreakPalette = 0;
+        Stats.SpriteBreakFlags = 0;
+        Stats.SpriteBreakDepth = 0;
         Stats.TileCmds = 0;
         Stats.TileBatches = 0;
         Stats.TileDrawCalls = 0;

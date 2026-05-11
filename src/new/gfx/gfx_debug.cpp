@@ -150,6 +150,25 @@ namespace Vinifera::Gfx::Gfx_Debug
                 ImGui::Text("  cmds   : %d", Stats.SpriteCmds);
                 ImGui::Text("  batches: %d", Stats.SpriteBatches);
                 ImGui::Text("  draws  : %d", Stats.SpriteDrawCalls);
+                /**
+                 *  Per-frame batch-break taxonomy. The largest column tells us
+                 *  which state field is the load-bearing batch-breaker, and
+                 *  therefore where the next optimization should go.
+                 */
+                const int total_breaks = Stats.SpriteBreakBucket
+                                       + Stats.SpriteBreakPage
+                                       + Stats.SpriteBreakZPage
+                                       + Stats.SpriteBreakPalette
+                                       + Stats.SpriteBreakFlags
+                                       + Stats.SpriteBreakDepth;
+                ImGui::Text("  breaks : %d (page=%d zpage=%d pal=%d flags=%d depth=%d bucket=%d)",
+                    total_breaks,
+                    Stats.SpriteBreakPage,
+                    Stats.SpriteBreakZPage,
+                    Stats.SpriteBreakPalette,
+                    Stats.SpriteBreakFlags,
+                    Stats.SpriteBreakDepth,
+                    Stats.SpriteBreakBucket);
 
                 ImGui::Separator();
                 ImGui::TextUnformatted("TileQueue:");

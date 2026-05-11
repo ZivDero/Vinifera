@@ -28,6 +28,18 @@ namespace Vinifera::Gfx
         int  SpriteCmds       = 0;
         int  SpriteBatches    = 0;
         int  SpriteDrawCalls  = 0;
+        /**
+         *  SpriteQueue batch-break taxonomy. Each state transition between
+         *  adjacent commands is classified by the *first* field that differs
+         *  (in the same order state_eq checks). Sum equals SpriteBatches
+         *  minus the number of bucket starts.
+         */
+        int  SpriteBreakBucket   = 0;     // OutputTarget transition (rare)
+        int  SpriteBreakPage     = 0;     // SHP atlas page differs
+        int  SpriteBreakZPage    = 0;     // Z-shape atlas page differs
+        int  SpriteBreakPalette  = 0;     // PaletteLUT* differs
+        int  SpriteBreakFlags    = 0;     // EffectFlags differ (DARKEN, NO_ALPHA_BUFFER)
+        int  SpriteBreakDepth    = 0;     // WriteDepth/DisableDepth differ
         int  TileCmds         = 0;
         int  TileBatches      = 0;
         int  TileDrawCalls    = 0;
@@ -79,6 +91,12 @@ namespace Vinifera::Gfx
         void Note_Sprite_Submit()     { ++Stats.SpriteCmds; }
         void Note_Sprite_Batch()      { ++Stats.SpriteBatches; }
         void Note_Sprite_Draw_Call()  { ++Stats.SpriteDrawCalls; }
+        void Note_Sprite_Break_Bucket()  { ++Stats.SpriteBreakBucket; }
+        void Note_Sprite_Break_Page()    { ++Stats.SpriteBreakPage; }
+        void Note_Sprite_Break_ZPage()   { ++Stats.SpriteBreakZPage; }
+        void Note_Sprite_Break_Palette() { ++Stats.SpriteBreakPalette; }
+        void Note_Sprite_Break_Flags()   { ++Stats.SpriteBreakFlags; }
+        void Note_Sprite_Break_Depth()   { ++Stats.SpriteBreakDepth; }
         void Note_Tile_Submit()       { ++Stats.TileCmds; }
         void Note_Tile_Batch()        { ++Stats.TileBatches; }
         void Note_Tile_Draw_Call()    { ++Stats.TileDrawCalls; }

@@ -250,13 +250,54 @@ namespace Vinifera::Gfx
             return true;
         };
 
+        /**
+         *  Classify the *first* differing field between two adjacent
+         *  state-incompatible commands. Used purely for telemetry — order
+         *  here mirrors state_eq so the histogram tells us which field is
+         *  the load-bearing batch-breaker.
+         */
+        const auto classify_break = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
+            if (a.Asset->Atlas_Page() != b.Asset->Atlas_Page()) {
+                PerfMonitor::Get().Note_Sprite_Break_Page();
+                return;
+            }
+            const int az = a.ZAsset ? a.ZAsset->Atlas_Page() : -1;
+            const int bz = b.ZAsset ? b.ZAsset->Atlas_Page() : -1;
+            if (az != bz) {
+                PerfMonitor::Get().Note_Sprite_Break_ZPage();
+                return;
+            }
+            if (a.Palette != b.Palette) {
+                PerfMonitor::Get().Note_Sprite_Break_Palette();
+                return;
+            }
+            if (a.EffectFlags != b.EffectFlags) {
+                PerfMonitor::Get().Note_Sprite_Break_Flags();
+                return;
+            }
+            if (a.WriteDepth != b.WriteDepth || a.DisableDepth != b.DisableDepth) {
+                PerfMonitor::Get().Note_Sprite_Break_Depth();
+                return;
+            }
+        };
+
         size_t bucket_start = 0;
+        bool seen_first_batch = false;
         while (bucket_start < pass_commands.size()) {
             const GpuRenderTarget bucket_target = pass_commands[bucket_start].OutputTarget;
             size_t bucket_end = bucket_start + 1;
             while (bucket_end < pass_commands.size()
                 && pass_commands[bucket_end].OutputTarget == bucket_target) {
                 ++bucket_end;
+            }
+
+            /**
+             *  Crossing a bucket boundary is itself a batch break (different
+             *  OutputTarget = different render-target bind). The first batch
+             *  of the frame doesn't count.
+             */
+            if (seen_first_batch) {
+                PerfMonitor::Get().Note_Sprite_Break_Bucket();
             }
 
             if (bucket_target == GpuRenderTarget::None) {
@@ -278,6 +319,15 @@ namespace Vinifera::Gfx
 
             size_t i = bucket_start;
             while (i < bucket_end) {
+                /**
+                 *  Each new in-bucket batch (after the first) was forced by
+                 *  some field in state_eq differing between pass_commands[i-1]
+                 *  and pass_commands[i]. Classify which one for telemetry.
+                 */
+                if (i > bucket_start) {
+                    classify_break(pass_commands[i - 1], pass_commands[i]);
+                }
+
                 size_t j = i + 1;
                 while (j < bucket_end && state_eq(pass_commands[i], pass_commands[j])) {
                     ++j;
@@ -366,6 +416,7 @@ namespace Vinifera::Gfx
                 Batch.End(device);
                 PerfMonitor::Get().Note_Sprite_Batch();
                 PerfMonitor::Get().Note_Sprite_Draw_Call();
+                seen_first_batch = true;
                 i = j;
             }
 
