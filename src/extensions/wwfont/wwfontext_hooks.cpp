@@ -28,11 +28,13 @@
 #include "graphics_device.h"
 #include "hooker.h"
 #include "optionsext.h"
+#include "primitive_queue.h"
 #include "render_pass.h"
 #include "shp_cache.h"      // PaletteCache lives next to ShpCache
 #include "vinifera_globals.h"
 #include "wwfont.h"
 
+#include <cstdint>
 #include <cstring>
 
 
@@ -55,6 +57,7 @@ Point2D WWFontClassExt::_Print(char const* string, Surface& surface, Rect const&
                                Point2D const& drawpoint, ConvertClass const& convertref,
                                unsigned char const* remap) const
 {
+    using Vinifera::Gfx::EBlend;
     using Vinifera::Gfx::FontAsset;
     using Vinifera::Gfx::FontCache;
     using Vinifera::Gfx::FontDrawCmd;
@@ -63,6 +66,9 @@ Point2D WWFontClassExt::_Print(char const* string, Surface& surface, Rect const&
     using Vinifera::Gfx::GpuRenderTarget;
     using Vinifera::Gfx::PaletteCache;
     using Vinifera::Gfx::PaletteLUT;
+    using Vinifera::Gfx::PrimitiveDrawCmd;
+    using Vinifera::Gfx::PrimitiveKind;
+    using Vinifera::Gfx::PrimitiveQueue;
     using Vinifera::Gfx::RectF;
     using Vinifera::Gfx::RenderPass;
 
@@ -140,6 +146,44 @@ Point2D WWFontClassExt::_Print(char const* string, Surface& surface, Rect const&
     const RenderPass pass = Vinifera::Gfx::Current_Render_Pass();
     const GpuRenderTarget target = gpu->Output_Target();
 
+    /**
+     *  Vanilla `WWFontClass::Print` rasterizes every pixel of each character
+     *  cell (`WidthBlock[c] × Raw_Height`), writing `fontpalette[pixel_idx]`
+     *  for every one. Palette-index-0 pixels — which dominate the cell's
+     *  empty surround and inter-character padding — get painted in the back
+     *  color the caller stuffed into `fontpalette[0]`.
+     *
+     *  Our atlas only stores each glyph's tight visible bbox, so the cell's
+     *  outer padding is never sampled. To mimic vanilla's behaviour we emit
+     *  one PrimitiveQueue solid rect per cell as a pre-pass background;
+     *  PrimitiveQueue flushes before FontQueue (see `sdl_functions.cpp`) so
+     *  the glyph lands on top.
+     *
+     *  When `remap[0] == 0` the caller wanted a transparent surround (vanilla
+     *  pixel-write of 0 → fontpalette[0] == 0 == no-op for that pixel), so
+     *  skip the background entirely.
+     */
+    const unsigned char back_idx = rmap[0];
+    const bool want_background = (back_idx != 0)
+        && (convertref.Translator != nullptr)
+        && PrimitiveQueue::Get().Is_Initialized();
+    float back_rgba[4] = { 0, 0, 0, 0 };
+    if (want_background) {
+        /**
+         *  Decode the back palette color from the same Translator that
+         *  `PaletteCache::Get_Or_Build` uses to build the GPU LUT, so the
+         *  on-screen background matches the on-screen foreground exactly.
+         */
+        const uint16_t v = static_cast<const uint16_t*>(convertref.Translator)[back_idx];
+        const uint8_t r5 = static_cast<uint8_t>((v >> 11) & 0x1F);
+        const uint8_t g6 = static_cast<uint8_t>((v >> 5)  & 0x3F);
+        const uint8_t b5 = static_cast<uint8_t>( v        & 0x1F);
+        back_rgba[0] = static_cast<float>((r5 << 3) | (r5 >> 2)) / 255.0f;
+        back_rgba[1] = static_cast<float>((g6 << 2) | (g6 >> 4)) / 255.0f;
+        back_rgba[2] = static_cast<float>((b5 << 3) | (b5 >> 2)) / 255.0f;
+        back_rgba[3] = 1.0f;
+    }
+
     for (const char* p = string; *p != '\0'; ++p) {
         const unsigned char c = (unsigned char)*p;
 
@@ -154,13 +198,40 @@ Point2D WWFontClassExt::_Print(char const* string, Surface& surface, Rect const&
         if (c == '\n') { xpos = cliprect.X;   ypos += line_height; continue; }
         if (c < 0x20)  { continue; }
 
+        const int cell_w = Char_Pixel_Width((char)c);
+
+        /**
+         *  Per-cell background fill (see comment above the loop). Issued
+         *  even for control chars / zero-width glyphs would be a no-op
+         *  (cell_w == 0), but those are filtered by the `< 0x20` early-out
+         *  above so we only get here for visible advance.
+         */
+        if (want_background && cell_w > 0) {
+            PrimitiveDrawCmd bg = {};
+            bg.Kind = PrimitiveKind::SolidRect;
+            bg.Pass = pass;
+            bg.Blend = EBlend::Opaque;
+            bg.Rect = RectF {
+                (float)xpos * xscale,
+                (float)ypos * yscale,
+                (float)cell_w * xscale,
+                (float)line_height * yscale
+            };
+            bg.Color[0] = back_rgba[0];
+            bg.Color[1] = back_rgba[1];
+            bg.Color[2] = back_rgba[2];
+            bg.Color[3] = back_rgba[3];
+            bg.OutputTarget = target;
+            PrimitiveQueue::Get().Submit(bg);
+        }
+
         const FontGlyphInfo* gi = asset->Get_Glyph(c);
         if (gi == nullptr || gi->W <= 0 || gi->H <= 0) {
             /**
              *  Char_Pixel_Width returns 0 for control chars and `WidthBlock[c] +
              *  FontXSpacing` otherwise — same advance vanilla uses.
              */
-            xpos += Char_Pixel_Width((char)c);
+            xpos += cell_w;
             continue;
         }
 
@@ -180,7 +251,7 @@ Point2D WWFontClassExt::_Print(char const* string, Surface& surface, Rect const&
         cmd.OutputTarget = target;
         FontQueue::Get().Submit(cmd);
 
-        xpos += Char_Pixel_Width((char)c);
+        xpos += cell_w;
     }
 
     /**
