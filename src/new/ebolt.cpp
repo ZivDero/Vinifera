@@ -440,6 +440,6 @@ void EBoltClass::Draw_Bolts()
 
         unsigned color = DSurface::Build_Hicolor_Pixel(data.Color.Red, data.Color.Green, data.Color.Blue);
 
-        CompositeSurface->Draw_Line_entry_34(TacticalRect, start_pixel, end_pixel, color, start_z, end_z);
+        CompositeSurface->Draw_Z_Line(TacticalRect, start_pixel, end_pixel, color, start_z, end_z);
     }
 }

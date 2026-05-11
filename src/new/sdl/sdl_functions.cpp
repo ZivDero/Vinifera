@@ -21,6 +21,7 @@
 #include "font_cache.h"
 #include "font_queue.h"
 #include "gpu_surface.h"
+#include "tactical_line_queue.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
 #include "shp_cache.h"
@@ -483,6 +484,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera FontQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::TacticalLineQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera TacticalLineQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -504,6 +509,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::ShroudFogQueue::Get().Shutdown();
     Vinifera::Gfx::PrimitiveQueue::Get().Shutdown();
     Vinifera::Gfx::FontQueue::Get().Shutdown();
+    Vinifera::Gfx::TacticalLineQueue::Get().Shutdown();
     Vinifera::Gfx::TmpCache::Get().Clear();
     Vinifera::Gfx::TmpAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -970,11 +976,13 @@ bool SDL_Update_Screen(Surface* surface)
         Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
         Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
         Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+        Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
         Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
     }
     Vinifera::Gfx::TileQueue::Get().Clear();
     Vinifera::Gfx::SpriteQueue::Get().Clear();
     Vinifera::Gfx::PrimitiveQueue::Get().Clear();
+    Vinifera::Gfx::TacticalLineQueue::Get().Clear();
     Vinifera::Gfx::FontQueue::Get().Clear();
     Vinifera::Gfx::Reset_Current_Render_Pass();
 

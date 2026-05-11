@@ -18,6 +18,7 @@
 #include "primitive_queue.h"
 #include "render_pass.h"
 #include "rgb.h"
+#include "tactical_line_queue.h"
 #include "vinifera_globals.h"
 
 #include <algorithm>
@@ -71,6 +72,22 @@ namespace
         out[1] = (float)color.Get_Green() / 255.0f;
         out[2] = (float)color.Get_Blue() / 255.0f;
         out[3] = std::clamp(alpha, 0.0f, 1.0f);
+    }
+
+
+    /**
+     *  Lerp two RGBClass entries by `t` in [0, 1]. Mirrors `RGBClass::Lerp`.
+     */
+    void Lerp_RGB(const RGBClass& a, const RGBClass& b, float t, float out[4])
+    {
+        t = std::clamp(t, 0.0f, 1.0f);
+        const float r = (float)a.Get_Red()   + ((float)b.Get_Red()   - (float)a.Get_Red())   * t;
+        const float g = (float)a.Get_Green() + ((float)b.Get_Green() - (float)a.Get_Green()) * t;
+        const float bl = (float)a.Get_Blue() + ((float)b.Get_Blue()  - (float)a.Get_Blue())  * t;
+        out[0] = std::clamp(r / 255.0f, 0.0f, 1.0f);
+        out[1] = std::clamp(g / 255.0f, 0.0f, 1.0f);
+        out[2] = std::clamp(bl / 255.0f, 0.0f, 1.0f);
+        out[3] = 1.0f;
     }
 
 
@@ -146,6 +163,122 @@ namespace
 
         PrimitiveQueue::Get().Submit(cmd);
         return true;
+    }
+
+
+    using Vinifera::Gfx::TacticalLineCmd;
+    using Vinifera::Gfx::TacticalLineQueue;
+    using Vinifera::Gfx::TacticalLineFlag;
+    using Vinifera::Gfx::TLF_NONE;
+    using Vinifera::Gfx::TLF_DEPTH_TEST;
+    using Vinifera::Gfx::TLF_DEPTH_WRITE;
+    using Vinifera::Gfx::TLF_ALPHA_MOD;
+    using Vinifera::Gfx::TLF_ALPHA_TEST_BG;
+    using Vinifera::Gfx::TLF_ALPHA_TEST_FG;
+    using Vinifera::Gfx::TLF_GRADIENT;
+    using Vinifera::Gfx::EDepthStencil;
+
+
+    /**
+     *  Match the screen-Y → SceneRT-depth mapping used by `Draw_Shape` /
+     *  tile rendering: 1/16000 is the project-wide pixel-to-depth scale
+     *  (see [draw_shapeext_hooks.cpp::Depth_From_Screen_Y], [tile_queue.cpp]
+     *  setting `ZDataDepthScale`). Tactical lines must land in the same
+     *  absolute depth range as the sprites and tiles they get z-tested
+     *  against; without the screen-Y baseline the line's depth would
+     *  always be near-0, defeating the per-pixel depth discard.
+     */
+    constexpr float kInvDepthRange = 1.0f / 16000.0f;
+
+    /**
+     *  Small bias keeping tactical lines a hair *nearer* than the matching
+     *  flat-terrain tile at the same screen Y. Without it, line.depth and
+     *  tile.depth land at exactly the same value (`1 - y/16000` from both
+     *  sides) and the line races rounding when the depth-state is
+     *  `LessEqual` — half the line ends up discarded on contact with the
+     *  ground. ~16 pixels worth of bias keeps the line on top while still
+     *  leaving plenty of room for taller sprite z-shape pixels to occlude
+     *  it.
+     */
+    constexpr float kTacticalLineDepthBias = 16.0f * kInvDepthRange;
+
+    inline float Tactical_Line_Depth(float logical_y, int vanilla_z)
+    {
+        float dz = 1.0f - logical_y * kInvDepthRange
+                        + (float)vanilla_z * kInvDepthRange
+                        - kTacticalLineDepthBias;
+        if (dz < 0.001f) dz = 0.001f;
+        if (dz > 0.999f) dz = 0.999f;
+        return dz;
+    }
+
+
+    /**
+     *  Submit one `TacticalLineCmd` covering a line segment with the given
+     *  flag bitmask and blend/depth state. Caller-supplied `start` / `end`
+     *  must already be biased to surface-absolute coords (matching the
+     *  vanilla `Bias_To` step).
+     *
+     *  `vanilla_z_start` / `vanilla_z_end` are the raw integer z values
+     *  that vanilla's CPU rasterizer would have compared against ZBuffer
+     *  bytes (e.g., `14 - Z_Lepton_To_Pixel(coord.Z)` from
+     *  `Tactical::Draw_3D_Line`). The function bakes them into the same
+     *  GPU depth scale that `Depth_From_Screen_Y` produces for sprites /
+     *  tiles — that way `if (line_z > scene_z) discard` in the pixel
+     *  shader compares apples to apples.
+     */
+    bool Submit_Tactical_Line(GpuRenderTarget target,
+                              Point2D start, Point2D end,
+                              const float color_start[4], const float color_end[4],
+                              int vanilla_z_start, int vanilla_z_end,
+                              uint32_t flags,
+                              EBlend blend, EDepthStencil depth)
+    {
+        if (target == GpuRenderTarget::None) return false;
+        if (Vinifera::Gfx::Device == nullptr) return false;
+        if (OptionsExtension != nullptr && OptionsExtension->LegacyRenderer) return false;
+        if (!TacticalLineQueue::Get().Is_Initialized()) return false;
+
+        float xscale = 1.0f;
+        float yscale = 1.0f;
+        if (!Vinifera::Gfx::Logical_To_Render_Target(*Vinifera::Gfx::Device, target, xscale, yscale)) {
+            return false;
+        }
+
+        TacticalLineCmd cmd = {};
+        cmd.X0 = ((float)start.X + 0.5f) * xscale;
+        cmd.Y0 = ((float)start.Y + 0.5f) * yscale;
+        cmd.X1 = ((float)end.X + 0.5f) * xscale;
+        cmd.Y1 = ((float)end.Y + 0.5f) * yscale;
+        cmd.Thickness = std::max(1.0f, std::max(xscale, yscale));
+        cmd.ZStart = Tactical_Line_Depth((float)start.Y, vanilla_z_start);
+        cmd.ZEnd   = Tactical_Line_Depth((float)end.Y,   vanilla_z_end);
+        memcpy(cmd.ColorStart, color_start, sizeof(cmd.ColorStart));
+        memcpy(cmd.ColorEnd,   color_end,   sizeof(cmd.ColorEnd));
+        cmd.Flags = flags;
+        cmd.Blend = blend;
+        cmd.Depth = depth;
+        cmd.Pass = Vinifera::Gfx::Current_Render_Pass();
+        cmd.OutputTarget = target;
+
+        TacticalLineQueue::Get().Submit(cmd);
+        return true;
+    }
+
+
+    /**
+     *  Emit a single 1×1 solid-color quad at (x, y) iff the point lies inside
+     *  `cliprect`. Used by the Bresenham-style ports (Plot_Line, Draw_Ellipse,
+     *  Draw_Lerped_Line, Put_Pixel_Clipped) so each "pixel" the vanilla
+     *  algorithm would have written becomes one PrimitiveQueue quad on the
+     *  GPU.
+     */
+    void Emit_Pixel(GpuRenderTarget target, int x, int y, Rect const& cliprect, const float color[4])
+    {
+        if (!cliprect.Is_Point_Within(Point2D(x, y))) {
+            return;
+        }
+        Submit_Solid_Rect(target, Rect(x, y, 1, 1), color, EBlend::Opaque);
     }
 
 
@@ -341,10 +474,77 @@ bool GpuSurface::Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int op
 }
 
 
-bool GpuSurface::Draw_Ellipse(Point2D, int, int, Rect, int)
+/**
+ *  Midpoint Bresenham ellipse (`XSurface::Draw_Ellipse` IDA port).
+ *
+ *  Walks the four-quadrant ellipse outline in two phases (low-slope and
+ *  high-slope), emitting one 1×1 quad per perimeter pixel. Algorithm mirrors
+ *  the vanilla binary at `0x006A7910`; we drop the surface-Lock pointer math
+ *  and the cardinal-axis `Put_Pixel` calls go through this surface's
+ *  vtable (which re-enters GpuSurface::Put_Pixel below).
+ */
+bool GpuSurface::Draw_Ellipse(Point2D pt, int radius_x, int radius_y, Rect clip, int color)
 {
-    GPU_SURFACE_WARN_STUB("Draw_Ellipse");
-    return false;
+    float rgba[4];
+    Color_From_Hicolor(color, 1.0f, rgba);
+
+    /* Four cardinal-axis points first. */
+    Put_Pixel(Point2D(pt.X, pt.Y + radius_y), color);
+    Put_Pixel(Point2D(pt.X, pt.Y - radius_y), color);
+    Put_Pixel(Point2D(pt.X + radius_x, pt.Y), color);
+    Put_Pixel(Point2D(pt.X - radius_x, pt.Y), color);
+
+    const int a_sq = radius_x * radius_x;
+    const int b_sq = radius_y * radius_y;
+
+    /* Phase 1: low slope (|dy/dx| < 1), start at top, walk outward in X. */
+    int y = radius_y;
+    int x = 0;
+    int var1 = 0;
+    int var2 = 2 * radius_y * a_sq;
+    int delta = (a_sq / 4) - radius_y * a_sq;
+
+    while (true) {
+        delta += b_sq + var1;
+        if (delta >= 0) {
+            var2 -= 2 * a_sq;
+            delta -= var2;
+            --y;
+        }
+        var1 += 2 * b_sq;
+        ++x;
+        if (var1 >= var2) break;
+
+        Emit_Pixel(OutputTarget, pt.X + x, pt.Y + y, clip, rgba);
+        Emit_Pixel(OutputTarget, pt.X - x, pt.Y - y, clip, rgba);
+        Emit_Pixel(OutputTarget, pt.X + x, pt.Y - y, clip, rgba);
+        Emit_Pixel(OutputTarget, pt.X - x, pt.Y + y, clip, rgba);
+    }
+
+    /* Phase 2: high slope (|dy/dx| > 1), start at right, walk outward in Y. */
+    int x2 = radius_x;
+    int y2 = 0;
+    int var1b = 2 * radius_x * b_sq;
+    int var2b = 0;
+    int deltab = (b_sq / 4) - radius_x * b_sq;
+
+    while (true) {
+        deltab += a_sq + var2b;
+        if (deltab >= 0) {
+            var1b -= 2 * b_sq;
+            deltab -= var1b;
+            --x2;
+        }
+        var2b += 2 * a_sq;
+        ++y2;
+        if (var2b > var1b) break;
+
+        Emit_Pixel(OutputTarget, pt.X + x2, pt.Y + y2, clip, rgba);
+        Emit_Pixel(OutputTarget, pt.X - x2, pt.Y - y2, clip, rgba);
+        Emit_Pixel(OutputTarget, pt.X + x2, pt.Y - y2, clip, rgba);
+        Emit_Pixel(OutputTarget, pt.X - x2, pt.Y + y2, clip, rgba);
+    }
+    return true;
 }
 
 
@@ -354,18 +554,6 @@ bool GpuSurface::Put_Pixel(Point2D const& point, int color)
     Color_From_Hicolor(color, 1.0f, rgba);
     Rect pixel(point.X, point.Y, 1, 1);
     return Submit_Solid_Rect(OutputTarget, pixel, rgba, EBlend::Opaque);
-}
-
-
-int GpuSurface::Get_Pixel(Point2D const&)
-{
-    /**
-     *  Reading a pixel back from the GPU requires a CPU readback / staging
-     *  texture. No vanilla code path in our audit reads pixels from a
-     *  tactical surface in performance-sensitive contexts — warn-stub.
-     */
-    GPU_SURFACE_WARN_STUB("Get_Pixel");
-    return 0;
 }
 
 
@@ -380,35 +568,211 @@ bool GpuSurface::Draw_Line(Rect const& cliprect, Point2D const& startpoint, Poin
     float rgba[4];
     Color_From_Hicolor(color, 1.0f, rgba);
     Rect clip = Intersect(cliprect, Get_Rect());
-    return Submit_Line(OutputTarget, clip, startpoint, endpoint, rgba);
+    /**
+     *  Vanilla `XSurface::Draw_Line(cliprect, ...)` treats start / end as
+     *  cliprect-relative; bias them into surface-absolute coords before
+     *  submitting (matches the old `Intersected_Clip_Origin` step the
+     *  pre-GpuSurface SDLSurface override did).
+     */
+    return Submit_Line(OutputTarget, clip,
+        Bias_To(startpoint, clip),
+        Bias_To(endpoint, clip),
+        rgba);
 }
 
 
-bool GpuSurface::Draw_Line_entry_34(Rect const&, Point2D const&, Point2D const&, int, int, int, bool)
+/**
+ *  Depth-tested, alpha-modulated constant-color line (`DSurface::Draw_Z_Line`
+ *  IDA port). `z_start` / `z_end` are z values at the line endpoints
+ *  (interpolated by the shader along the line). `write_depth` enables
+ *  depth-write — vanilla conditionally writes the interpolated z into the
+ *  depth buffer on each visible pixel. Maps to one TacticalLineCmd with
+ *  `TLF_DEPTH_TEST | TLF_ALPHA_MOD` plus optional `TLF_DEPTH_WRITE`.
+ *
+ *  Vanilla source-tree name: `DSurface::Draw_Line_entry_34` (`0x0048EA90`).
+ */
+bool GpuSurface::Draw_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int z_start, int z_end, bool write_depth)
 {
-    GPU_SURFACE_WARN_STUB("Draw_Line_entry_34");
-    return false;
+    Rect clip = Intersect(cliprect, Get_Rect());
+    Point2D s = Bias_To(startpoint, clip);
+    Point2D e = Bias_To(endpoint,   clip);
+
+    float rgba[4];
+    Color_From_Hicolor(color, 1.0f, rgba);
+
+    uint32_t flags = TLF_DEPTH_TEST | TLF_ALPHA_MOD;
+    if (write_depth) flags |= TLF_DEPTH_WRITE;
+
+    const EDepthStencil depth_state = write_depth ? EDepthStencil::WriteLessEqual
+                                                  : EDepthStencil::TestLessEqual_NoWrite;
+
+    return Submit_Tactical_Line(OutputTarget, s, e, rgba, rgba, z_start, z_end,
+                                flags, EBlend::Premultiplied, depth_state);
 }
 
 
-bool GpuSurface::Draw_Line_entry_38(Rect const&, Point2D const&, Point2D const&, int, int, int, bool)
+/**
+ *  Depth-tested "brighten existing scene" line (`DSurface::Brighten_Line`
+ *  IDA port). Vanilla reads the existing surface pixel and adds
+ *  `(brightness * channel) >> 8` per channel (saturated) — there is no
+ *  color input, the line tints whatever is already there. On GPU a true
+ *  read-modify-write of the same RT we're drawing into needs an
+ *  intermediate copy. The cheap approximation: emit a neutral additive
+ *  tint scaled by `brightness/256`, which writes a uniform brighten
+ *  regardless of the underlying pixel color.
+ *
+ *  Vanilla source-tree name: `DSurface::Draw_Line_entry_38` (`0x0048C150`).
+ */
+bool GpuSurface::Brighten_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int brightness, int z_start, int z_end, bool write_depth)
 {
-    GPU_SURFACE_WARN_STUB("Draw_Line_entry_38");
-    return false;
+    Rect clip = Intersect(cliprect, Get_Rect());
+    Point2D s = Bias_To(startpoint, clip);
+    Point2D e = Bias_To(endpoint,   clip);
+
+    const float factor = std::clamp((float)brightness / 256.0f, 0.0f, 1.0f);
+    float rgba[4] = { factor, factor, factor, 1.0f };
+
+    uint32_t flags = TLF_DEPTH_TEST;
+    if (write_depth) flags |= TLF_DEPTH_WRITE;
+
+    const EDepthStencil depth_state = write_depth ? EDepthStencil::WriteLessEqual
+                                                  : EDepthStencil::TestLessEqual_NoWrite;
+
+    return Submit_Tactical_Line(OutputTarget, s, e, rgba, rgba, z_start, z_end,
+                                flags, EBlend::Additive, depth_state);
 }
 
 
-bool GpuSurface::Draw_Line_entry_3C(Rect const&, Point2D const&, Point2D const&, RGBClass const&, int, int, bool, bool, bool, bool, float)
+/**
+ *  Depth-tested gradient laser line (`DSurface::Draw_Gradient_Z_Line` IDA
+ *  port). `color` is the line tint, `opacity` is in [0, 1], the bools
+ *  control depth-write / alpha-mod / gradient modes. Maps to a gradient
+ *  TacticalLine with additive blend (the visual approximation of vanilla's
+ *  "scene + tinted line" effect).
+ *
+ *  Vanilla source-tree name: `DSurface::Draw_Line_entry_3C` (`0x0048CC00`).
+ */
+bool GpuSurface::Draw_Gradient_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int z_start, int z_end, bool write_depth, bool gradient, bool alpha_modulate, bool unused_flag, float opacity)
 {
-    GPU_SURFACE_WARN_STUB("Draw_Line_entry_3C");
-    return false;
+    Rect clip = Intersect(cliprect, Get_Rect());
+    Point2D s = Bias_To(startpoint, clip);
+    Point2D e = Bias_To(endpoint,   clip);
+
+    const float op = std::clamp(opacity, 0.0f, 1.0f);
+    float rgba_start[4];
+    float rgba_end[4];
+    Color_From_RGB(color, op, rgba_start);
+    rgba_start[0] *= op;
+    rgba_start[1] *= op;
+    rgba_start[2] *= op;
+    rgba_end[0] = 0.0f;
+    rgba_end[1] = 0.0f;
+    rgba_end[2] = 0.0f;
+    rgba_end[3] = 0.0f;
+
+    /**
+     *  Vanilla layout has four bool toggles; the first three drive depth-
+     *  write, gradient enable, and alpha-buffer modulate respectively. The
+     *  fourth is unused in observed call sites; retain it in the signature
+     *  for vanilla parity. If a specific caller turns out to depend on a
+     *  different mapping, this is where to adjust.
+     */
+    uint32_t flags = TLF_DEPTH_TEST;
+    if (write_depth)    flags |= TLF_DEPTH_WRITE;
+    if (gradient)       flags |= TLF_GRADIENT;
+    if (alpha_modulate) flags |= TLF_ALPHA_MOD;
+    (void)unused_flag;
+
+    const EDepthStencil depth_state = write_depth ? EDepthStencil::WriteLessEqual
+                                                  : EDepthStencil::TestLessEqual_NoWrite;
+
+    return Submit_Tactical_Line(OutputTarget, s, e, rgba_start, rgba_end, z_start, z_end,
+                                flags, EBlend::Additive, depth_state);
 }
 
 
-bool GpuSurface::Plot_Line(Rect const&, Point2D const&, Point2D const&, void (*)(Point2D&))
+/**
+ *  Bresenham line that invokes a caller-supplied callback once per pixel
+ *  (`XSurface::Plot_Line` IDA port, `0x006A7150`). The callback is user
+ *  code — it may itself call back into the surface via Put_Pixel or any
+ *  other method, which on `GpuSurface` re-routes through GPU primitive
+ *  submissions. We do not pre-Lock the surface; vanilla's Unlock at the
+ *  end of the routine is a no-op for us.
+ */
+bool GpuSurface::Plot_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, void (*drawer_callback)(Point2D&))
 {
-    GPU_SURFACE_WARN_STUB("Plot_Line");
-    return false;
+    if (drawer_callback == nullptr) {
+        return false;
+    }
+
+    Rect clip = Intersect(cliprect, Get_Rect());
+    Point2D start = Bias_To(startpoint, clip);
+    Point2D end   = Bias_To(endpoint,   clip);
+
+    if (!Clip_Line(start, end, clip)) {
+        return false;
+    }
+
+    if (start.X > end.X) {
+        std::swap(start, end);
+    }
+
+    if (start.Y == end.Y) {
+        /* Horizontal. */
+        const int dx = end.X - start.X;
+        for (int i = 0; i <= dx; ++i) {
+            Point2D p(start.X + i, end.Y);
+            drawer_callback(p);
+        }
+    } else if (start.X == end.X) {
+        /* Vertical. */
+        int y_lo = std::min(start.Y, end.Y);
+        int dy = std::abs(start.Y - end.Y);
+        for (int i = 0; i <= dy; ++i) {
+            Point2D p(start.X, y_lo + i);
+            drawer_callback(p);
+        }
+    } else {
+        /* Diagonal Bresenham — two-octant split (low / high slope). */
+        const int dx = end.X - start.X;
+        int dy = end.Y - start.Y;
+        const int sy = (dy < 0) ? -1 : 1;
+        dy = std::abs(dy);
+        const int dx2 = 2 * dx;
+        const int dy2 = 2 * dy;
+
+        if (dx > dy) {
+            /* Low slope. */
+            int delta = dy2 - dx;
+            int yy = start.Y;
+            for (int x = start.X; x <= end.X; ++x) {
+                Point2D p(x, yy);
+                drawer_callback(p);
+                if (delta > 0) {
+                    delta -= dx2;
+                    yy += sy;
+                }
+                delta += dy2;
+            }
+        } else {
+            /* High slope. */
+            int delta = dx2 - dy;
+            int xx = start.X;
+            int yy = start.Y;
+            for (int i = 0; i <= dy; ++i) {
+                Point2D p(xx, yy);
+                drawer_callback(p);
+                if (delta > 0) {
+                    delta -= dy2;
+                    ++xx;
+                }
+                delta += dx2;
+                yy += sy;
+            }
+        }
+    }
+
+    return true;
 }
 
 
@@ -477,17 +841,122 @@ int GpuSurface::Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpo
 }
 
 
-int GpuSurface::entry_48(Point2D const&, Point2D const&, int, bool[], int offset, bool)
+/**
+ *  Alpha-mask dashed line (`DSurface::Draw_Dashed_Alpha_Line` source
+ *  port). Walks Bresenham, advances the 16-entry dash pattern per pixel;
+ *  for each "on" pixel emits a 1×1 TacticalLineCmd with the chosen
+ *  alpha-mask flag (TLF_ALPHA_TEST_BG when `alpha_test_bg` true → write
+ *  only where alpha == 0, the shroud-only mask; TLF_ALPHA_TEST_FG when
+ *  false → write only where alpha != 0, the lit-only mask). Returns the
+ *  advanced pattern index.
+ *
+ *  Vanilla source-tree name: `DSurface::entry_48` (`0x0048F4B0`).
+ */
+int GpuSurface::Draw_Dashed_Alpha_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int pattern_index, bool alpha_test_bg)
 {
-    GPU_SURFACE_WARN_STUB("entry_48");
-    return offset;
+    if (pattern == nullptr) {
+        return pattern_index;
+    }
+
+    Rect clip = Get_Rect();
+    Point2D start = startpoint;
+    Point2D end = endpoint;
+    int pattern_step = 1;
+
+    if (start.X > end.X) {
+        std::swap(start, end);
+        const int dx = std::abs(start.X - end.X);
+        const int dy = std::abs(start.Y - end.Y) + 1;
+        const int len = std::max(dx, dy);
+        pattern_index = (pattern_index + len) % 16;
+        pattern_step = -1;
+    }
+
+    if (!Clip_Line(start, end, clip)) {
+        return pattern_index;
+    }
+
+    float rgba[4];
+    Color_From_Hicolor(color, 1.0f, rgba);
+    const uint32_t flags = alpha_test_bg ? TLF_ALPHA_TEST_BG : TLF_ALPHA_TEST_FG;
+
+    /**
+     *  Per-pixel walk so we can advance pattern_index correctly. Each "on"
+     *  pixel becomes one 1×1 line. The alpha mask is enforced per-pixel by
+     *  the shader sampling AlphaTex.
+     */
+    auto emit_if_on = [&](int x, int y) {
+        if (pattern[pattern_index & 15]) {
+            Submit_Tactical_Line(OutputTarget, Point2D(x, y), Point2D(x, y),
+                                 rgba, rgba, 0, 0,
+                                 flags, EBlend::Opaque, EDepthStencil::None);
+        }
+        pattern_index = (pattern_index + pattern_step) & 15;
+    };
+
+    if (start.Y == end.Y) {
+        for (int x = start.X; x <= end.X; ++x) emit_if_on(x, start.Y);
+    } else if (start.X == end.X) {
+        const int y_lo = std::min(start.Y, end.Y);
+        const int dy = std::abs(end.Y - start.Y);
+        for (int i = 0; i <= dy; ++i) emit_if_on(start.X, y_lo + i);
+    } else {
+        const int dx = end.X - start.X;
+        int dy = end.Y - start.Y;
+        const int sy = (dy < 0) ? -1 : 1;
+        dy = std::abs(dy);
+        const int dx2 = 2 * dx;
+        const int dy2 = 2 * dy;
+
+        if (dx > dy) {
+            int delta = dy2 - dx;
+            int yy = start.Y;
+            for (int i = 0; i <= dx; ++i) {
+                emit_if_on(start.X + i, yy);
+                if (delta > 0) {
+                    delta -= dx2;
+                    yy += sy;
+                }
+                delta += dy2;
+            }
+        } else {
+            int delta = dx2 - dy;
+            int xx = start.X;
+            int yy = start.Y;
+            for (int i = 0; i <= dy; ++i) {
+                emit_if_on(xx, yy);
+                if (delta > 0) {
+                    delta -= dy2;
+                    ++xx;
+                }
+                delta += dx2;
+                yy += sy;
+            }
+        }
+    }
+
+    return pattern_index;
 }
 
 
-bool GpuSurface::entry_4C(Point2D const&, Point2D const&, int, bool)
+/**
+ *  Alpha-mask line (`DSurface::Draw_Alpha_Line` source port). Like the
+ *  dashed variant but no dash pattern — every pixel is "on", just gated by
+ *  the alpha mask. Maps to a single TacticalLineCmd with `TLF_ALPHA_TEST_FG`.
+ *
+ *  Vanilla source-tree name: `DSurface::entry_4C` (`0x0048FB90`).
+ */
+bool GpuSurface::Draw_Alpha_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool /*unused*/)
 {
-    GPU_SURFACE_WARN_STUB("entry_4C");
-    return false;
+    Rect clip = Get_Rect();
+    Point2D s = Bias_To(startpoint, clip);
+    Point2D e = Bias_To(endpoint,   clip);
+
+    float rgba[4];
+    Color_From_Hicolor(color, 1.0f, rgba);
+
+    return Submit_Tactical_Line(OutputTarget, s, e, rgba, rgba, 0, 0,
+                                TLF_ALPHA_TEST_FG, EBlend::Opaque, EDepthStencil::None);
 }
 
 
@@ -506,24 +975,33 @@ bool GpuSurface::Draw_Rect(Rect const& cliprect, Rect const& rect, int color)
     float rgba[4];
     Color_From_Hicolor(color, 1.0f, rgba);
 
-    Point2D top_left(rect.X, rect.Y);
-    Point2D top_right(rect.X + rect.Width - 1, rect.Y);
-    Point2D bottom_left(rect.X, rect.Y + rect.Height - 1);
-    Point2D bottom_right(rect.X + rect.Width - 1, rect.Y + rect.Height - 1);
+    /**
+     *  `rect` is cliprect-relative (matches vanilla `XSurface::Draw_Rect`);
+     *  bias it into surface-absolute coords by adding the intersected clip
+     *  origin. Same step the pre-GpuSurface SDLSurface override did via
+     *  `rect.Bias_To(Intersect(cliprect, Get_Rect()))`.
+     */
+    Rect clip = Intersect(cliprect, Get_Rect());
+    Rect biased = rect.Bias_To(clip);
 
-    Submit_Line(OutputTarget, cliprect, top_left, top_right, rgba);
-    if (rect.Height > 1) {
-        Submit_Line(OutputTarget, cliprect, bottom_left, bottom_right, rgba);
+    Point2D top_left(biased.X, biased.Y);
+    Point2D top_right(biased.X + biased.Width - 1, biased.Y);
+    Point2D bottom_left(biased.X, biased.Y + biased.Height - 1);
+    Point2D bottom_right(biased.X + biased.Width - 1, biased.Y + biased.Height - 1);
+
+    Submit_Line(OutputTarget, clip, top_left, top_right, rgba);
+    if (biased.Height > 1) {
+        Submit_Line(OutputTarget, clip, bottom_left, bottom_right, rgba);
     }
-    if (rect.Height > 2) {
-        Submit_Line(OutputTarget, cliprect,
-            Point2D(rect.X, rect.Y + 1),
-            Point2D(rect.X, rect.Y + rect.Height - 2),
+    if (biased.Height > 2) {
+        Submit_Line(OutputTarget, clip,
+            Point2D(biased.X, biased.Y + 1),
+            Point2D(biased.X, biased.Y + biased.Height - 2),
             rgba);
-        if (rect.Width > 1) {
-            Submit_Line(OutputTarget, cliprect,
-                Point2D(rect.X + rect.Width - 1, rect.Y + 1),
-                Point2D(rect.X + rect.Width - 1, rect.Y + rect.Height - 2),
+        if (biased.Width > 1) {
+            Submit_Line(OutputTarget, clip,
+                Point2D(biased.X + biased.Width - 1, biased.Y + 1),
+                Point2D(biased.X + biased.Width - 1, biased.Y + biased.Height - 2),
                 rgba);
         }
     }
@@ -531,15 +1009,116 @@ bool GpuSurface::Draw_Rect(Rect const& cliprect, Rect const& rect, int color)
 }
 
 
-bool GpuSurface::entry_84(Point2D const&, int, Rect const&)
+/**
+ *  Put a single pixel iff the point lies inside `rect`. Source-faithful port
+ *  of `XSurface::Put_Pixel_Clipped` — vanilla just gates Put_Pixel on
+ *  Is_Point_Within.
+ *
+ *  Vanilla source-tree name: `XSurface::entry_84` (`0x006A7550`).
+ */
+bool GpuSurface::Put_Pixel_Clipped(Point2D const& point, int color, Rect const& rect)
 {
-    GPU_SURFACE_WARN_STUB("entry_84");
-    return false;
+    if (!rect.Is_Point_Within(point)) {
+        return false;
+    }
+    return Put_Pixel(point, color);
 }
 
 
-bool GpuSurface::entry_90(Rect&, Point2D&, Point2D&, RGBClass&, RGBClass&, float&, float&)
+/**
+ *  Gradient line with ping-pong color interpolation
+ *  (`DSurface::Draw_Lerped_Line` source port, IDA-verified). Walks
+ *  Bresenham, computes a per-pixel lerp(startColor, endColor, t), and
+ *  emits each pixel as a 1×1 quad. The `t` / `step` are by-reference so a
+ *  caller can chain multiple segments through the same gradient state.
+ *
+ *  Vanilla source-tree name: `DSurface::entry_90` (`0x0048E4B0`).
+ */
+bool GpuSurface::Draw_Lerped_Line(Rect& cliprect, Point2D& startpoint, Point2D& endpoint, RGBClass& startcolor, RGBClass& endcolor, float& t, float& step)
 {
-    GPU_SURFACE_WARN_STUB("entry_90");
-    return false;
+    Rect clip = Intersect(cliprect, Get_Rect());
+    Point2D start = Bias_To(startpoint, clip);
+    Point2D end   = Bias_To(endpoint,   clip);
+
+    if (!Clip_Line(start, end, clip)) {
+        return false;
+    }
+    if (start.X > end.X) {
+        std::swap(start, end);
+    }
+
+    auto advance_t = [&]() {
+        t += step;
+        if (t < 0.0f) {
+            if (step < 0.0f) t = 0.0f;
+            step = -step;
+        } else if (t > 1.0f) {
+            if (step > 0.0f) t = 1.0f;
+            step = -step;
+        }
+    };
+
+    if (start.Y == end.Y) {
+        /* Horizontal. */
+        const int dx = end.X - start.X;
+        for (int i = 0; i <= dx; ++i) {
+            float rgba[4];
+            Lerp_RGB(startcolor, endcolor, t, rgba);
+            Emit_Pixel(OutputTarget, start.X + i, start.Y, clip, rgba);
+            advance_t();
+        }
+    } else if (start.X == end.X) {
+        /* Vertical. */
+        const int sy = (start.Y > end.Y) ? -1 : 1;
+        const int dy = std::abs(end.Y - start.Y);
+        for (int i = 0; i <= dy; ++i) {
+            float rgba[4];
+            Lerp_RGB(startcolor, endcolor, t, rgba);
+            Emit_Pixel(OutputTarget, start.X, start.Y + i * sy, clip, rgba);
+            advance_t();
+        }
+    } else {
+        const int dx = end.X - start.X;
+        int dy = end.Y - start.Y;
+        const int sy = (dy < 0) ? -1 : 1;
+        dy = std::abs(dy);
+        const int dx2 = 2 * dx;
+        const int dy2 = 2 * dy;
+
+        if (dx > dy) {
+            /* Low slope. */
+            int delta = dy2 - dx;
+            int yy = start.Y;
+            for (int i = 0; i <= dx; ++i) {
+                float rgba[4];
+                Lerp_RGB(startcolor, endcolor, t, rgba);
+                Emit_Pixel(OutputTarget, start.X + i, yy, clip, rgba);
+                advance_t();
+                if (delta > 0) {
+                    delta -= dx2;
+                    yy += sy;
+                }
+                delta += dy2;
+            }
+        } else {
+            /* High slope. */
+            int delta = dx2 - dy;
+            int xx = 0;
+            int yy = start.Y;
+            for (int i = 0; i <= dy; ++i) {
+                float rgba[4];
+                Lerp_RGB(startcolor, endcolor, t, rgba);
+                Emit_Pixel(OutputTarget, start.X + xx, yy, clip, rgba);
+                advance_t();
+                if (delta > 0) {
+                    delta -= dy2;
+                    ++xx;
+                }
+                delta += dx2;
+                yy += sy;
+            }
+        }
+    }
+
+    return true;
 }

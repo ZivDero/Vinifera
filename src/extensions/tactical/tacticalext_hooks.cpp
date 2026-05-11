@@ -1,4 +1,4 @@
-/*******************************************************************************
+﻿/*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
  *  @brief  Contains the hooks for the extended Tactical class.
@@ -629,7 +629,7 @@ void TacticalExt::_Draw_Rally_Points(bool blit)
                     end_pos.Y += 2;
                     if (Clip_Line(start_pos, end_pos, TacticalRect))
                     {
-                        LogicalSurface->entry_48(start_pos, end_pos, color_black, _pattern, offset, blit);
+                        LogicalSurface->Draw_Dashed_Alpha_Line(start_pos, end_pos, color_black, _pattern, offset, blit);
                     }
 
                     /**
@@ -640,14 +640,14 @@ void TacticalExt::_Draw_Rally_Points(bool blit)
                     --end_pos.Y;
                     if (Clip_Line(start_pos, end_pos, TacticalRect))
                     {
-                        LogicalSurface->entry_48(start_pos, end_pos, color, _pattern, offset, blit);
+                        LogicalSurface->Draw_Dashed_Alpha_Line(start_pos, end_pos, color, _pattern, offset, blit);
                     }
 
                     --start_pos.Y;
                     --end_pos.Y;
                     if (Clip_Line(start_pos, end_pos, TacticalRect))
                     {
-                        LogicalSurface->entry_48(start_pos, end_pos, color, _pattern, offset, blit);
+                        LogicalSurface->Draw_Dashed_Alpha_Line(start_pos, end_pos, color, _pattern, offset, blit);
                     }
                 }
             }
@@ -717,7 +717,7 @@ DEFINE_HOOK(0x006172DB, _Tactical_Draw_Waypoint_Paths_NormaliseLineAnimation_Pat
     start_pos.Y += 2;
     end_pos.Y += 2;
     if (Clip_Line(start_pos, end_pos, TacticalRect)) {
-        LogicalSurface->entry_48(start_pos, end_pos, color_black, _pattern, offset, blit);
+        LogicalSurface->Draw_Dashed_Alpha_Line(start_pos, end_pos, color_black, _pattern, offset, blit);
     }
 
     /**
@@ -727,13 +727,13 @@ DEFINE_HOOK(0x006172DB, _Tactical_Draw_Waypoint_Paths_NormaliseLineAnimation_Pat
     --start_pos.Y;
     --end_pos.Y;
     if (Clip_Line(start_pos, end_pos, TacticalRect)) {
-        LogicalSurface->entry_48(start_pos, end_pos, color, _pattern, offset, blit);
+        LogicalSurface->Draw_Dashed_Alpha_Line(start_pos, end_pos, color, _pattern, offset, blit);
     }
 
     --start_pos.Y;
     --end_pos.Y;
     if (Clip_Line(start_pos, end_pos, TacticalRect)) {
-        LogicalSurface->entry_48(start_pos, end_pos, color, _pattern, offset, blit);
+        LogicalSurface->Draw_Dashed_Alpha_Line(start_pos, end_pos, color, _pattern, offset, blit);
     }
 
     return(0x00617307);
@@ -762,7 +762,7 @@ DEFINE_HOOK(0x00617327, _Tactical_Draw_Waypoint_Paths_DrawNormalLine_Patch, 0)
     start_pos.Y += 2;
     end_pos.Y += 2;
     if (Clip_Line(start_pos, end_pos, TacticalRect)) {
-        LogicalSurface->entry_4C(start_pos, end_pos, color_black, false);
+        LogicalSurface->Draw_Alpha_Line(start_pos, end_pos, color_black, false);
     }
 
     /**
@@ -772,13 +772,13 @@ DEFINE_HOOK(0x00617327, _Tactical_Draw_Waypoint_Paths_DrawNormalLine_Patch, 0)
     --start_pos.Y;
     --end_pos.Y;
     if (Clip_Line(start_pos, end_pos, TacticalRect)) {
-        LogicalSurface->entry_4C(start_pos, end_pos, color, false);
+        LogicalSurface->Draw_Alpha_Line(start_pos, end_pos, color, false);
     }
 
     --start_pos.Y;
     --end_pos.Y;
     if (Clip_Line(start_pos, end_pos, TacticalRect)) {
-        LogicalSurface->entry_4C(start_pos, end_pos, color, false);
+        LogicalSurface->Draw_Alpha_Line(start_pos, end_pos, color, false);
     }
 
     return(0x00617307);
@@ -1102,3 +1102,4 @@ void TacticalExtension_Hooks()
     Patch_Call(0x00611AF4, &SpotLight_Draw_All_Post_Effects);
     Patch_Call(0x00611B4A, &TacticalExt::_Draw_Rubber_Band_UI_Overlay);
 }
+

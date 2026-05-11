@@ -68,20 +68,31 @@ public:
     bool Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int opacity) override;
     bool Draw_Ellipse(Point2D center, int radius_x, int radius_y, Rect clip, int color) override;
     bool Put_Pixel(Point2D const& point, int color) override;
-    int Get_Pixel(Point2D const& point) override;
     bool Draw_Line(Point2D const& startpoint, Point2D const& endpoint, int color) override;
     bool Draw_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color) override;
-    bool Draw_Line_entry_34(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int a5, int a6, bool a7 = false) override;
-    bool Draw_Line_entry_38(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int a4, int a5, int a6, bool a7 = false) override;
-    bool Draw_Line_entry_3C(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int a5, int a6, bool a7, bool a8, bool a9, bool a10, float a11) override;
+    /**
+     *  Cross-reference table for vanilla source-tree names (the names
+     *  used in the historical TS source dump under `Tiberian-Sun/code`):
+     *
+     *      Draw_Z_Line             → DSurface::Draw_Line_entry_34   (0x0048EA90)
+     *      Brighten_Line           → DSurface::Draw_Line_entry_38   (0x0048C150)
+     *      Draw_Gradient_Z_Line    → DSurface::Draw_Line_entry_3C   (0x0048CC00)
+     *      Draw_Dashed_Alpha_Line  → DSurface::entry_48             (0x0048F4B0)
+     *      Draw_Alpha_Line         → DSurface::entry_4C             (0x0048FB90)
+     *      Put_Pixel_Clipped       → XSurface::entry_84             (0x006A7550)
+     *      Draw_Lerped_Line        → DSurface::entry_90             (0x0048E4B0)
+     */
+    bool Draw_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int z_start, int z_end, bool write_depth = false) override;
+    bool Brighten_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int brightness, int z_start, int z_end, bool write_depth = false) override;
+    bool Draw_Gradient_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int z_start, int z_end, bool write_depth, bool gradient, bool alpha_modulate, bool unused_flag, float opacity) override;
     bool Plot_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, void (*drawer_callback)(Point2D&)) override;
     int Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset) override;
-    int entry_48(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset, bool a6) override;
-    bool entry_4C(Point2D const& startpoint, Point2D const& endpoint, int color, bool a4 = false) override;
+    int Draw_Dashed_Alpha_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int offset, bool alpha_test_bg) override;
+    bool Draw_Alpha_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool unused = false) override;
     bool Draw_Rect(Rect const& rect, int color) override;
     bool Draw_Rect(Rect const& cliprect, Rect const& rect, int color) override;
-    bool entry_84(Point2D const& point, int color, Rect const& rect) override;
-    bool entry_90(Rect& area, Point2D& start, Point2D& end, RGBClass& a4, RGBClass& a5, float& a6, float& a7) override;
+    bool Put_Pixel_Clipped(Point2D const& point, int color, Rect const& rect) override;
+    bool Draw_Lerped_Line(Rect& cliprect, Point2D& startpoint, Point2D& endpoint, RGBClass& startcolor, RGBClass& endcolor, float& t, float& step) override;
 
 protected:
     Vinifera::Gfx::GpuRenderTarget OutputTarget;
