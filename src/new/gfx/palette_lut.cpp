@@ -22,16 +22,6 @@ namespace Vinifera::Gfx
                                    D3D11_USAGE_DEFAULT, nullptr, 0)) {
             return false;
         }
-        if (!RemapTex.Initialize(device, 16, 1, DXGI_FORMAT_R8_UINT,
-                                 D3D11_USAGE_DEFAULT, nullptr, 0)) {
-            Shutdown();
-            return false;
-        }
-
-        /**
-         *  Default remap = identity (16..31 stay as 16..31).
-         */
-        Update_Remap(nullptr);
         return true;
     }
 
@@ -39,7 +29,6 @@ namespace Vinifera::Gfx
     void PaletteLUT::Shutdown()
     {
         PaletteTex.Shutdown();
-        RemapTex.Shutdown();
     }
 
 
@@ -74,20 +63,5 @@ namespace Vinifera::Gfx
         }
 
         PaletteTex.Set_Data(lut, 256 * 4);
-    }
-
-
-    void PaletteLUT::Update_Remap(const uint8_t* remap_indices)
-    {
-        if (RemapTex.Get_Texture() == nullptr) {
-            return;
-        }
-        uint8_t buf[16];
-        if (remap_indices != nullptr) {
-            memcpy(buf, remap_indices, 16);
-        } else {
-            for (int i = 0; i < 16; ++i) buf[i] = (uint8_t)(16 + i);
-        }
-        RemapTex.Set_Data(buf, 16);
     }
 }

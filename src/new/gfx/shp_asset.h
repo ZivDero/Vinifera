@@ -20,8 +20,6 @@
 #include <string>
 #include <vector>
 
-#include "texture2d.h"
-
 
 namespace Vinifera::Gfx
 {
@@ -34,7 +32,7 @@ namespace Vinifera::Gfx
         int  Y = 0;          // origin Y relative to logical (0,0)
         int  W = 0;          // frame width in pixels
         int  H = 0;          // frame height in pixels
-        int  AtlasX = 0;     // pixel offset of this frame in the atlas
+        int  AtlasX = 0;     // pixel offset of this frame in the shared atlas page
         int  AtlasY = 0;
         bool Transparent = false;
         bool RLE = false;
@@ -70,22 +68,22 @@ namespace Vinifera::Gfx
 
         void Unload();
 
-        bool Is_Loaded() const { return Atlas.Get_SRV() != nullptr; }
+        bool Is_Loaded() const { return AtlasPage >= 0; }
 
         int                 Frame_Count() const { return (int)Frames.size(); }
         int                 Logical_Width() const { return LogicalWidth; }
         int                 Logical_Height() const { return LogicalHeight; }
         const ShpFrameInfo* Get_Frame(int index) const;
 
-        Texture2D&          Get_Atlas() { return Atlas; }
-        const Texture2D&    Get_Atlas() const { return Atlas; }
+        /** Index into ShpAtlas::Get_Page(). -1 if unloaded. */
+        int                 Atlas_Page() const { return AtlasPage; }
 
         const std::string&  Source_Path() const { return SourcePath; }
 
     private:
         bool Decompress_Line_RLE(const uint8_t*& src, const uint8_t* src_end, uint8_t* row_dst, int row_w);
 
-        Texture2D                  Atlas;
+        int                        AtlasPage = -1;
         std::vector<ShpFrameInfo>  Frames;
         int                        LogicalWidth = 0;
         int                        LogicalHeight = 0;

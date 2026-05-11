@@ -49,7 +49,7 @@ namespace Vinifera::Gfx
         PaletteLUT*     Palette = nullptr;
         RectF           Dst = {};                // dst rect in logical/backbuffer coords
         RectF           Clip = {};               // scissor rect; invalid = full target
-        uint32_t        EffectFlags = 0;         // SEF_* (SEF_DARKEN, SEF_TRANSLUCENT*, ...)
+        uint32_t        EffectFlags = 0;         // SEF_* (typically 0 for voxels; translucency lives in Tint[3])
         float           Tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
         float           DepthBaseline = 0.0f;    // [0,1] flat depth; baseline applied to all pixels
         bool            WriteDepth = false;

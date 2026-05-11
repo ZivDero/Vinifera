@@ -14,6 +14,7 @@
 #include "ccfile.h"
 #include "debughandler.h"
 #include "graphics_device.h"
+#include "shp_atlas.h"
 
 #include <algorithm>
 #include <cstring>
@@ -295,22 +296,55 @@ namespace Vinifera::Gfx
             }
         }
 
-        if (!Atlas.Initialize(device, atlas_w, atlas_h, DXGI_FORMAT_R8_UINT,
-                              D3D11_USAGE_DEFAULT, atlas_pixels.data(), atlas_w)) {
-            DEBUG_ERROR("ShpAsset: '%s' failed to create atlas texture (%dx%d).\n", debug_name, atlas_w, atlas_h);
+        /**
+         *  Allocate a single (atlas_w x atlas_h) region in the shared
+         *  ShpAtlas. All frames of this SHP land on the same page; the base
+         *  offset is baked into each frame's AtlasX/AtlasY so the queue/
+         *  shader sample directly into shared-atlas space.
+         *
+         *  Lazy-init the atlas on first SHP load — matches IsoTileAsset's
+         *  pattern. Idempotent: subsequent calls just return true.
+         */
+        if (!ShpAtlas::Get().Initialize(device)) {
+            DEBUG_ERROR("ShpAsset: '%s' failed to initialize the shared atlas.\n", debug_name);
             return false;
         }
+        int base_x = 0, base_y = 0;
+        int page = -1;
+        if (!ShpAtlas::Get().Allocate_Region(atlas_w, atlas_h, page, base_x, base_y)) {
+            DEBUG_ERROR("ShpAsset: '%s' failed to reserve %dx%d in the shared atlas.\n",
+                debug_name, atlas_w, atlas_h);
+            return false;
+        }
+        if (!ShpAtlas::Get().Upload_Region(page, base_x, base_y, atlas_w, atlas_h,
+                                           atlas_pixels.data(), atlas_w)) {
+            DEBUG_ERROR("ShpAsset: '%s' failed to upload atlas region.\n", debug_name);
+            return false;
+        }
+        for (int i = 0; i < frame_count; ++i) {
+            ShpFrameInfo& fi = Frames[i];
+            if (fi.W <= 0 || fi.H <= 0) continue;
+            fi.AtlasX += base_x;
+            fi.AtlasY += base_y;
+        }
+        AtlasPage = page;
 
         SourcePath = debug_name;
-        DEBUG_INFO("ShpAsset: '%s' loaded — %d frames, atlas %dx%d.\n",
-            debug_name, frame_count, atlas_w, atlas_h);
+        DEBUG_INFO("ShpAsset: '%s' loaded — %d frames, atlas %dx%d on page %d.\n",
+            debug_name, frame_count, atlas_w, atlas_h, page);
         return true;
     }
 
 
     void ShpAsset::Unload()
     {
-        Atlas.Shutdown();
+        /**
+         *  Note: we do not free the atlas region. ShpAtlas regions live for
+         *  the duration of the atlas (until Reset() drops the page). That's
+         *  fine — SHPs are cached for the level/theater lifetime and the
+         *  whole atlas resets on theater swap / video-mode reset.
+         */
+        AtlasPage = -1;
         Frames.clear();
         LogicalWidth = 0;
         LogicalHeight = 0;

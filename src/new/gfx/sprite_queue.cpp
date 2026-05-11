@@ -16,12 +16,12 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
+#include "shp_atlas.h"
 #include "shp_cache.h"
 #include "tactical.h"
 #include "tibsun_globals.h"
 
 #include <algorithm>
-#include <cstring>
 
 
 namespace Vinifera::Gfx
@@ -154,6 +154,7 @@ namespace Vinifera::Gfx
             if (asset == nullptr) continue;
             const ShpFrameInfo* fi = asset->Get_Frame(0);
             if (fi == nullptr || fi->W <= 0 || fi->H <= 0) continue;
+            if (asset->Atlas_Page() < 0) continue;
 
             RectF dst;
             dst.X = (float)(screen_x + fi->X) * xscale;
@@ -162,6 +163,8 @@ namespace Vinifera::Gfx
             dst.H = (float)fi->H * yscale;
             const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY,
                                  (float)fi->W,      (float)fi->H };
+
+            Texture2D& page_tex = ShpAtlas::Get().Get_Page(asset->Atlas_Page());
 
             /**
              *  One Begin/End per shape so each batch can carry its own
@@ -172,12 +175,12 @@ namespace Vinifera::Gfx
                         &AlphaEffect, bb_w, bb_h, EDepthStencil::None);
 
             AlphaWriteEffectParams params = {};
-            params.AtlasSize[0] = (float)asset->Get_Atlas().Width();
-            params.AtlasSize[1] = (float)asset->Get_Atlas().Height();
+            params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+            params.AtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
             AlphaEffect.Set_Params(device, params);
 
             const float identity_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-            Batch.Draw(&asset->Get_Atlas(), dst, &src, identity_tint, 0.0f, 0.0f);
+            Batch.Draw(&page_tex, dst, &src, identity_tint, 0.0f, 0.0f);
             Batch.End(device);
             ++submitted;
         }
@@ -228,19 +231,22 @@ namespace Vinifera::Gfx
 
         /**
          *  Inner contiguous-state grouping: walk a bucket in submission
-         *  order, batching commands that share (Asset, Palette, EffectFlags,
-         *  Remap, depth flags). `Set_Params` runs once per batch since
-         *  `SpriteBatch` defers all DrawIndexed calls to `End()`.
+         *  order, batching commands that share (atlas page, palette,
+         *  EffectFlags, depth flags). Since ShpAtlas packs all SHPs into a
+         *  shared paged texture, distinct SHP assets that land on the same
+         *  page now share a batch — the dominant pre-atlas state break.
+         *  `Set_Params` runs once per batch since `SpriteBatch` defers all
+         *  DrawIndexed calls to `End()`.
          */
         const auto state_eq = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
-            if (a.Asset != b.Asset) return false;
-            if (a.ZAsset != b.ZAsset) return false;
+            if (a.Asset->Atlas_Page() != b.Asset->Atlas_Page()) return false;
+            const int az = a.ZAsset ? a.ZAsset->Atlas_Page() : -1;
+            const int bz = b.ZAsset ? b.ZAsset->Atlas_Page() : -1;
+            if (az != bz) return false;
             if (a.Palette != b.Palette) return false;
             if (a.EffectFlags != b.EffectFlags) return false;
-            if (a.UseRemap != b.UseRemap) return false;
             if (a.WriteDepth != b.WriteDepth) return false;
             if (a.DisableDepth != b.DisableDepth) return false;
-            if (a.UseRemap && memcmp(a.RemapTable, b.RemapTable, 16) != 0) return false;
             return true;
         };
 
@@ -278,20 +284,23 @@ namespace Vinifera::Gfx
                 }
 
                 const SpriteDrawCmd& head = pass_commands[i];
-                head.Palette->Update_Remap(head.UseRemap ? head.RemapTable : nullptr);
 
+                /**
+                 *  All pages share a single PageSize, so AtlasSize is
+                 *  constant across all batches once the atlas is up; we
+                 *  still write it into the per-batch CB to avoid a
+                 *  bind-state divergence between TileEffect (which actually
+                 *  does vary atlas size) and SpriteEffect.
+                 */
                 SpriteEffectParams params = {};
-                params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
-                params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
+                params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+                params.AtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
                 if (head.ZAsset != nullptr) {
-                    params.ZShapeAtlasSize[0] = (float)head.ZAsset->Get_Atlas().Width();
-                    params.ZShapeAtlasSize[1] = (float)head.ZAsset->Get_Atlas().Height();
+                    params.ZShapeAtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+                    params.ZShapeAtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
                     params.ZShapeDepthScale = 1.0f / 16000.0f;
                 }
                 params.Flags = head.EffectFlags;
-                if (head.UseRemap) {
-                    params.Flags |= SEF_USE_REMAP;
-                }
                 if (is_sidebar) {
                     /**
                      *  Sidebar (and any future non-Scene bucket) must not
@@ -332,12 +341,14 @@ namespace Vinifera::Gfx
                 PalEffect.Bind_Palette(device, *head.Palette);
                 PalEffect.Set_Params(device, params);
                 ID3D11ShaderResourceView* z_srv = head.ZAsset != nullptr
-                    ? head.ZAsset->Get_Atlas().Get_SRV()
+                    ? ShpAtlas::Get().Get_Page(head.ZAsset->Atlas_Page()).Get_SRV()
                     : nullptr;
                 device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
 
                 ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
                 device.Get_Context()->PSSetShaderResources(4, 1, &alpha_srv);
+
+                Texture2D& page_tex = ShpAtlas::Get().Get_Page(head.Asset->Atlas_Page());
 
                 for (size_t k = i; k < j; ++k) {
                     const SpriteDrawCmd& c = pass_commands[k];
@@ -346,7 +357,7 @@ namespace Vinifera::Gfx
                         continue;
                     }
                     const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
-                    Batch.Draw(&c.Asset->Get_Atlas(), c.Dst, &src, c.Tint,
+                    Batch.Draw(&page_tex, c.Dst, &src, c.Tint,
                                c.DstZTop, c.DstZBottom,
                                c.ZAsset != nullptr ? &c.ZSrcUV : nullptr,
                                c.Clip.Is_Valid() ? &c.Clip : nullptr);

@@ -11,7 +11,8 @@
  *          Bind layout:
  *            t0 — paletted atlas (R8_UINT)
  *            t1 — palette LUT (RGBA8, 256x1)
- *            t2 — remap LUT (R8_UINT, 16x1)
+ *            t3 — z-shape atlas (R8_UINT, optional)
+ *            t4 — alpha buffer (R8_UNORM)
  *            s0 — point-clamp sampler (atlas is loaded, not sampled, but UVs use s0 for the LUTs)
  *            b0 — SpriteBatch ProjMtx
  *            b1 — palette-effect parameters (SpriteEffectParams)
@@ -37,17 +38,12 @@ namespace Vinifera::Gfx
 
     /**
      *  Per-draw flags. The shader's PerDrawFlags uniform is the bitwise-OR of
-     *  these. Multiple translucent levels are mutually exclusive — the
-     *  highest-set wins.
+     *  these.
      */
     enum SpriteEffectFlag : uint32_t
     {
         SEF_NONE             = 0,
-        SEF_USE_REMAP        = 1u << 0,
         SEF_DARKEN           = 1u << 1,
-        SEF_TRANSLUCENT25    = 1u << 2,    // alpha 0.75
-        SEF_TRANSLUCENT50    = 1u << 3,    // alpha 0.50
-        SEF_TRANSLUCENT75    = 1u << 4,    // alpha 0.25
         SEF_USE_ZSHAPE       = 1u << 5,
         /**
          *  Skip the alpha-buffer modulation. The shared `AlphaTex` is sized
@@ -81,7 +77,7 @@ namespace Vinifera::Gfx
         void Shutdown();
 
         /**
-         *  Bind palette + remap to t1 / t2 on both VS and PS slots. Call after
+         *  Bind the palette LUT to t1 on both VS and PS slots. Call after
          *  SpriteBatch::Begin (which sets up t0) but before SpriteBatch::End.
          */
         void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);

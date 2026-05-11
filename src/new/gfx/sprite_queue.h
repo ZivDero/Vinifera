@@ -61,11 +61,9 @@ namespace Vinifera::Gfx
         RenderPass   Pass;
         uint32_t     EffectFlags;     // SEF_* from sprite_effect.h
         float        Tint[4];         // RGBA float, 1.0 = neutral; from Brightness_To_Tint(intensity)
-        bool         UseRemap;
         bool         WriteDepth;      // SHAPE_ZREADWRITE: occlude later sprites
         bool         DisableDepth;    // Non-z UI sprites (pips, select brackets, cameos)
         SpriteDrawMode Mode;          // Color | AlphaWriteAdd | AlphaWriteMult
-        uint8_t      RemapTable[16];  // copy of caller's `remap` arg
         GpuRenderTarget OutputTarget = GpuRenderTarget::Scene;
     };
 

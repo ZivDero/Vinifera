@@ -40,11 +40,7 @@ namespace Vinifera::Gfx
             "    uint   Flags;\n"
             "    uint2  _pad1;\n"
             "};\n"
-            "static const uint SEF_USE_REMAP        = 0x01;\n"
             "static const uint SEF_DARKEN           = 0x02;\n"
-            "static const uint SEF_TRANSLUCENT25    = 0x04;\n"
-            "static const uint SEF_TRANSLUCENT50    = 0x08;\n"
-            "static const uint SEF_TRANSLUCENT75    = 0x10;\n"
             "static const uint SEF_USE_ZSHAPE       = 0x20;\n"
             "static const uint SEF_NO_ALPHA_BUFFER  = 0x40;\n"
             "\n"
@@ -63,7 +59,6 @@ namespace Vinifera::Gfx
             "\n"
             "Texture2D<uint>      Atlas    : register(t0);\n"
             "Texture2D<float4>    Palette  : register(t1);\n"
-            "Texture2D<uint>      Remap    : register(t2);\n"
             "Texture2D<uint>      ZShape   : register(t3);\n"
             "Texture2D<float>     AlphaTex : register(t4);\n"
             "\n"
@@ -92,9 +87,6 @@ namespace Vinifera::Gfx
             "        o.color = float4(0, 0, 0, 1);\n"
             "        return o;\n"
             "    }\n"
-            "    if ((Flags & SEF_USE_REMAP) && idx >= 16 && idx < 32) {\n"
-            "        idx = Remap.Load(int3((int)idx - 16, 0, 0));\n"
-            "    }\n"
             "    float4 c = Palette.Load(int3((int)idx, 0, 0));\n"
             "    c.rgb *= v.col.rgb;\n"
             "    c.a   *= v.col.a;\n"
@@ -111,9 +103,6 @@ namespace Vinifera::Gfx
             "        float alpha_byte = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0;\n"
             "        c.rgb *= alpha_byte / 127.0;\n"
             "    }\n"
-            "    if (Flags & SEF_TRANSLUCENT25) c.a *= 0.75;\n"
-            "    if (Flags & SEF_TRANSLUCENT50) c.a *= 0.5;\n"
-            "    if (Flags & SEF_TRANSLUCENT75) c.a *= 0.25;\n"
             "    c.rgb *= c.a;     /* premultiply for the EBlend::Premultiplied output */\n"
             "    o.color = c;\n"
             "    return o;\n"
@@ -162,11 +151,8 @@ namespace Vinifera::Gfx
         ID3D11DeviceContext* ctx = device.Get_Context();
         if (ctx == nullptr) return;
 
-        ID3D11ShaderResourceView* srvs[2] = {
-            palette.Get_Palette_Texture().Get_SRV(),
-            palette.Get_Remap_Texture().Get_SRV(),
-        };
-        ctx->PSSetShaderResources(1, 2, srvs);
+        ID3D11ShaderResourceView* srv = palette.Get_Palette_Texture().Get_SRV();
+        ctx->PSSetShaderResources(1, 1, &srv);
     }
 
 

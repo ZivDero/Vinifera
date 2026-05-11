@@ -188,15 +188,6 @@ namespace Vinifera::Gfx
                                         cmd.ZData.data(), cmd.SourceW);
                 }
 
-                /**
-                 *  Voxel composites never use the 16..31 house-remap range
-                 *  (the vanilla blitter SHAPE_REMAP flag is explicitly cleared
-                 *  in `Techno_Render_Voxel`). Bind identity remap so the
-                 *  shader's SEF_USE_REMAP path is a no-op even if a stale flag
-                 *  got through.
-                 */
-                cmd.Palette->Update_Remap(nullptr);
-
                 SpriteEffectParams params = {};
                 params.AtlasSize[0] = (float)kVoxelAtlasSize;
                 params.AtlasSize[1] = (float)kVoxelAtlasSize;

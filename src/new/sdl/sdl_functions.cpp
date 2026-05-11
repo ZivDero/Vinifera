@@ -31,6 +31,7 @@
 #include "tile_queue.h"
 #include "voxel_composite_queue.h"
 #include "iso_tile_atlas.h"
+#include "shp_atlas.h"
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
@@ -508,6 +509,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
+    Vinifera::Gfx::ShpAtlas::Get().Shutdown();
     Vinifera::Gfx::PaletteCache::Get().Clear();
     Vinifera::Gfx::FontCache::Get().Clear();
 

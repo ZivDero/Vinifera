@@ -14,6 +14,8 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 #include "perf_monitor.h"
+#include "shp_atlas.h"
+#include "shp_asset.h"
 #include "tibsun_globals.h"
 
 #include <algorithm>
@@ -145,10 +147,18 @@ namespace Vinifera::Gfx
                         &Effect, bb_w, bb_h, EDepthStencil::None);
 
             ShroudFogEffectParams params = {};
-            params.AtlasSize[0] = (float)head.Asset->Get_Atlas().Width();
-            params.AtlasSize[1] = (float)head.Asset->Get_Atlas().Height();
+            params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+            params.AtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
             params.Mode         = (uint32_t)head.Mode;
             Effect.Set_Params(device, params);
+
+            if (head.Asset->Atlas_Page() < 0) {
+                Batch.End(device);
+                ++draws;
+                i = j;
+                continue;
+            }
+            Texture2D& page_tex = ShpAtlas::Get().Get_Page(head.Asset->Atlas_Page());
 
             for (size_t k = i; k < j; ++k) {
                 const ShroudFogDrawCmd& c = Commands[k];
@@ -163,7 +173,7 @@ namespace Vinifera::Gfx
                 const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY,
                                     (float)fi->W,      (float)fi->H };
 
-                Batch.Draw(&c.Asset->Get_Atlas(), dst, &src, identity_tint, 0.0f, 0.0f);
+                Batch.Draw(&page_tex, dst, &src, identity_tint, 0.0f, 0.0f);
                 ++submitted;
             }
 

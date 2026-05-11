@@ -18,6 +18,7 @@
 #include "palette_lut.h"
 #include "shapeset.h"
 #include "shp_asset.h"
+#include "shp_atlas.h"
 #include "iso_tile_asset.h"
 #include "iso_tile_atlas.h"
 
@@ -64,6 +65,12 @@ namespace Vinifera::Gfx
     void ShpCache::Clear()
     {
         Map.clear();
+        /**
+         *  Drop atlas pages too — their pixel data is keyed off the SHPs we
+         *  just evicted. ShpAtlas::Reset releases the page textures; next
+         *  load repopulates lazily.
+         */
+        ShpAtlas::Get().Reset();
     }
 
 

@@ -18,6 +18,7 @@
 #include "sdl_functions.h"
 #include "tibsun_globals.h"
 #include "iso_tile_atlas.h"
+#include "shp_atlas.h"
 #include "vinifera_globals.h"
 
 #include <algorithm>
@@ -208,6 +209,18 @@ namespace Vinifera::Gfx::Gfx_Debug
                 ImGui::Text("  fill : %.2f%% (%lld / %lld px)", pct, used, total);
                 ImGui::Text("  pack : cursor=(%d, %d), row_h=%d",
                     atlas.Cursor_X(), atlas.Cursor_Y(), atlas.Row_Height());
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("ShpAtlas:");
+                const ShpAtlas& shp_atlas = ShpAtlas::Get();
+                const long long shp_used = shp_atlas.Used_Pixels();
+                const long long shp_total = shp_atlas.Total_Pixels();
+                const double shp_pct = shp_total > 0 ? 100.0 * (double)shp_used / (double)shp_total : 0.0;
+                ImGui::Text("  pages: %d x (%dx%d) = %.1f MB R8",
+                    shp_atlas.Page_Count(),
+                    shp_atlas.Page_Width(), shp_atlas.Page_Height(),
+                    (double)shp_total / (1024.0 * 1024.0));
+                ImGui::Text("  fill : %.2f%% (%lld / %lld px)", shp_pct, shp_used, shp_total);
 
                 if (Vinifera::Gfx::Device != nullptr) {
                     ImGui::Separator();

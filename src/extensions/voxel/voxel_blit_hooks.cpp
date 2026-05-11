@@ -84,9 +84,6 @@ using Vinifera::Gfx::PaletteLUT;
 using Vinifera::Gfx::RectF;
 using Vinifera::Gfx::RenderPass;
 using Vinifera::Gfx::SEF_DARKEN;
-using Vinifera::Gfx::SEF_TRANSLUCENT25;
-using Vinifera::Gfx::SEF_TRANSLUCENT50;
-using Vinifera::Gfx::SEF_TRANSLUCENT75;
 using Vinifera::Gfx::VoxelCompositeCmd;
 using Vinifera::Gfx::VoxelCompositeQueue;
 
@@ -111,45 +108,47 @@ namespace
 
 
     /**
-     *  Brightness → tint scalar. Vanilla's `intensity` runs 0..2000 (1000 =
-     *  neutral). Map to 0..2.0 RGB tint so overbright values pass through the
-     *  shader without clipping (matches the existing SHP path's tint logic).
+     *  Brightness + visual-type → tint scalar. Vanilla's `intensity` runs
+     *  0..2000 (1000 = neutral). Map to 0..2.0 RGB tint so overbright values
+     *  pass through the shader without clipping (matches the SHP path).
+     *  Translucency from the unit's Visual_Character is folded into alpha
+     *  rather than passed as a shader flag — keeps translucent voxels
+     *  batchable with opaque ones.
      */
-    inline void Tint_From_Brightness(int intensity, float out[4])
+    inline void Tint_From_Brightness_And_Alpha(int intensity, float alpha, float out[4])
     {
         const float t = (float)intensity / 1000.0f;
         out[0] = t;
         out[1] = t;
         out[2] = t;
-        out[3] = 1.0f;
+        out[3] = alpha;
     }
 
 
     /**
-     *  Effect-flag bits derived from the unit's `Visual_Character`. Mirrors
-     *  the vanilla switch in `Unit_Blit_Voxel` ([unit.cpp:2445-2479] in vanilla
-     *  source). Predator displacement (VISUAL_RIPPLE) is deferred — the
-     *  cloaked unit renders with the same translucency level as VISUAL_DARKEN
-     *  for now. Returns `false` and zeroes `out_flags` for VISUAL_HIDDEN
-     *  (caller must skip the draw).
+     *  Translucency multiplier derived from the unit's `Visual_Character`.
+     *  Mirrors the vanilla switch in `Unit_Blit_Voxel` ([unit.cpp:2445-2479]).
+     *  Predator displacement (VISUAL_RIPPLE) is deferred — the cloaked unit
+     *  renders with the same translucency level as VISUAL_DARKEN for now.
+     *  Returns `false` for VISUAL_HIDDEN (caller must skip the draw).
      */
-    bool Effect_Flags_From_Visual(VisualType v, uint32_t& out_flags)
+    bool Alpha_From_Visual(VisualType v, float& out_alpha)
     {
-        out_flags = 0;
+        out_alpha = 1.0f;
         switch (v) {
         case VISUAL_NORMAL:
             return true;
         case VISUAL_INDISTINCT:
-            out_flags = SEF_TRANSLUCENT25;
+            out_alpha = 0.75f;
             return true;
         case VISUAL_DARKEN:
         case VISUAL_SHADOWY:
-            out_flags = SEF_TRANSLUCENT50;
+            out_alpha = 0.5f;
             return true;
         case VISUAL_RIPPLE:
             /* Predator effect is deferred; render translucent so the unit
                is at least selectable and visible. */
-            out_flags = SEF_TRANSLUCENT50;
+            out_alpha = 0.5f;
             return true;
         case VISUAL_HIDDEN:
         default:
@@ -171,7 +170,7 @@ namespace
                                 Rect const& dest_clip,
                                 int z_adjust,
                                 int brightness,
-                                uint32_t effect_flags,
+                                float alpha,
                                 bool has_per_pixel_z,
                                 BSurface const* z_source)
     {
@@ -254,8 +253,8 @@ namespace
                 (float)clipped.Height * yscale
             };
         }
-        cmd.EffectFlags = effect_flags;
-        Tint_From_Brightness(brightness, cmd.Tint);
+        cmd.EffectFlags = 0;
+        Tint_From_Brightness_And_Alpha(brightness, alpha, cmd.Tint);
 
         /**
          *  Depth baseline. Pull from screen Y at the dst bottom (camera-near
@@ -320,7 +319,7 @@ namespace
                                  Rect const& dest_clip,
                                  int z_adjust,
                                  int brightness,
-                                 uint32_t effect_flags,
+                                 float alpha,
                                  bool has_per_pixel_z,
                                  BSurface const* z_source)
     {
@@ -340,7 +339,7 @@ namespace
         return Submit_Voxel_Composite(*gpu_dest, *bsource, converter,
                                       source_rect, dest_rect, dest_clip,
                                       z_adjust, brightness,
-                                      effect_flags, has_per_pixel_z, z_source);
+                                      alpha, has_per_pixel_z, z_source);
     }
 }
 
@@ -370,12 +369,12 @@ void UnitClassExt::_Unit_Blit_Voxel(Surface& surface, Point2D xyoff, Rect rect, 
     }
 
     /**
-     *  Visual character → effect flags (translucency etc.). Hidden units
-     *  produce no draw (matches vanilla's `VISUAL_HIDDEN` no-op).
+     *  Visual character → translucency alpha. Hidden units produce no draw
+     *  (matches vanilla's `VISUAL_HIDDEN` no-op).
      */
     const VisualType visual = const_cast<UnitClassExt*>(this)->Visual_Character(false, nullptr);
-    uint32_t effect_flags = 0;
-    if (!Effect_Flags_From_Visual(visual, effect_flags)) {
+    float visual_alpha = 1.0f;
+    if (!Alpha_From_Visual(visual, visual_alpha)) {
         return;
     }
 
@@ -420,7 +419,7 @@ void UnitClassExt::_Unit_Blit_Voxel(Surface& surface, Point2D xyoff, Rect rect, 
     if (!Try_GPU_Voxel_Composite(surface, *EightBitSurface, converter,
                                  dirty, dst_rect, rect,
                                  z_adjust, alpha,
-                                 effect_flags,
+                                 visual_alpha,
                                  /*has_per_pixel_z*/ false,
                                  /*z_source*/ nullptr))
     {
@@ -488,7 +487,7 @@ static void __fastcall Blit_Block_Voxel_Proxy(Surface& dest, ConvertClass& conve
     if (Try_GPU_Voxel_Composite(dest, source, convert,
                                 source_rect, dst_rect, clip,
                                 z_adjust, brightness,
-                                /*effect_flags*/ 0,
+                                /*alpha*/ 1.0f,
                                 /*has_per_pixel_z*/ true,
                                 /*z_source*/ &VoxelZSurface_g))
     {

@@ -31,13 +31,12 @@
 #include "render_pass.h"
 #include "shapeset.h"
 #include "shp_asset.h"
+#include "shp_atlas.h"
 #include "shp_cache.h"
 #include "sprite_queue.h"
 #include "surface.h"
 #include "tibsun_globals.h"
 #include "vinifera_globals.h"
-
-#include <cstring>
 
 
 using namespace Vinifera::Gfx;
@@ -45,7 +44,7 @@ using namespace Vinifera::Gfx;
 
 namespace
 {
-    inline void Tint_From_Intensity(int intensity, float out[4])
+    inline void Tint_From_Intensity_And_Flags(int intensity, ShapeFlags_Type flags, float out[4])
     {
         /**
          *  Vanilla `intensity` ranges 0..2000 with 1000 == 100% (full normal)
@@ -53,22 +52,28 @@ namespace
          *  into a [0, 2] RGB multiplier; the float vertex tint preserves
          *  values above 1.0 through to the shader (the RT format saturates
          *  on store, but the math composes correctly in HLSL).
-         *  Translucency lives on EffectFlags; alpha stays 1.0 here.
+         *
+         *  Translucency is folded into alpha here rather than passed as a
+         *  shader flag — the shader already does `c.a *= v.col.a` and the
+         *  premultiplied blend handles the rest, so this is mathematically
+         *  identical to the old SEF_TRANSLUCENT* branches while keeping
+         *  translucent shapes batchable with opaque ones.
          */
         const float t = Brightness_To_Tint(intensity);
+        float a = 1.0f;
+        if (flags & SHAPE_TRANSLUCENT25) a *= 0.75f;
+        if (flags & SHAPE_TRANSLUCENT50) a *= 0.5f;
+        if (flags & SHAPE_TRANSLUCENT75) a *= 0.25f;
         out[0] = t;
         out[1] = t;
         out[2] = t;
-        out[3] = 1.0f;
+        out[3] = a;
     }
 
     inline uint32_t Effect_Flags_From_Shape(ShapeFlags_Type flags)
     {
         uint32_t out = 0;
-        if (flags & SHAPE_DARKEN)        out |= SEF_DARKEN;
-        if (flags & SHAPE_TRANSLUCENT25) out |= SEF_TRANSLUCENT25;
-        if (flags & SHAPE_TRANSLUCENT50) out |= SEF_TRANSLUCENT50;
-        if (flags & SHAPE_TRANSLUCENT75) out |= SEF_TRANSLUCENT75;
+        if (flags & SHAPE_DARKEN) out |= SEF_DARKEN;
         return out;
     }
 
@@ -223,7 +228,7 @@ void Draw_Shape_Proxy_DX11(
     cmd.Clip.H      = clipped_window.Height * yscale;
     cmd.Pass        = Current_Render_Pass();
     cmd.EffectFlags = Effect_Flags_From_Shape(flags);
-    Tint_From_Intensity(intensity, cmd.Tint);
+    Tint_From_Intensity_And_Flags(intensity, flags, cmd.Tint);
     const bool z_active = (flags & SHAPE_ZREAD) || (flags & SHAPE_ZGRAD) || (flags & SHAPE_ZREADWRITE);
     const bool z_write = (flags & SHAPE_ZREADWRITE);
     if (z_asset != nullptr && z_fi != nullptr) {
@@ -240,8 +245,8 @@ void Draw_Shape_Proxy_DX11(
         zpoint.X += z_fi->X;
         zpoint.Y += z_fi->Y;
 
-        const float ztw = (float)z_asset->Get_Atlas().Width();
-        const float zth = (float)z_asset->Get_Atlas().Height();
+        const float ztw = (float)ShpAtlas::Get().Page_Width();
+        const float zth = (float)ShpAtlas::Get().Page_Height();
         if (ztw > 0.0f && zth > 0.0f) {
             cmd.ZSrcUV.X = ((float)z_fi->AtlasX + (float)zpoint.X) / ztw;
             cmd.ZSrcUV.Y = ((float)z_fi->AtlasY + (float)zpoint.Y) / zth;
@@ -345,17 +350,11 @@ void Draw_Shape_Proxy_DX11(
     }
 
     /**
-     *  House-color remap. Vanilla's `remap` is a 256-byte LUT but only the
-     *  16-entry slot for indices 16..31 ever differs in practice. Our
-     *  PaletteLUT::Update_Remap consumes 16 bytes; copy from offset 16 of the
-     *  vanilla table (where the per-house overrides live). Vanilla's
-     *  Draw_Shape sets SHAPE_REMAP whenever `remap != NULL`, so test the
-     *  pointer directly.
+     *  Vanilla's `remap` argument is dead code — TS bakes per-house colors
+     *  into the converter at scenario init and never relies on SHAPE_REMAP /
+     *  the 16-byte runtime override. We drop it entirely.
      */
-    if (remap != nullptr) {
-        cmd.UseRemap = true;
-        memcpy(cmd.RemapTable, remap + 16, 16);
-    }
+    (void)remap;
 
     cmd.OutputTarget = gpu_surface->Output_Target();
 
