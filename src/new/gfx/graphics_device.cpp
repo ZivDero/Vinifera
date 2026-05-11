@@ -701,6 +701,18 @@ namespace Vinifera::Gfx
     }
 
 
+    int GraphicsDevice::Get_Scene_Target_Width() const
+    {
+        return SceneTarget != nullptr ? SceneTarget->Width() : 0;
+    }
+
+
+    int GraphicsDevice::Get_Scene_Target_Height() const
+    {
+        return SceneTarget != nullptr ? SceneTarget->Height() : 0;
+    }
+
+
     ID3D11ShaderResourceView* GraphicsDevice::Get_Sidebar_Target_SRV() const
     {
         return SidebarTarget != nullptr ? SidebarTarget->Get_SRV() : nullptr;

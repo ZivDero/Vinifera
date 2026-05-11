@@ -33,11 +33,7 @@ extern bool Vinifera_DeveloperMode;
 
 extern bool Vinifera_AudioDebug;
 
-extern bool Vinifera_ShpViewer;
-
-extern bool Vinifera_PerfWindow;
-
-extern bool Vinifera_ZBufferWindow;
+extern bool Vinifera_GfxDebug;
 
 extern bool Vinifera_PerformingLoad;
 

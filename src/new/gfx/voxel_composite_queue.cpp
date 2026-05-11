@@ -15,6 +15,7 @@
 #include "graphics_device.h"
 #include "gpu_surface_target.h"
 #include "palette_lut.h"
+#include "perf_monitor.h"
 #include "states.h"
 
 #include <algorithm>
@@ -101,6 +102,7 @@ namespace Vinifera::Gfx
             return;
         }
         Commands.push_back(cmd);
+        PerfMonitor::Get().Note_Voxel_Composite_Submit();
     }
 
 
@@ -255,6 +257,7 @@ namespace Vinifera::Gfx
                            has_z ? &z_uv : nullptr,
                            cmd.Clip.Is_Valid() ? &cmd.Clip : nullptr);
                 Batch.End(device);
+                PerfMonitor::Get().Note_Voxel_Composite_Draw_Call();
             }
 
             bucket_start = bucket_end;

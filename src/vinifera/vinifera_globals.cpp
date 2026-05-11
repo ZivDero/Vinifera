@@ -19,11 +19,7 @@ bool Vinifera_DeveloperMode = false;
 
 bool Vinifera_AudioDebug = false;
 
-bool Vinifera_ShpViewer = false;
-
-bool Vinifera_PerfWindow = true;
-
-bool Vinifera_ZBufferWindow = true;
+bool Vinifera_GfxDebug = true;
 
 bool Vinifera_PerformingLoad = false;
 

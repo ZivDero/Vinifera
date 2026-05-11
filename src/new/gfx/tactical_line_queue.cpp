@@ -13,6 +13,7 @@
 
 #include "debughandler.h"
 #include "graphics_device.h"
+#include "perf_monitor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -59,6 +60,7 @@ namespace Vinifera::Gfx
             return;
         }
         Commands.push_back(cmd);
+        PerfMonitor::Get().Note_Tactical_Line_Submit();
     }
 
 
@@ -158,6 +160,7 @@ namespace Vinifera::Gfx
         ctx->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
         ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         ctx->Draw(6, 0);
+        PerfMonitor::Get().Note_Tactical_Line_Draw_Call();
     }
 
 

@@ -25,7 +25,6 @@
 #include "graphics_device.h"
 #include "perf_monitor.h"
 #include "shp_cache.h"
-#include "shp_viewer.h"
 #include "shroud_fog_queue.h"
 #include "sprite_queue.h"
 #include "surface_target_registry.h"
@@ -458,13 +457,6 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
     }
 
-    if (Vinifera::Gfx::g_ShpViewer == nullptr) {
-        Vinifera::Gfx::g_ShpViewer = new Vinifera::Gfx::ShpViewer();
-    }
-    if (!Vinifera::Gfx::g_ShpViewer->Initialize(*Vinifera::Gfx::Device)) {
-        DEBUG_ERROR("Vinifera SHP Viewer could not be initialized.\n");
-    }
-
     if (!Vinifera::Gfx::SpriteQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
         DEBUG_ERROR("Vinifera SpriteQueue could not be initialized.\n");
     }
@@ -522,10 +514,6 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::PaletteCache::Get().Clear();
     Vinifera::Gfx::FontCache::Get().Clear();
 
-    if (Vinifera::Gfx::g_ShpViewer != nullptr) {
-        delete Vinifera::Gfx::g_ShpViewer;
-        Vinifera::Gfx::g_ShpViewer = nullptr;
-    }
     ViniferaImGui::Shutdown();
 
     /**
@@ -1013,10 +1001,6 @@ bool SDL_Update_Screen(Surface* surface)
      *  Draw overlays, then present.
      */
     ViniferaImGui::Render();
-
-    if (Vinifera::Gfx::g_ShpViewer != nullptr) {
-        Vinifera::Gfx::g_ShpViewer->Render(*Vinifera::Gfx::Device);
-    }
 
     Vinifera::Gfx::Device->End_Frame();
     Vinifera::Gfx::PerfMonitor::Get().End_Frame();

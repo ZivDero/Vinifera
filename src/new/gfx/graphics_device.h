@@ -87,6 +87,8 @@ namespace Vinifera::Gfx
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
         int                     Get_Sidebar_Target_Width() const;
         int                     Get_Sidebar_Target_Height() const;
+        int                     Get_Scene_Target_Width() const;
+        int                     Get_Scene_Target_Height() const;
 
         StateCache&             States() { return StateCacheInstance; }
 

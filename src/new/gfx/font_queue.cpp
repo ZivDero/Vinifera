@@ -15,6 +15,7 @@
 #include "font_asset.h"
 #include "graphics_device.h"
 #include "palette_lut.h"
+#include "perf_monitor.h"
 
 #include <algorithm>
 #include <cstring>
@@ -62,6 +63,7 @@ namespace Vinifera::Gfx
             return;
         }
         Commands.push_back(cmd);
+        PerfMonitor::Get().Note_Font_Submit();
     }
 
 
@@ -169,6 +171,8 @@ namespace Vinifera::Gfx
                 }
 
                 Batch.End(device);
+                PerfMonitor::Get().Note_Font_Batch();
+                PerfMonitor::Get().Note_Font_Draw_Call();
                 i = j;
             }
 

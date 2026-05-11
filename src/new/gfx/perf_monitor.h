@@ -1,13 +1,13 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Lightweight per-frame performance counters + ImGui window.
+ *  @brief  Lightweight per-frame performance counters.
  *
  *          Counts SpriteQueue / TileQueue throughput (commands submitted,
  *          batches issued, DrawIndexed calls), tracks asset-cache sizes,
- *          and measures per-frame wall-clock time via QPC. The ImGui window
- *          is gated on `Vinifera_PerfWindow` and only renders when the user
- *          opens it; counters always run with negligible cost.
+ *          and measures per-frame wall-clock time via QPC. Counters always
+ *          run with negligible cost; the ImGui view lives in `gfx_debug.cpp`
+ *          and reads through `Get_Stats` / `Recent_Frame_Ms_*`.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -33,6 +33,13 @@ namespace Vinifera::Gfx
         int  TileDrawCalls    = 0;
         int  PrimitiveCmds    = 0;
         int  PrimitiveDrawCalls = 0;
+        int  FontCmds         = 0;
+        int  FontBatches      = 0;
+        int  FontDrawCalls    = 0;
+        int  VoxelCompositeCmds      = 0;
+        int  VoxelCompositeDrawCalls = 0;
+        int  TacticalLineCmds      = 0;
+        int  TacticalLineDrawCalls = 0;
         int  SidebarComposites = 0;
         int  AlphaLights      = 0;     // alpha-light shapes submitted this frame
         int  ShroudFog        = 0;     // shroud/fog cells submitted this frame
@@ -77,6 +84,13 @@ namespace Vinifera::Gfx
         void Note_Tile_Draw_Call()    { ++Stats.TileDrawCalls; }
         void Note_Primitive_Submit()  { ++Stats.PrimitiveCmds; }
         void Note_Primitive_Draw_Call() { ++Stats.PrimitiveDrawCalls; }
+        void Note_Font_Submit()       { ++Stats.FontCmds; }
+        void Note_Font_Batch()        { ++Stats.FontBatches; }
+        void Note_Font_Draw_Call()    { ++Stats.FontDrawCalls; }
+        void Note_Voxel_Composite_Submit()    { ++Stats.VoxelCompositeCmds; }
+        void Note_Voxel_Composite_Draw_Call() { ++Stats.VoxelCompositeDrawCalls; }
+        void Note_Tactical_Line_Submit()    { ++Stats.TacticalLineCmds; }
+        void Note_Tactical_Line_Draw_Call() { ++Stats.TacticalLineDrawCalls; }
         void Note_Sidebar_Composite()  { ++Stats.SidebarComposites; }
         void Set_Alpha_Lights(int n)  { Stats.AlphaLights = n; }
         void Set_Shroud_Fog(int n)    { Stats.ShroudFog = n; }
@@ -85,12 +99,19 @@ namespace Vinifera::Gfx
         /* Cache snapshots — called by Begin_Frame; queues update separately. */
         void Set_Cache_Sizes(int shp, int tmp, int pal);
 
-        /**
-         *  Build the ImGui window. No-op when Vinifera_PerfWindow is false.
-         */
-        void Build_UI();
-
         const PerfStats& Get_Stats() const { return Stats; }
+
+        /**
+         *  Recent per-frame elapsed times (ms) used by the perf graph.
+         *  Returns the ring-buffer storage; `count` is how many entries are
+         *  populated (up to kWindowSize), `head` is the index where the *next*
+         *  sample will be written (so the oldest sample is at `head` when the
+         *  ring is full).
+         */
+        const double* Recent_Frame_Ms_Data() const { return RecentFrameMs.data(); }
+        int           Recent_Frame_Ms_Count() const { return WindowFilled; }
+        int           Recent_Frame_Ms_Head() const { return WindowIdx; }
+        int           Recent_Frame_Ms_Capacity() const { return kWindowSize; }
 
     private:
         PerfMonitor();
