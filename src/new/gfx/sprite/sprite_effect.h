@@ -1,7 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Stage 2a palette-LUT sprite Effect.
+ *  @brief  Palette-LUT sprite Effect.
  *
  *          A pixel-shader uber-effect that takes paletted (R8_UINT) atlas
  *          textures and converts them to RGBA via a 256-entry palette LUT,
@@ -80,17 +80,7 @@ namespace Vinifera::Gfx
         bool Initialize(GraphicsDevice& device);
         void Shutdown();
 
-        /**
-         *  Bind the shared PaletteArray (Texture2DArray) at t1. Call after
-         *  SpriteBatch::Begin (which sets up t0) but before SpriteBatch::End.
-         *  Palette layer is supplied per-vertex by the caller.
-         */
-        void Bind_Palette_Array(GraphicsDevice& device);
-
-        /**
-         *  Update per-draw effect parameters in the b1 CB. Call before
-         *  SpriteBatch::End.
-         */
+        void Bind_Palette_Array(GraphicsDevice& device);  // bind PaletteArray at t1
         void Set_Params(GraphicsDevice& device, const SpriteEffectParams& params);
 
     private:

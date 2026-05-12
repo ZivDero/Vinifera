@@ -3,13 +3,9 @@
 /*******************************************************************************
  *  @brief  Per-frame queue for `WaveClass` GPU rendering (sonic + laser beams).
  *
- *          Vanilla rasterises the beam polygon on the CPU and runs a per-pixel
- *          blitter that reads each dest pixel, mutates a channel, and writes
- *          back (`Set_Sonic_Pixel` at `0x670370`, `Set_Laser_Pixel` at
- *          `0x6704B0`). Vinifera's GPU pipeline bypasses the CPU surface, so
- *          those writes go nowhere — sonic and laser visuals are missing.
- *
- *          This module ports the beam math to a PostEffects-pass GPU shader:
+ *          Vanilla rasterises the beam polygon on the CPU (`Set_Sonic_Pixel`,
+ *          `Set_Laser_Pixel`) against the CPU surface. The GPU pipeline uses a
+ *          PostEffects-pass shader instead:
  *          for each captured wave we emit the 6-vertex polygon as a triangle
  *          fan, sample `SceneCopy` (the per-frame scene snapshot) in the PS,
  *          apply type-specific blend math (cyan boost + sine-modulated

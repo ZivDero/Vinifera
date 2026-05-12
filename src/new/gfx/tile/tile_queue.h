@@ -3,8 +3,7 @@
 /*******************************************************************************
  *  @brief  Per-frame terrain-tile queue + flush.
  *
- *          The `CellClassExt::_Draw_It` reimpl submits a TileDrawCmd per cell
- *          tagged with the current vanilla Tactical::Render phase. Every tile
+ *          One TileDrawCmd per cell, tagged with the current render phase. Every tile
  *          draws against a single shared `PaletteLUT` (looked up from
  *          `PaletteCache` keyed on the active `PaletteClass*` — typically
  *          vanilla's `IsoTilePalette`) and the tile-effect-owned tint mask,
@@ -67,21 +66,11 @@ namespace Vinifera::Gfx
 
         void Submit(const TileDrawCmd& cmd);
 
-        /**
-         *  Issue all queued tile draws to the back buffer with depth-write
-         *  enabled, then clear the queue. Call before SpriteQueue::Flush.
-         */
         void Flush(GraphicsDevice& device);
         void Flush_Pass(GraphicsDevice& device, RenderPass pass);
 
         void Clear();
 
-        /**
-         *  True if any cmd is pending. Used by `SDL_Update_Screen` to detect
-         *  that a tactical render actually ran this frame (tiles are submitted
-         *  by `CellClassExt::_Draw_It` on every active cell), so it can skip
-         *  invalidating the captured-scene snapshot on empty frames.
-         */
         bool Has_Commands() const { return !Commands.empty(); }
 
     private:

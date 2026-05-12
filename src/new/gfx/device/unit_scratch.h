@@ -3,24 +3,11 @@
 /*******************************************************************************
  *  @brief  Per-unit scratch render target for composite-unit rendering.
  *
- *          Multi-section voxel units (e.g. Stealth Tank chassis + turret) and
- *          translucent voxel units suffer from "depth-blend compounding" when
- *          rendered directly to the scene RT: multiple voxels rasterizing to
- *          the same screen pixel each blend in turn, so the unit's visible
- *          alpha drifts toward fully opaque. Vanilla TS sidesteps this by
- *          rasterizing the unit to an off-screen 160x160 scratch buffer
- *          first, then translucently blitting the finished scratch to the
- *          scene — one blend per output pixel.
- *
- *          This module owns that scratch RT for the GPU pipeline. Composite
- *          units:
- *            1) `Begin_Unit(device)` — bind scratch RTV+DSV, clear, set viewport.
- *            2) Render all voxel sections of the unit into the scratch with
- *               OPAQUE blend (front-most voxel wins via depth test).
- *            3) `End_Unit_Composite(device, scene_origin, alpha, scene_depth)`
- *               — rebind scene RT, composite the scratch into it as a single
- *               quad at the unit's drawpoint, alpha-blended at `alpha`, depth-
- *               tested at `scene_depth` against scene depth.
+ *          Multi-section voxel units suffer from "depth-blend compounding" when
+ *          rendered directly to the scene RT. This scratch RT avoids it: all
+ *          sections render opaque into the scratch (depth test picks the
+ *          front-most voxel), then `End_Unit_Composite` blits the finished
+ *          scratch to the scene as a single alpha-blended quad.
  *
  *          One scratch is shared across all units in a frame (rendered
  *          sequentially, with cheap clear between). Logical scratch coords

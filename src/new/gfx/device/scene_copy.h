@@ -2,14 +2,8 @@
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
  *  @brief  Scene-RT snapshot for post-effects that need to sample the rendered
- *          scene (predator distortion, future Sonic/Laser refraction).
- *
- *          Owns a single `RenderTarget2D` sized to match the active Scene RT.
- *          `Ensure_Copied(device)` performs the per-frame `CopyResource` at
- *          most once — subsequent calls within the same frame are no-ops.
- *          Both `DistortionQueue` and `VoxelQueue` call this at the start of
- *          their `PostEffects` flush so whichever runs first triggers the
- *          copy and the other reuses the snapshot.
+ *          scene (predator distortion, Sonic/Laser refraction). `Ensure_Copied`
+ *          performs at most one `CopyResource` per frame; subsequent calls are no-ops.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -45,11 +39,7 @@ namespace Vinifera::Gfx
          */
         bool Ensure_Copied(GraphicsDevice& device);
 
-        /**
-         *  Call once per frame (end of frame) to reset the per-frame guard so
-         *  the next frame's first caller triggers a fresh copy.
-         */
-        void Begin_Frame();
+        void Begin_Frame();  // reset the per-frame guard so the next frame triggers a fresh copy
 
         ID3D11ShaderResourceView* Get_SRV() const;
         int Get_Width() const  { return Width; }

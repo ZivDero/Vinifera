@@ -132,10 +132,8 @@ namespace Vinifera::Gfx
         };
 
         /**
-         *  TacPixelX/TacPixelY live at offset 0x5C/0x60 in `Tactical` (verified
-         *  via the disasm of `Get_Relative_Tactical_Position` at 0x00612D70).
-         *  The TSpp wrapper exposes the slot as `field_5C` (an IsoCoordinate /
-         *  Point2D); .X is TacPixelX, .Y is TacPixelY.
+         *  TacPixelX/TacPixelY are exposed via `TacticalMap->field_5C` by the
+         *  TSpp wrapper (IsoCoordinate / Point2D); .X = TacPixelX, .Y = TacPixelY.
          */
         const int tac_pixel_x = TacticalMap->field_5C.X;
         const int tac_pixel_y = TacticalMap->field_5C.Y;
@@ -221,11 +219,7 @@ namespace Vinifera::Gfx
             return;
         }
 
-        /**
-         *  Phase 4.1 Chunk A: only render `Color` mode commands. Alpha-buffer
-         *  write modes (AlphaWriteAdd / AlphaWriteMult) are handled by
-         *  `Flush_Alpha_Lights`.
-         */
+        // Alpha-buffer write modes are handled separately by Flush_Alpha_Lights.
         std::vector<SpriteDrawCmd> pass_commands;
         pass_commands.reserve(Commands.size());
         for (const SpriteDrawCmd& cmd : Commands) {

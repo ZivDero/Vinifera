@@ -81,7 +81,7 @@ namespace Vinifera::Gfx
             "    o.color = c * Alpha;\n"
             "    // Per-pixel SV_Depth: emit a depth value that just barely beats\n"
             "    // terrain at THIS pixel's screen-Y. Terrain depth at pixel Y is\n"
-            "    // `1 - Y * kPixelToDepth` (1/16000 from tile_queue.cpp); subtract\n"
+            "    // `1 - Y * kPixelToDepth` (1/16000); subtract\n"
             "    // a small eps so composite consistently wins LessEqual against\n"
             "    // terrain across the whole 256x256 unit footprint. Without this,\n"
             "    // a single per-unit depth value misses on roughly half the unit\n"

@@ -13,9 +13,8 @@
 namespace Vinifera::Gfx::Gfx_Debug
 {
     /**
-     *  Draws every gfx-debug ImGui surface (the TacticalRect-anchored toolbar
-     *  and the Perf / Z buffer / Alpha buffer windows). Caller gates on
-     *  `Vinifera_GfxDebug`; sub-window visibility is owned internally.
+     *  Draws every gfx-debug ImGui surface (TacticalRect-anchored toolbar
+     *  and the Perf / Z buffer / Alpha buffer windows).
      */
     void Draw_Debug_UI();
 }

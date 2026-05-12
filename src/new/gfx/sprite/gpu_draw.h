@@ -4,17 +4,9 @@
  *  @brief  Vinifera-native GPU draw entry points.
  *
  *          A separate API from vanilla's `Draw_Shape` / `Draw_Tile` —
- *          intentionally NOT ABI-compatible. Vinifera code that wants the GPU
- *          pipeline directly should call these instead of the vanilla
- *          functions, and can pass extra parameters the legacy ABI has no
- *          slot for (e.g. predator warp offset).
- *
- *          The function-entry intercept on vanilla `Draw_Shape` (see
- *          draw_shape/draw_shapeext_hooks.cpp) routes via this with
- *          `predator_offset = 0`, so legacy call sites get unchanged
- *          behaviour. New call sites that have richer context (e.g. a
- *          TechnoClass with `Get_Predator_Offset()`) call these directly to
- *          unlock the full effect path.
+ *          intentionally NOT ABI-compatible. Accepts extra parameters the
+ *          legacy ABI has no slot for (e.g. predator warp offset). Vanilla
+ *          `Draw_Shape` intercepts route here with `predator_offset = 0`.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -51,8 +43,6 @@ namespace Vinifera::Gfx
      *      standard sprites, DistortionQueue when SHAPE_PREDATOR is set).
      *    - Falls through to vanilla `Draw_Shape` when the device isn't ready
      *      or the destination isn't a GpuSurface.
-     *    - Does NOT handle the EightBitSurface composite-capture path —
-     *      that's a vanilla-call-site quirk and lives in the legacy proxy.
      *
      *  Parameters (a stripped, modernised version of `Draw_Shape`):
      *

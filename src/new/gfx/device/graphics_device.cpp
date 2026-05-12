@@ -631,10 +631,9 @@ namespace Vinifera::Gfx
         }
         if (AlphaRTV != nullptr) {
             /**
-             *  Vanilla seeds AlphaBuffer to 127 each frame ("neutral mid-gray")
-             *  per `map.cpp:448`. Alpha-write shapes accumulate from there;
-             *  alpha-sample shapes read this baseline when nothing has lit
-             *  the pixel.
+             *  Vanilla seeds AlphaBuffer to 127 each frame ("neutral mid-gray").
+             *  Alpha-write shapes accumulate from there; alpha-sample shapes read
+             *  this baseline when nothing has lit the pixel.
              */
             const float alpha_clear[4] = { 127.0f / 255.0f, 0.0f, 0.0f, 0.0f };
             Context->ClearRenderTargetView(AlphaRTV, alpha_clear);

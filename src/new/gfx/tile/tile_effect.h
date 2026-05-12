@@ -1,7 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Stage 3 palette-LUT tile Effect.
+ *  @brief  Palette-LUT tile Effect.
  *
  *          Renders an isometric tile diamond from a paletted (R8_UINT) atlas
  *          via a 256-entry palette LUT. Per-vertex tint replaces vanilla's
@@ -50,21 +50,8 @@ namespace Vinifera::Gfx
         bool Initialize(GraphicsDevice& device);
         void Shutdown();
 
-        /**
-         *  Bind palette LUT to t1 (atlas at t0 is bound by SpriteBatch).
-         */
-        void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);
-
-        /**
-         *  Bind the tint mask (mirrors vanilla's `_default_mask`) to t4.
-         *  The texture is built once in `Initialize` from `DefaultTintMask`
-         *  and lives with this effect for its lifetime.
-         */
-        void Bind_Tint_Mask(GraphicsDevice& device);
-
-        /**
-         *  Update per-batch effect parameters (atlas size).
-         */
+        void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);   // bind palette LUT at t1
+        void Bind_Tint_Mask(GraphicsDevice& device);                       // bind tint mask at t4
         void Set_Params(GraphicsDevice& device, const TileEffectParams& params);
 
     private:

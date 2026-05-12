@@ -1,13 +1,8 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Lightweight per-frame performance counters.
- *
- *          Counts SpriteQueue / TileQueue throughput (commands submitted,
- *          batches issued, DrawIndexed calls), tracks asset-cache sizes,
- *          and measures per-frame wall-clock time via QPC. Counters always
- *          run with negligible cost; the ImGui view lives in `gfx_debug.cpp`
- *          and reads through `Get_Stats` / `Recent_Frame_Ms_*`.
+ *  @brief  Lightweight per-frame GPU performance counters (queue throughput,
+ *          cache sizes, wall-clock time via QPC).
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -75,17 +70,8 @@ namespace Vinifera::Gfx
     public:
         static PerfMonitor& Get();
 
-        /**
-         *  Reset per-frame counters and snapshot the start time. Call near
-         *  the top of SDL_Update_Screen.
-         */
-        void Begin_Frame();
-
-        /**
-         *  Stop the timer; commit the elapsed time to the sliding window.
-         *  Call at the end of SDL_Update_Screen (after End_Frame Present).
-         */
-        void End_Frame();
+        void Begin_Frame();  // reset per-frame counters and snapshot the start time
+        void End_Frame();    // stop the timer; commit elapsed time to the sliding window
 
         /* Counter helpers used by the queues. */
         void Note_Sprite_Submit()     { ++Stats.SpriteCmds; }

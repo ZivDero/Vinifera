@@ -51,11 +51,7 @@ namespace Vinifera::Gfx
         ID3D11Buffer* Get() const { return Buffer; }
         int Get_Capacity() const { return Capacity; }
 
-        /**
-         *  Returns a writable pointer to `count` elements. The caller must call
-         *  End() before Begin() is called again or the buffer is bound.
-         */
-        T* Begin(int count)
+        T* Begin(int count)  // returns writable T* for count elements; call End() before re-use
         {
             if (Device == nullptr || count <= 0) {
                 return nullptr;
@@ -100,10 +96,7 @@ namespace Vinifera::Gfx
     };
 
 
-    /**
-     *  16-bit index buffer specialization. ImGui wants 16-bit; sprite batches
-     *  too (since each batch is small).
-     */
+    /** 16-bit index buffer specialization (batches are small; 16-bit is sufficient). */
     class DynamicIndexBuffer
     {
     public:

@@ -3,11 +3,8 @@
 /*******************************************************************************
  *  @brief  Process-wide cache of WWFont GPU assets keyed on font-data pointer.
  *
- *          Vanilla keeps the .FON blob resident for the process lifetime
- *          (`Font6Ptr`, `Metal12FontPtr`, …), so the raw byte pointer is a
- *          stable identity key. Lazy-build on first hit; flushed on
- *          video-mode reset because the atlas texture lives on the destroyed
- *          device. Mirrors `ShpCache`.
+ *          Raw font-data pointer as the stable identity key. Lazy-build on
+ *          first hit; flushed on video-mode reset.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors

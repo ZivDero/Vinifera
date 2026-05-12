@@ -1,14 +1,9 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  GPU binding metadata for legacy Surface instances.
- *
- *          After Stage 7's class split, a registered `Surface*` is either an
- *          `SDLSurface` (CPU-rendered) or a `GpuSurface` (GPU-rendered).
- *          Class identity drives all dispatch. This registry holds purely
- *          informational metadata: which render target the surface routes
- *          to (when applicable), and its logical/screen rectangles for
- *          composite math.
+ *  @brief  GPU binding metadata for registered Surface instances.
+ *          Tracks which render target each surface routes to and its
+ *          logical/screen rectangles for composite math.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors

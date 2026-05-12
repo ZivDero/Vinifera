@@ -13,9 +13,8 @@
  *          Vanilla's per-pixel `BlitTransLucent*ZReadWarp<ushort>` blitters
  *          read `dest[warp_offset]` and blend at 25/50/75 ratios. Our shader
  *          does the GPU equivalent: `lerp(palette[shp], scene_copy[uv+warp],
- *          blend_ratio)`. The Alpha-variants' per-pixel noise shimmer is a
- *          deliberate omission for the first pass; the displacement alone
- *          reproduces the cloak well enough to look right in motion.
+ *          blend_ratio)`. The Alpha-variants' per-pixel noise shimmer is not
+ *          implemented; the displacement alone reproduces the cloak in motion.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors

@@ -183,9 +183,9 @@ namespace Vinifera::Gfx
              *  Optional extra graphics (cliffs / walls / ramp bodies).
              *  Stored as a flat ExtraWidth × ExtraHeight rect (no diamond
              *  packing) at record + ExtraOffset. Followed by ExtraZData
-             *  which we ignore for Stage 3.0. Only set HasExtraData=true
-             *  if we actually upload — otherwise the renderer would point
-             *  to a stale atlas slot.
+             *  (not uploaded). Only set HasExtraData=true if we actually
+             *  upload — otherwise the renderer would point to a stale atlas
+             *  slot.
              */
             bool extra_uploaded = false;
             if (s.HasExtraData) {

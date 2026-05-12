@@ -3,9 +3,7 @@
 /*******************************************************************************
  *  @brief  Per-frame queue for depth/alpha-aware tactical lines.
  *
- *          Backing for `GpuSurface::Draw_Z_Line` / `Brighten_Line` /
- *          `Draw_Gradient_Z_Line` / `Draw_Dashed_Alpha_Line` /
- *          `Draw_Alpha_Line`. Each cmd is one line segment with a `TacticalLineFlag`
+ *          Each cmd is one line segment with a `TacticalLineFlag`
  *          bitmask that controls z-test, z-write, alpha modulation, alpha
  *          masking, and optional color gradient. The shader (in
  *          `TacticalLineEffect`) samples `SceneRT.DepthSRV` and `AlphaSRV`

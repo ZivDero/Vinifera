@@ -3,25 +3,10 @@
 /*******************************************************************************
  *  @brief  Per-frame voxel draw queue + flush.
  *
- *          Each `VoxelDrawCmd` references an immutable per-section vertex
- *          buffer from `VoxelAssetCache` plus a unit-specific `PaletteLUT`
- *          (from `PaletteCache`, built from the unit's `ColorScheme`
- *          converter — house colors baked in there). The flush path
- *          bucket-sorts commands by output target, then issues per-cmd:
- *              1. Update VoxelEffectParams CB (transform + lighting + tint)
- *              2. Bind palette LUT (t0) + light remap (t1) + normals (t2)
- *              3. Set viewport / rasterizer / depth / blend
- *              4. IASetVertexBuffers(mesh.VB) + Draw(POINTLIST)
- *
- *          The light-remap texture (VPL) is uploaded once on first flush
- *          from the global `Voxel_PaletteLookup`. The VPL is a single
- *          game-wide static load (`voxels.vpl` at startup); it does not
- *          change per-theatre or per-unit, so no refresh is needed.
- *
- *          One vertex = one rasterized pixel. Object pass uses standard
- *          alpha blend + LessEqual depth. Shadow pass reuses a separate
- *          per-section VB (one vertex per occupied (x,y) column) with a
- *          ground-projection transform and DestMultiplyHalf blend.
+ *          Each `VoxelDrawCmd` carries a per-section vertex buffer and a
+ *          house-color-baked `PaletteLUT`. One vertex = one rasterized pixel.
+ *          Object pass: alpha blend + LessEqual depth. Shadow pass: per-column
+ *          VB, ground-projection transform, DestMultiplyHalf blend.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -123,18 +108,13 @@ namespace Vinifera::Gfx
 
         /**
          *  Reserve a new UnitGroupID and register the unit's metadata.
-         *  Returns the allocated ID for stamping into VoxelDrawCmd. Caller
-         *  is responsible for submitting the cmds; the group's metadata
-         *  (drawpoint, alpha, depth) is used by the composite flush path.
+         *  Returns the allocated ID for stamping into VoxelDrawCmd.
          */
         int Allocate_Unit_Group(const VoxelUnitGroup& group);
 
         /**
          *  Render one voxel cmd synchronously against the currently bound
-         *  render target. Used by the composite-replay path (turreted units
-         *  composed via the EightBitSurface intercept) which needs to render
-         *  voxel and SHP parts to the unit-scratch in submission order, not
-         *  via the deferred per-queue flush.
+         *  render target, bypassing the deferred queue.
          */
         void Render_Cmd_Immediate(GraphicsDevice& device, const VoxelDrawCmd& cmd,
                                   int target_w, int target_h, bool is_sidebar);

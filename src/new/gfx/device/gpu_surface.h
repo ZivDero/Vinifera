@@ -1,21 +1,8 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  GPU-authoritative surface class.
- *
- *          Counterpart to `SDLSurface`. Where `SDLSurface` owns a CPU GDI/DIB
- *          pixel buffer and dispatches drawing operations against it (with an
- *          optional GPU-queue fast path), `GpuSurface` has no real CPU pixel
- *          buffer — its pixels live in a GPU render target (`SceneRT` /
- *          `SidebarRT`). Vanilla code that calls `Lock()` receives a dummy
- *          buffer that no one ever reads; vanilla draws via vtable virtuals
- *          either enqueue onto the GPU command queues (for Stage 1, the
- *          virtuals are warn-stubs; queue dispatch is wired up incrementally
- *          as `CompositeSurface` and `SidebarSurface` migrate over).
- *
- *          Inherits from `DSurface` so vanilla code that casts a `Surface*`
- *          to `DSurface*` finds the right vtable slots. The DirectDraw
- *          internals of `DSurface` stay zeroed / unused.
+ *  @brief  GPU-authoritative surface class. Pixels live in a GPU render target;
+ *          vanilla drawing virtuals enqueue GPU commands instead of writing CPU pixels.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -53,11 +40,9 @@ public:
     bool Can_Blit() const override { return false; }
 
     /**
-     *  Drawing virtuals. Stage 1 keeps these as warn-stubs (return safe
-     *  default + one-shot DEBUG_WARNING naming the caller) so any vanilla
-     *  code path we hadn't anticipated surfaces itself in the log. Queue
-     *  dispatch implementations land incrementally as Composite / Sidebar
-     *  migrate to this class.
+     *  Drawing virtuals. Unimplemented paths return a safe default and emit
+     *  a one-shot DEBUG_WARNING so unexpected vanilla call sites surface in
+     *  the log.
      */
     bool Blit_From(Rect const& dcliprect, Rect const& destrect, Surface const& source, Rect const& scliprect, Rect const& sourcerect, bool trans = false, bool a7 = true) override;
     bool Blit_From(Rect const& destrect, Surface const& source, Rect const& sourcerect, bool trans = false, bool a5 = true) override;
@@ -71,16 +56,15 @@ public:
     bool Draw_Line(Point2D const& startpoint, Point2D const& endpoint, int color) override;
     bool Draw_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color) override;
     /**
-     *  Cross-reference table for vanilla source-tree names (the names
-     *  used in the historical TS source dump under `Tiberian-Sun/code`):
+     *  Cross-reference table for vanilla source-tree names:
      *
-     *      Draw_Z_Line             → DSurface::Draw_Line_entry_34   (0x0048EA90)
-     *      Brighten_Line           → DSurface::Draw_Line_entry_38   (0x0048C150)
-     *      Draw_Gradient_Z_Line    → DSurface::Draw_Line_entry_3C   (0x0048CC00)
-     *      Draw_Dashed_Alpha_Line  → DSurface::entry_48             (0x0048F4B0)
-     *      Draw_Alpha_Line         → DSurface::entry_4C             (0x0048FB90)
-     *      Put_Pixel_Clipped       → XSurface::entry_84             (0x006A7550)
-     *      Draw_Lerped_Line        → DSurface::entry_90             (0x0048E4B0)
+     *      Draw_Z_Line             → DSurface::Draw_Line_entry_34
+     *      Brighten_Line           → DSurface::Draw_Line_entry_38
+     *      Draw_Gradient_Z_Line    → DSurface::Draw_Line_entry_3C
+     *      Draw_Dashed_Alpha_Line  → DSurface::entry_48
+     *      Draw_Alpha_Line         → DSurface::entry_4C
+     *      Put_Pixel_Clipped       → XSurface::entry_84
+     *      Draw_Lerped_Line        → DSurface::entry_90
      */
     bool Draw_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int z_start, int z_end, bool write_depth = false) override;
     bool Brighten_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int brightness, int z_start, int z_end, bool write_depth = false) override;

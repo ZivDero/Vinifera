@@ -8,10 +8,8 @@
  *          texture-state group.
  *
  *          The default Effect is a textured-quad shader (Tex × VertexColor).
- *          A caller can pass a custom Effect to Begin() (e.g. the Stage 2a
- *          palette-LUT Effect); the caller is responsible for binding any
- *          extra SRVs the Effect needs (palette LUT, remap LUT) before
- *          calling End().
+ *          Pass a custom Effect to Begin() to override it; bind any extra SRVs
+ *          the effect needs before calling End().
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -85,10 +83,8 @@ namespace Vinifera::Gfx
 
         /**
          *  Draw `texture` at backbuffer-pixel rect `dst`. `src` is in pixels
-         *  within the texture; nullptr means "the whole texture". `color` is
-         *  RGBA8 modulate (unpacked to floats internally). `z` is the depth
-         *  value (0 = near, 1 = far) used by the shared depth buffer; default
-         *  is 0 so callers without a depth scheme draw at the near plane.
+         *  within the texture (nullptr = whole texture). `color` is RGBA8
+         *  modulate. `z` is the depth value (0 = near, 1 = far); default 0.
          */
         void Draw(Texture2D* texture, const RectF& dst, const RectF* src, uint32_t color, float z = 0.0f);
 

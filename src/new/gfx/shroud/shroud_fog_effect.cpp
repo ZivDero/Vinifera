@@ -1,7 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Stage 4 Phase 4.2 shroud / fog alpha-write Effect.
+ *  @brief  Shroud / fog alpha-write Effect.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -35,11 +35,8 @@ namespace Vinifera::Gfx
 
 
         /**
-         *  Vanilla shroud/fog formulas, ported verbatim from
-         *  `CellClass::Draw_Shroud_Or_Fog_Shape` (0x00454E60) and
-         *  `CellClass::Draw_Fog_Shape` (0x00455130). The cross-quad write
-         *  ordering is whatever D3D's draw-order serialization gives us,
-         *  matching vanilla's per-cell sequence one-to-one.
+         *  Vanilla shroud/fog formulas from `CellClass::Draw_Shroud_Or_Fog_Shape`
+         *  and `CellClass::Draw_Fog_Shape`.
          */
         const char ShroudFogHLSL[] =
             "cbuffer SpriteCB : register(b0) {\n"
@@ -70,11 +67,11 @@ namespace Vinifera::Gfx
             "    uint shape = Atlas.Load(int3(px, 0));\n"
             "    int2 dst = int2(v.pos.xy);\n"
             "    if (Mode == 0) {\n"
-            "        /* ShroudOverwrite — vanilla 0x00454E60. */\n"
+            "        /* ShroudOverwrite — CellClass::Draw_Shroud_Or_Fog_Shape. */\n"
             "        if (shape == 0xFE) discard;\n"
             "        AlphaUAV[dst] = (float)shape / 255.0;\n"
             "    } else {\n"
-            "        /* FogAdditive — vanilla 0x00455130. */\n"
+            "        /* FogAdditive — CellClass::Draw_Fog_Shape. */\n"
             "        if (shape > 0x7F) discard;\n"
             "        float old_byte = AlphaUAV[dst] * 255.0;\n"
             "        float new_byte;\n"

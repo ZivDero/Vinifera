@@ -3,8 +3,7 @@
 /*******************************************************************************
  *  @brief  Per-frame glyph queue for the GPU WWFont path.
  *
- *          The `WWFontClass::Print` proxy decomposes each Print() call into
- *          one `FontDrawCmd` per visible glyph and submits them here. Flush
+ *          One `FontDrawCmd` per visible glyph. Flush
  *          buckets by `OutputTarget` (Scene / Sidebar), groups within each
  *          bucket by (Asset, Palette, Remap), and emits one quad per glyph
  *          via `SpriteBatch`.

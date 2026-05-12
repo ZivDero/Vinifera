@@ -3,10 +3,9 @@
 /*******************************************************************************
  *  @brief  Per-frame sprite queue + flush.
  *
- *          The Draw_Shape proxy submits draw commands here tagged with the
- *          current vanilla Tactical::Render phase. Flush_Pass preserves
- *          submission order within each phase while batching compatible
- *          contiguous commands.
+ *          Commands are tagged with the current render phase. `Flush_Pass`
+ *          preserves submission order within each phase while batching
+ *          compatible contiguous commands.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -32,11 +31,10 @@ namespace Vinifera::Gfx
 
 
     /**
-     *  Mirrors vanilla's blitter selection for shapes interacting with the
-     *  alpha buffer. `Color` is the normal palette draw to the backbuffer
-     *  (the only mode that existed before Phase 4.1). `AlphaWriteAdd` and
-     *  `AlphaWriteMult` write alpha intensity into the AlphaBuffer instead
-     *  of color, matching `SHAPE_WRITE_ALPHA` (1<<15) and
+     *  Blitter selection for shapes interacting with the alpha buffer.
+     *  `Color` is the normal palette draw to the backbuffer. `AlphaWriteAdd`
+     *  and `AlphaWriteMult` write intensity into the AlphaBuffer instead of
+     *  color, matching `SHAPE_WRITE_ALPHA` (1<<15) and
      *  `SHAPE_WRITE_ALPHA_MULT` (1<<8) respectively.
      */
     enum class SpriteDrawMode : uint8_t
@@ -77,16 +75,11 @@ namespace Vinifera::Gfx
         void Shutdown();
 
         /**
-         *  Push a command onto the back of the queue. No deduplication, no
-         *  reordering — vanilla's submission order *is* the layer order until
-         *  Stage 3 introduces a depth buffer.
+         *  Push a command onto the back of the queue. Submission order is
+         *  preserved as the layer order within each pass.
          */
         void Submit(const SpriteDrawCmd& cmd);
 
-        /**
-         *  Issue all queued draws to the back buffer, then clear the queue.
-         *  Call after the present-quad upload and before ImGui renders.
-         */
         void Flush(GraphicsDevice& device);
         void Flush_Pass(GraphicsDevice& device, RenderPass pass);
 

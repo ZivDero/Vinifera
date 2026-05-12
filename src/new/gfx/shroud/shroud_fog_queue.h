@@ -3,10 +3,9 @@
 /*******************************************************************************
  *  @brief  Per-frame shroud / fog alpha-write queue.
  *
- *          The shroudext hooks (`Patch_Jump` on `Draw_Shroud_Or_Fog_Shape` and
- *          `Draw_Fog_Shape`) submit one command per cell during the vanilla
- *          render walk. Flush runs before `Flush_Alpha_Lights` and writes the
- *          UAV with vanilla's exact shroud-overwrite / fog-additive formulas.
+ *          One command per cell submitted during the vanilla render walk.
+ *          Writes the AlphaUAV with vanilla's shroud-overwrite / fog-additive
+ *          formulas.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors

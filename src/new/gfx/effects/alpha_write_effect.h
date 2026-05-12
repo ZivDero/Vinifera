@@ -1,9 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Stage 4 alpha-write Effect.
- *
- *          PS_5_0 shader bound with `RWTexture2D<unorm float>` over the
+ *  @brief  Alpha-write Effect — PS_5_0 shader bound with `RWTexture2D<unorm float>` over the
  *          GraphicsDevice's AlphaUAV. Reads the current alpha pixel and
  *          writes back the vanilla `BrightnessTable[shape][old]` formula
  *          (multiplicative modulation, saturating at 255). Source is the
@@ -50,9 +48,6 @@ namespace Vinifera::Gfx
         bool Initialize(GraphicsDevice& device);
         void Shutdown();
 
-        /**
-         *  Update the per-batch atlas-size CB (b1). Call before SpriteBatch::End.
-         */
         void Set_Params(GraphicsDevice& device, const AlphaWriteEffectParams& params);
 
     private:

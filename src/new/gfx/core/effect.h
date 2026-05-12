@@ -4,9 +4,8 @@
  *  @brief  Bundle of compiled VS + PS + InputLayout, plus an optional set of
  *          named constant-buffer slots for parameter upload.
  *
- *          Lighter than MonoGame's Effect (no parameter reflection, no
- *          technique/pass machinery) but enough to factor out shader-bundle
- *          construction into one object that gets bound via Apply().
+ *          No parameter reflection or technique/pass machinery — enough to
+ *          factor out shader-bundle construction into one bindable object.
  *
  *  SPDX-License-Identifier: GPL-3.0-or-later
  *  Copyright (c) 2020-2026 Vinifera contributors
@@ -45,11 +44,7 @@ namespace Vinifera::Gfx
 
         void Shutdown();
 
-        /**
-         *  Bind VS, PS and InputLayout. Caller is responsible for binding
-         *  vertex/index buffers, primitive topology, and any custom CB/SRVs.
-         */
-        void Apply(GraphicsDevice& device);
+        void Apply(GraphicsDevice& device);  // bind VS, PS and InputLayout
 
         /**
          *  Update and bind the effect's optional constant buffer at slot b0

@@ -1,7 +1,7 @@
 /*******************************************************************************
 /*                 O P E N  S O U R C E  --  V I N I F E R A                  **
 /*******************************************************************************
- *  @brief  Stage 4 Phase 4.2 shroud / fog alpha-write Effect.
+ *  @brief  Shroud / fog alpha-write Effect.
  *
  *          PS_5_0 shader bound with `RWTexture2D<unorm float>` over the
  *          GraphicsDevice's AlphaUAV. Two modes selected by a uniform:

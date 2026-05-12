@@ -178,13 +178,12 @@ namespace
 
 
     /**
-     *  Match the screen-Y → SceneRT-depth mapping used by `Draw_Shape` /
-     *  tile rendering: 1/16000 is the project-wide pixel-to-depth scale
-     *  (see [draw_shapeext_hooks.cpp::Depth_From_Screen_Y], [tile_queue.cpp]
-     *  setting `ZDataDepthScale`). Tactical lines must land in the same
-     *  absolute depth range as the sprites and tiles they get z-tested
-     *  against; without the screen-Y baseline the line's depth would
-     *  always be near-0, defeating the per-pixel depth discard.
+     *  Match the screen-Y → SceneRT-depth mapping used by sprite and tile
+     *  rendering: 1/16000 is the project-wide pixel-to-depth scale. Tactical
+     *  lines must land in the same absolute depth range as the sprites and
+     *  tiles they get z-tested against; without the screen-Y baseline the
+     *  line's depth would always be near-0, defeating the per-pixel depth
+     *  discard.
      */
     constexpr float kInvDepthRange = 1.0f / 16000.0f;
 
@@ -213,17 +212,13 @@ namespace
 
     /**
      *  Submit one `TacticalLineCmd` covering a line segment with the given
-     *  flag bitmask and blend/depth state. Caller-supplied `start` / `end`
-     *  must already be biased to surface-absolute coords (matching the
-     *  vanilla `Bias_To` step).
+     *  flag bitmask and blend/depth state. `start` / `end` must already be
+     *  biased to surface-absolute coords.
      *
-     *  `vanilla_z_start` / `vanilla_z_end` are the raw integer z values
-     *  that vanilla's CPU rasterizer would have compared against ZBuffer
-     *  bytes (e.g., `14 - Z_Lepton_To_Pixel(coord.Z)` from
-     *  `Tactical::Draw_3D_Line`). The function bakes them into the same
-     *  GPU depth scale that `Depth_From_Screen_Y` produces for sprites /
-     *  tiles — that way `if (line_z > scene_z) discard` in the pixel
-     *  shader compares apples to apples.
+     *  `vanilla_z_start` / `vanilla_z_end` are the raw integer z values from
+     *  vanilla's line drawing routines. The function bakes them into the same
+     *  GPU depth scale used by sprites and tiles so depth comparison in the
+     *  pixel shader is consistent.
      */
     bool Submit_Tactical_Line(GpuRenderTarget target,
                               Point2D start, Point2D end,
@@ -402,8 +397,7 @@ bool GpuSurface::Blit_From(Rect const&, Rect const&, Surface const&, Rect const&
     /**
      *  Blit_From needs source-pixel readback (when the source is an
      *  `SDLSurface` with real CPU pixels) or an RT-to-RT copy (when source
-     *  is another `GpuSurface`). Neither path is wired yet — they land with
-     *  the recovery chunks (radar minimap, etc.).
+     *  is another `GpuSurface`). Neither path is implemented yet.
      */
     GPU_SURFACE_WARN_STUB("Blit_From(rects)");
     return false;
@@ -472,13 +466,9 @@ bool GpuSurface::Fill_Rect_Trans(Rect const& rect, RGBClass const& color, int op
 
 
 /**
- *  Midpoint Bresenham ellipse (`XSurface::Draw_Ellipse` IDA port).
- *
- *  Walks the four-quadrant ellipse outline in two phases (low-slope and
- *  high-slope), emitting one 1×1 quad per perimeter pixel. Algorithm mirrors
- *  the vanilla binary at `0x006A7910`; we drop the surface-Lock pointer math
- *  and the cardinal-axis `Put_Pixel` calls go through this surface's
- *  vtable (which re-enters GpuSurface::Put_Pixel below).
+ *  Midpoint Bresenham ellipse (`XSurface::Draw_Ellipse`). Walks the
+ *  four-quadrant outline in two phases (low-slope and high-slope), emitting
+ *  one 1×1 quad per perimeter pixel.
  */
 bool GpuSurface::Draw_Ellipse(Point2D pt, int radius_x, int radius_y, Rect clip, int color)
 {
@@ -568,8 +558,7 @@ bool GpuSurface::Draw_Line(Rect const& cliprect, Point2D const& startpoint, Poin
     /**
      *  Vanilla `XSurface::Draw_Line(cliprect, ...)` treats start / end as
      *  cliprect-relative; bias them into surface-absolute coords before
-     *  submitting (matches the old `Intersected_Clip_Origin` step the
-     *  pre-GpuSurface SDLSurface override did).
+     *  submitting.
      */
     return Submit_Line(OutputTarget, clip,
         Bias_To(startpoint, clip),
@@ -579,14 +568,10 @@ bool GpuSurface::Draw_Line(Rect const& cliprect, Point2D const& startpoint, Poin
 
 
 /**
- *  Depth-tested, alpha-modulated constant-color line (`DSurface::Draw_Z_Line`
- *  IDA port). `z_start` / `z_end` are z values at the line endpoints
- *  (interpolated by the shader along the line). `write_depth` enables
- *  depth-write — vanilla conditionally writes the interpolated z into the
- *  depth buffer on each visible pixel. Maps to one TacticalLineCmd with
- *  `TLF_DEPTH_TEST | TLF_ALPHA_MOD` plus optional `TLF_DEPTH_WRITE`.
- *
- *  Vanilla source-tree name: `DSurface::Draw_Line_entry_34` (`0x0048EA90`).
+ *  Depth-tested, alpha-modulated constant-color line (`DSurface::Draw_Line_entry_34`).
+ *  `z_start` / `z_end` are interpolated by the shader. `write_depth` enables
+ *  depth-write. Maps to one TacticalLineCmd with `TLF_DEPTH_TEST | TLF_ALPHA_MOD`
+ *  plus optional `TLF_DEPTH_WRITE`.
  */
 bool GpuSurface::Draw_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int color, int z_start, int z_end, bool write_depth)
 {
@@ -609,16 +594,10 @@ bool GpuSurface::Draw_Z_Line(Rect const& cliprect, Point2D const& startpoint, Po
 
 
 /**
- *  Depth-tested "brighten existing scene" line (`DSurface::Brighten_Line`
- *  IDA port). Vanilla reads the existing surface pixel and adds
- *  `(brightness * channel) >> 8` per channel (saturated) — there is no
- *  color input, the line tints whatever is already there. On GPU a true
- *  read-modify-write of the same RT we're drawing into needs an
- *  intermediate copy. The cheap approximation: emit a neutral additive
- *  tint scaled by `brightness/256`, which writes a uniform brighten
- *  regardless of the underlying pixel color.
- *
- *  Vanilla source-tree name: `DSurface::Draw_Line_entry_38` (`0x0048C150`).
+ *  Depth-tested "brighten existing scene" line (`DSurface::Draw_Line_entry_38`).
+ *  Vanilla adds `(brightness * channel) >> 8` per channel; on GPU a true
+ *  read-modify-write needs an intermediate copy, so this emits a neutral
+ *  additive tint scaled by `brightness/256` instead.
  */
 bool GpuSurface::Brighten_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, int brightness, int z_start, int z_end, bool write_depth)
 {
@@ -641,13 +620,9 @@ bool GpuSurface::Brighten_Line(Rect const& cliprect, Point2D const& startpoint, 
 
 
 /**
- *  Depth-tested gradient laser line (`DSurface::Draw_Gradient_Z_Line` IDA
- *  port). `color` is the line tint, `opacity` is in [0, 1], the bools
- *  control depth-write / alpha-mod / gradient modes. Maps to a gradient
- *  TacticalLine with additive blend (the visual approximation of vanilla's
- *  "scene + tinted line" effect).
- *
- *  Vanilla source-tree name: `DSurface::Draw_Line_entry_3C` (`0x0048CC00`).
+ *  Depth-tested gradient laser line (`DSurface::Draw_Line_entry_3C`). `color`
+ *  is the line tint, `opacity` in [0, 1]; bools control depth-write / alpha-mod /
+ *  gradient modes. Maps to a gradient TacticalLine with additive blend.
  */
 bool GpuSurface::Draw_Gradient_Z_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, RGBClass const& color, int z_start, int z_end, bool write_depth, bool gradient, bool alpha_modulate, bool unused_flag, float opacity)
 {
@@ -668,11 +643,9 @@ bool GpuSurface::Draw_Gradient_Z_Line(Rect const& cliprect, Point2D const& start
     rgba_end[3] = 0.0f;
 
     /**
-     *  Vanilla layout has four bool toggles; the first three drive depth-
-     *  write, gradient enable, and alpha-buffer modulate respectively. The
-     *  fourth is unused in observed call sites; retain it in the signature
-     *  for vanilla parity. If a specific caller turns out to depend on a
-     *  different mapping, this is where to adjust.
+     *  Vanilla layout has four bool toggles: depth-write, gradient enable,
+     *  alpha-buffer modulate, and an unused fourth parameter kept for vanilla
+     *  ABI parity.
      */
     uint32_t flags = TLF_DEPTH_TEST;
     if (write_depth)    flags |= TLF_DEPTH_WRITE;
@@ -689,12 +662,9 @@ bool GpuSurface::Draw_Gradient_Z_Line(Rect const& cliprect, Point2D const& start
 
 
 /**
- *  Bresenham line that invokes a caller-supplied callback once per pixel
- *  (`XSurface::Plot_Line` IDA port, `0x006A7150`). The callback is user
- *  code — it may itself call back into the surface via Put_Pixel or any
- *  other method, which on `GpuSurface` re-routes through GPU primitive
- *  submissions. We do not pre-Lock the surface; vanilla's Unlock at the
- *  end of the routine is a no-op for us.
+ *  Bresenham line that invokes a per-pixel callback (`XSurface::Plot_Line`).
+ *  The callback may call back into the surface via Put_Pixel or other virtuals,
+ *  which on `GpuSurface` re-routes through GPU primitive submissions.
  */
 bool GpuSurface::Plot_Line(Rect const& cliprect, Point2D const& startpoint, Point2D const& endpoint, void (*drawer_callback)(Point2D&))
 {
@@ -839,15 +809,11 @@ int GpuSurface::Draw_Dashed_Line(Point2D const& startpoint, Point2D const& endpo
 
 
 /**
- *  Alpha-mask dashed line (`DSurface::Draw_Dashed_Alpha_Line` source
- *  port). Walks Bresenham, advances the 16-entry dash pattern per pixel;
- *  for each "on" pixel emits a 1×1 TacticalLineCmd with the chosen
- *  alpha-mask flag (TLF_ALPHA_TEST_BG when `alpha_test_bg` true → write
- *  only where alpha == 0, the shroud-only mask; TLF_ALPHA_TEST_FG when
- *  false → write only where alpha != 0, the lit-only mask). Returns the
- *  advanced pattern index.
- *
- *  Vanilla source-tree name: `DSurface::entry_48` (`0x0048F4B0`).
+ *  Alpha-mask dashed line (`DSurface::entry_48`). Walks Bresenham, advancing
+ *  the 16-entry dash pattern per pixel; each "on" pixel emits a 1×1
+ *  TacticalLineCmd with `TLF_ALPHA_TEST_BG` (write only where alpha == 0) or
+ *  `TLF_ALPHA_TEST_FG` (write only where alpha != 0). Returns the advanced
+ *  pattern index.
  */
 int GpuSurface::Draw_Dashed_Alpha_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool pattern[], int pattern_index, bool alpha_test_bg)
 {
@@ -937,11 +903,8 @@ int GpuSurface::Draw_Dashed_Alpha_Line(Point2D const& startpoint, Point2D const&
 
 
 /**
- *  Alpha-mask line (`DSurface::Draw_Alpha_Line` source port). Like the
- *  dashed variant but no dash pattern — every pixel is "on", just gated by
- *  the alpha mask. Maps to a single TacticalLineCmd with `TLF_ALPHA_TEST_FG`.
- *
- *  Vanilla source-tree name: `DSurface::entry_4C` (`0x0048FB90`).
+ *  Alpha-mask line (`DSurface::entry_4C`). Every pixel is "on", gated by the
+ *  alpha mask. Maps to a single TacticalLineCmd with `TLF_ALPHA_TEST_FG`.
  */
 bool GpuSurface::Draw_Alpha_Line(Point2D const& startpoint, Point2D const& endpoint, int color, bool /*unused*/)
 {
@@ -975,8 +938,7 @@ bool GpuSurface::Draw_Rect(Rect const& cliprect, Rect const& rect, int color)
     /**
      *  `rect` is cliprect-relative (matches vanilla `XSurface::Draw_Rect`);
      *  bias it into surface-absolute coords by adding the intersected clip
-     *  origin. Same step the pre-GpuSurface SDLSurface override did via
-     *  `rect.Bias_To(Intersect(cliprect, Get_Rect()))`.
+     *  origin.
      */
     Rect clip = Intersect(cliprect, Get_Rect());
     Rect biased = rect.Bias_To(clip);
@@ -1007,11 +969,8 @@ bool GpuSurface::Draw_Rect(Rect const& cliprect, Rect const& rect, int color)
 
 
 /**
- *  Put a single pixel iff the point lies inside `rect`. Source-faithful port
- *  of `XSurface::Put_Pixel_Clipped` — vanilla just gates Put_Pixel on
- *  Is_Point_Within.
- *
- *  Vanilla source-tree name: `XSurface::entry_84` (`0x006A7550`).
+ *  Put a single pixel iff the point lies inside `rect`
+ *  (`XSurface::entry_84` — gates `Put_Pixel` on `Is_Point_Within`).
  */
 bool GpuSurface::Put_Pixel_Clipped(Point2D const& point, int color, Rect const& rect)
 {
@@ -1023,13 +982,10 @@ bool GpuSurface::Put_Pixel_Clipped(Point2D const& point, int color, Rect const& 
 
 
 /**
- *  Gradient line with ping-pong color interpolation
- *  (`DSurface::Draw_Lerped_Line` source port, IDA-verified). Walks
- *  Bresenham, computes a per-pixel lerp(startColor, endColor, t), and
- *  emits each pixel as a 1×1 quad. The `t` / `step` are by-reference so a
- *  caller can chain multiple segments through the same gradient state.
- *
- *  Vanilla source-tree name: `DSurface::entry_90` (`0x0048E4B0`).
+ *  Gradient line with ping-pong color interpolation (`DSurface::entry_90`).
+ *  Walks Bresenham, computes per-pixel `lerp(startColor, endColor, t)`, and
+ *  emits each pixel as a 1×1 quad. `t` / `step` are by-reference so multiple
+ *  segments can be chained through the same gradient state.
  */
 bool GpuSurface::Draw_Lerped_Line(Rect& cliprect, Point2D& startpoint, Point2D& endpoint, RGBClass& startcolor, RGBClass& endcolor, float& t, float& step)
 {
