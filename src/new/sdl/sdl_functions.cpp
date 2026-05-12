@@ -1049,6 +1049,22 @@ bool SDL_Update_Screen(Surface* surface)
          */
         for (int pass = 0; pass < (int)Vinifera::Gfx::RenderPass::Count; ++pass) {
             const auto render_pass = (Vinifera::Gfx::RenderPass)pass;
+
+            /**
+             *  Capture SceneCopy explicitly at the start of PostEffects,
+             *  AFTER all the pre-PostEffects passes have written their
+             *  content (terrain, shroud, buildings, ObjectLayer units) but
+             *  BEFORE any predator/distortion sampling and BEFORE UI
+             *  overlays. Predator units sampling SceneCopy then see the
+             *  fully-rendered tactical scene without UI bleed-through.
+             *
+             *  VoxelQueue's and DistortionQueue's own `Ensure_Copied` calls
+             *  later in the pass become no-ops (per-frame idempotent).
+             */
+            if (render_pass == Vinifera::Gfx::RenderPass::PostEffects) {
+                Vinifera::Gfx::SceneCopy::Get().Ensure_Copied(*Vinifera::Gfx::Device);
+            }
+
             Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::VoxelQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);

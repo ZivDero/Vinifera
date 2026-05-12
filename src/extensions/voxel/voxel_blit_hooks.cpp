@@ -38,36 +38,38 @@
 #include "debughandler.h"
 #include "drawshape.h"
 #include "foot.h"
-#include "graphics_device.h"
+#include "gpu_draw.h"
 #include "gpu_surface.h"
 #include "gpu_surface_target.h"
+#include "graphics_device.h"
 #include "hooker.h"
 #include "house.h"
 #include "map.h"
 #include "matrix3d.h"
 #include "motionlib.h"
+#include "mouse.h"
 #include "objecttype.h"
 #include "render_pass.h"
 #include "shp_cache.h"
 #include "sprite_batch.h"
+#include "sprite_queue.h"
 #include "tactical.h"
 #include "techno.h"
 #include "tibsun_globals.h"
 #include "unit.h"
 #include "unit_composite.h"
+#include "unit_scratch.h"
 #include "unittype.h"
-#include "voxel.hh"
 #include "voxel_asset.h"
 #include "voxel_effect.h"
-#include "gpu_draw.h"
-#include "sprite_queue.h"
-#include "unit_scratch.h"
 #include "voxel_queue.h"
 #include "voxelanim.h"
 #include "voxelanimtype.h"
 #include "voxelinit.h"
 #include "voxellib.h"
 #include "voxelobj.h"
+
+#include "voxel.hh"
 
 
 /**
@@ -224,7 +226,7 @@ namespace
      */
     inline void Tint_From_Brightness_And_Alpha(int brightness, float alpha, float out[4])
     {
-        const float t = (float)brightness / 1000.0f;
+        const float t = static_cast<float>(brightness) / 1000.0f;
         out[0] = t;
         out[1] = t;
         out[2] = t;
@@ -233,22 +235,12 @@ namespace
 
 
     /**
-     *  Master feature gate for the screen-space warp/distortion effect on
-     *  VISUAL_RIPPLE units. When false, predator routing is bypassed and
-     *  cloaked units fall back to plain 50% translucent rendering (same as
-     *  VISUAL_DARKEN). The infrastructure (VoxelDistortionEffect, SceneCopy,
-     *  PostEffects branch in VoxelQueue) remains compiled in; flipping this
-     *  back to true re-enables the warp path with no other code changes.
-     */
-    static constexpr bool kPredatorWarpEnabled = false;
-
-
-    /**
      *  Visual_Character → render-effect descriptor. `alpha` is the
-     *  conventional translucency for VISUAL_DARKEN / VISUAL_INDISTINCT;
-     *  `is_predator` flags VISUAL_RIPPLE which routes to the distortion
-     *  pass (scene-copy refraction + lerp). Returns false for VISUAL_HIDDEN
-     *  (don't render at all).
+     *  conventional translucency for VISUAL_DARKEN / VISUAL_INDISTINCT /
+     *  VISUAL_SHADOWY; `is_predator` flags VISUAL_RIPPLE which routes to
+     *  the distortion pass (scene-copy refraction + lerp). Mirrors vanilla
+     *  TS's per-state mapping. Returns false for VISUAL_HIDDEN (don't
+     *  render at all).
      */
     struct VisualFx
     {
@@ -270,33 +262,15 @@ namespace
             out.alpha = 0.5f;
             return true;
         case VISUAL_RIPPLE:
-            if (kPredatorWarpEnabled) {
-                // Alpha unused in the predator path — the PS owns the blend.
-                out.alpha       = 1.0f;
-                out.is_predator = true;
-            } else {
-                // Warp disabled — render as plain 50% translucent.
-                out.alpha       = 0.5f;
-                out.is_predator = false;
-            }
+            // Alpha unused in the predator path — the PS owns the blend.
+            out.alpha       = 1.0f;
+            out.is_predator = true;
             return true;
         case VISUAL_HIDDEN:
         default:
             return false;
         }
     }
-
-
-    /**
-     *  Bind to vanilla's `TechnoClass::Get_Predator_Offset()` at 0x00638C70.
-     *  Returns the per-unit shimmer offset `(Fetch_ID + field_118) % 400`
-     *  used as the SceneCopy horizontal sample displacement. Vanilla mutates
-     *  `field_118` internally so each call advances the shimmer phase.
-     */
-    typedef int (__thiscall *Get_Predator_Offset_Fn)(TechnoClass*);
-    static const Get_Predator_Offset_Fn Get_Predator_Offset_Vanilla =
-        reinterpret_cast<Get_Predator_Offset_Fn>(0x00638C70);
-
 
     /**
      *  Apply only the rotation part of an affine Matrix3D to a Vector3
@@ -395,7 +369,7 @@ namespace
                        "  TBL_local=(%.2f,%.2f,%.2f) -> proj_cz=(%.2f,%.2f,%.2f)\n"
                        "  center=(%.2f,%.2f,%.2f)\n",
                        s_debug_count, point.X, point.Y,
-                       (int)mesh.XSize, (int)mesh.YSize, (int)mesh.ZSize, (int)mesh.NormalType,
+                       static_cast<int>(mesh.XSize), static_cast<int>(mesh.YSize), static_cast<int>(mesh.ZSize), static_cast<int>(mesh.NormalType),
                        section_world[0][0], section_world[0][1], section_world[0][2], section_world[0][3],
                        section_world[1][0], section_world[1][1], section_world[1][2], section_world[1][3],
                        section_world[2][0], section_world[2][1], section_world[2][2], section_world[2][3],
@@ -424,8 +398,8 @@ namespace
         // probably tied to a static value (LEVEL_PIXEL_H, half tile height,
         // etc.) rather than per-section bounds.
         constexpr float kVoxelYBias = 16.0f;
-        out.T0[0] = (float)point.X + c0.X;
-        out.T0[1] = (float)point.Y + c0.Y + kVoxelYBias;
+        out.T0[0] = static_cast<float>(point.X) + c0.X;
+        out.T0[1] = static_cast<float>(point.Y) + c0.Y + kVoxelYBias;
         // T0.z = ABSOLUTE projected iso_z of BBL (no centroid subtraction).
         // This makes voxel_z in the shader an absolute iso_z value shared
         // across all sections of the unit, so a turret sitting on top of
@@ -442,7 +416,7 @@ namespace
         // at overlapping pixels — without this, back-unit top voxels would
         // beat front-unit body voxels because they happen to have a larger
         // voxel_z at the same pixel.
-        out.T0[3] = (float)point.Y;
+        out.T0[3] = static_cast<float>(point.Y);
 
         // Shadow: shift the entire shadow along the shadow-light vector so the
         // shadow falls away from the unit in the light direction (vanilla
@@ -457,9 +431,9 @@ namespace
         }
 
         // T1/T2/T3: per-voxel-step deltas along the section's X/Y/Z axes.
-        const float x_size = (float)std::max<int>(1, mesh.XSize);
-        const float y_size = (float)std::max<int>(1, mesh.YSize);
-        const float z_size = (float)std::max<int>(1, mesh.ZSize);
+        const float x_size = static_cast<float>(std::max<int>(1, mesh.XSize));
+        const float y_size = static_cast<float>(std::max<int>(1, mesh.YSize));
+        const float z_size = static_cast<float>(std::max<int>(1, mesh.ZSize));
 
         out.T1[0] = (cx.X - c0.X) / x_size;
         out.T1[1] = (cx.Y - c0.Y) / x_size;
@@ -489,8 +463,8 @@ namespace
         // Normal table base offset — slots 0..3 of the packed normals buffer
         // hold VoxelNormals1..4 (one slot per `VoxelNormalType` enum value
         // 1..4; NORMAL_NONE=0 has no data). 256-entry strides.
-        const int normal_type = (int)mesh.NormalType;
-        out.LightDir[3] = (float)(std::max(0, normal_type - 1) * 256);
+        const int normal_type = mesh.NormalType;
+        out.LightDir[3] = static_cast<float>(std::max(0, normal_type - 1) * 256);
 
         Tint_From_Brightness_And_Alpha(brightness, alpha, out.Tint);
 
@@ -535,14 +509,14 @@ namespace
             const float screen_y_offset = -v.Y + kVoxelYBias;
             const float back_z_contribution = std::max(0.0f, -v.Z) * kVoxelZScale;
             const float eps_this_corner = std::max(0.0f, screen_y_offset) * kPixelToDepth + back_z_contribution;
-            if (eps_this_corner > max_eps_needed) max_eps_needed = eps_this_corner;
+            max_eps_needed = std::max(eps_this_corner, max_eps_needed);
         }
         const float kObjectEps_section = max_eps_needed + 1.0e-4f;
 
-        out.Misc[0] = is_shadow ? 0.0f : (float)z_adjust;
+        out.Misc[0] = is_shadow ? 0.0f : static_cast<float>(z_adjust);
         out.Misc[1] = kPixelToDepth;
         out.Misc[2] = is_shadow ? 0.5f : kObjectEps_section;
-        out.Misc[3] = is_shadow ? (float)VEF_SHADOW : 0.0f;
+        out.Misc[3] = is_shadow ? static_cast<float>(VEF_SHADOW) : 0.0f;
     }
 
 
@@ -590,10 +564,10 @@ namespace
         RectF clip = {};
         if (cliprect.Width > 0 && cliprect.Height > 0) {
             clip = RectF {
-                (float)cliprect.X * xscale,
-                (float)cliprect.Y * yscale,
-                (float)cliprect.Width  * xscale,
-                (float)cliprect.Height * yscale
+                static_cast<float>(cliprect.X) * xscale,
+                static_cast<float>(cliprect.Y) * yscale,
+                static_cast<float>(cliprect.Width)  * xscale,
+                static_cast<float>(cliprect.Height) * yscale
             };
         }
 
@@ -630,7 +604,7 @@ namespace
              *  unit gets occluded by closer geometry.
              */
             const float unit_depth = std::clamp(
-                1.0f - (float)point.Y * kPixelToDepth - 1.0e-4f,
+                1.0f - static_cast<float>(point.Y) * kPixelToDepth - 1.0e-4f,
                 1.0e-4f, 0.9999f);
             VoxelUnitGroup group;
             group.Drawpoint  = point;
@@ -655,7 +629,7 @@ namespace
                 const int section_count = motlib->Get_Section_Count();   // = vanilla "LayerCount"
                 const int frame_count   = motlib->Get_Layer_Count();     // = vanilla "FrameCount"
                 if (section_count > 0 && frame_count > 0) {
-                    const int safe_frame = (int)(frame % (unsigned)frame_count);
+                    const int safe_frame = static_cast<int>(frame % (unsigned)frame_count);
                     const Matrix3D& hva = matrices[layer + section_count * safe_frame];
                     section_world = matrix * hva;
                 }
@@ -692,8 +666,8 @@ namespace
                  *  drawpoint Y — depth math is unchanged, only the screen
                  *  projection shifts to local space.
                  */
-                const float dx = (float)point.X - (float)kUnitScratchOrigin.X;
-                const float dy = (float)point.Y - (float)kUnitScratchOrigin.Y;
+                const float dx = static_cast<float>(point.X) - static_cast<float>(kUnitScratchOrigin.X);
+                const float dy = static_cast<float>(point.Y) - static_cast<float>(kUnitScratchOrigin.Y);
                 cmd.Params.T0[0] -= dx;
                 cmd.Params.T0[1] -= dy;
                 cmd.UnitGroupID   = unit_group_id;
@@ -708,7 +682,7 @@ namespace
                 cmd.IsPredator         = true;
                 cmd.PredatorWarpPixels = predator_warp_pixels;
                 cmd.PredatorBlendRatio = 0.5f;   // vanilla VISUAL_RIPPLE = 50/50
-                cmd.Params.Predator[0] = (float)predator_warp_pixels;
+                cmd.Params.Predator[0] = static_cast<float>(predator_warp_pixels);
                 cmd.Params.Predator[1] = cmd.PredatorBlendRatio;
                 // Predator[2..3] (scene_w/h) patched in by VoxelQueue at issue.
             }
@@ -772,7 +746,7 @@ namespace
                 const int section_count = motlib->Get_Section_Count();
                 const int frame_count   = motlib->Get_Layer_Count();
                 if (section_count > 0 && frame_count > 0) {
-                    const int safe_frame = (int)(frame % (unsigned)frame_count);
+                    const int safe_frame = static_cast<int>(frame % (unsigned)frame_count);
                     const Matrix3D& hva = matrices[layer + section_count * safe_frame];
                     section_world = matrix * hva;
                 }
@@ -812,10 +786,10 @@ namespace
      */
     float Alpha_From_Sprite_Flags(ShapeFlags_Type flags)
     {
-        const unsigned tmask = (unsigned)flags & (unsigned)SHAPE_TRANSLUCENT75;
-        if (tmask == (unsigned)SHAPE_TRANSLUCENT75)      return 0.25f;
-        if (tmask == (unsigned)SHAPE_TRANSLUCENT50)      return 0.5f;
-        if (tmask == (unsigned)SHAPE_TRANSLUCENT25)      return 0.75f;
+        const unsigned tmask = static_cast<unsigned>(flags) & static_cast<unsigned>(SHAPE_TRANSLUCENT75);
+        if (tmask == static_cast<unsigned>(SHAPE_TRANSLUCENT75))      return 0.25f;
+        if (tmask == static_cast<unsigned>(SHAPE_TRANSLUCENT50))      return 0.5f;
+        if (tmask == static_cast<unsigned>(SHAPE_TRANSLUCENT25))      return 0.75f;
         return 1.0f;
     }
 
@@ -851,10 +825,10 @@ namespace
         RectF clip = {};
         if (cliprect.Width > 0 && cliprect.Height > 0) {
             clip = RectF {
-                (float)cliprect.X * xscale,
-                (float)cliprect.Y * yscale,
-                (float)cliprect.Width  * xscale,
-                (float)cliprect.Height * yscale
+                static_cast<float>(cliprect.X) * xscale,
+                static_cast<float>(cliprect.Y) * yscale,
+                static_cast<float>(cliprect.Width)  * xscale,
+                static_cast<float>(cliprect.Height) * yscale
             };
         }
 
@@ -986,12 +960,86 @@ void Composite_Replay(Surface&       dst_surface,
     }
 
     /**
-     *  Defer the actual GPU work — this function is called from inside
-     *  vanilla's CPU-side Tactical::Render via the Unit_Blit_Voxel hook,
-     *  BEFORE the scene RT has been bound/cleared and before any of the
-     *  queue flushes have laid down terrain/sprites. Snapshot the unit's
-     *  records and let `Composite_Process_Deferred` (called from the GPU
-     *  pass loop) do the actual rendering at the correct time.
+     *  Predator (VISUAL_RIPPLE) routing. If any captured voxel record is
+     *  flagged as predator, treat the WHOLE unit as predator: re-issue each
+     *  record through the normal deferred queues. Voxel records go through
+     *  Submit_Voxel_Object with `is_predator=true` — that routes them to
+     *  VoxelQueue with `Pass=PostEffects + IsPredator=true`, and VoxelQueue's
+     *  PostEffects branch renders them via `VoxelDistortionEffect` which
+     *  samples SceneCopy with the warp offset (vanilla's per-pixel
+     *  `BlitTransLucent*ZReadWarp` equivalent).
+     *
+     *  Why bypass the scratch path for predator units:
+     *    - The distortion shader needs `SceneCopy` (captured at the start
+     *      of PostEffects). The scratch composite would happen earlier in
+     *      the pass loop, before SceneCopy is valid.
+     *    - The distortion shader's per-pixel SceneCopy sample relies on
+     *      `SV_Position.xy` being scene-space pixels. Rendering into a
+     *      256x256 scratch would give scratch-local pixels instead, so
+     *      we'd be sampling SceneCopy from the wrong location.
+     *    - Vanilla itself doesn't compose predator voxels through the
+     *      EightBitSurface scratch — it runs the warp blitter directly
+     *      on the final scene buffer (see unit.cpp:2459-2470).
+     *
+     *  SHP records in a predator unit re-issue via `Draw_Shape_Proxy_DX11`
+     *  (the same code path the legacy proxy uses), so cloaked SHP parts
+     *  stay on the SpriteQueue's normal translucent path.
+     */
+    bool unit_is_predator = false;
+    for (const PendingComposite& rec : g_pending_composite) {
+        if (rec.kind == CompositeKind::Voxel && rec.voxel.is_predator) {
+            unit_is_predator = true;
+            break;
+        }
+    }
+
+    if (unit_is_predator) {
+        for (const PendingComposite& rec : g_pending_composite) {
+            if (rec.kind == CompositeKind::Voxel) {
+                const PendingVoxelDraw& p = rec.voxel;
+                if (p.voxeldata == nullptr) continue;
+                ColorScheme* scheme = ColorSchemes[p.color_scheme];
+                if (scheme == nullptr || scheme->Converter == nullptr) continue;
+
+                const Point2D real_point(
+                    xyoff.X + (p.buffer_drawpoint.X - kCompositeOrigin.X),
+                    xyoff.Y + (p.buffer_drawpoint.Y - kCompositeOrigin.Y));
+
+                Submit_Voxel_Object(*p.voxeldata, p.frame, p.matrix, real_point, rect,
+                                    *scheme->Converter, p.brightness, p.alpha, p.z_adjust,
+                                    /*single_layer*/ -1,
+                                    p.is_predator, p.predator_warp_pixels);
+            } else {
+                const PendingShapeDraw& p = rec.shape;
+                if (p.shapefile == nullptr) continue;
+                ConvertClass* convert = shape_convert_override != nullptr
+                                      ? shape_convert_override
+                                      : p.convert;
+                if (convert == nullptr) continue;
+
+                const Point2D real_point(
+                    xyoff.X + (p.buffer_point.X - kCompositeOrigin.X),
+                    xyoff.Y + (p.buffer_point.Y - kCompositeOrigin.Y) + kCompositeYBias);
+
+                const ShapeFlags_Type replay_flags =
+                    p.flags & ~SHAPE_WIN_REL;
+
+                Draw_Shape_Proxy_DX11(dst_surface, *convert, p.shapefile, p.shapenum,
+                                      real_point, rect, replay_flags,
+                                      /*remap*/ nullptr,
+                                      p.height_offset, p.zgrad, p.intensity,
+                                      p.z_shapefile, p.z_shapenum, p.z_off);
+            }
+        }
+        g_pending_composite.clear();
+        return;
+    }
+
+    /**
+     *  Non-predator composite (Titan, Disruptor, HMLRS, etc). Defer to the
+     *  scratch-RT composite path — runs in the GPU pass loop where the
+     *  scene RT is bound, terrain depth is established, and we can do
+     *  unified body+turret rendering with correct paint order.
      */
     DeferredComposite deferred;
     deferred.records                = g_pending_composite;
@@ -1026,10 +1074,10 @@ namespace
         float unit_alpha = 1.0f;
         for (const PendingComposite& rec : deferred.records) {
             if (rec.kind == CompositeKind::Voxel) {
-                if (rec.voxel.alpha < unit_alpha) unit_alpha = rec.voxel.alpha;
+                unit_alpha = std::min(rec.voxel.alpha, unit_alpha);
             } else {
                 const float a = Alpha_From_Sprite_Flags(rec.shape.flags);
-                if (a < unit_alpha) unit_alpha = a;
+                unit_alpha = std::min(a, unit_alpha);
             }
         }
 
@@ -1111,8 +1159,7 @@ namespace
              *  makes the per-pixel blend equivalent across voxel and SHP
              *  parts of the unit.
              */
-            const ShapeFlags_Type replay_flags = ShapeFlags_Type(
-                p.flags & ~(SHAPE_WIN_REL | SHAPE_TRANSLUCENT75));
+            const ShapeFlags_Type replay_flags = p.flags & ~(SHAPE_WIN_REL | SHAPE_TRANSLUCENT75);
 
             /**
              *  Build the SpriteDrawCmd without queuing — we render
@@ -1230,7 +1277,7 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
      *  Translucency / predator / hidden flags from Visual_Character —
      *  same logic vanilla applies in its outer Draw_Voxel.
      */
-    const VisualType visual = const_cast<TechnoClassExt*>(this)->Visual_Character(false, nullptr);
+    const VisualType visual = Visual_Character(false, nullptr);
     VisualFx vfx;
     if (!VisualFx_From_Visual(visual, vfx)) {
         return;
@@ -1239,13 +1286,10 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
     /**
      *  Predator offset is computed up front so it's stable across both the
      *  direct-submit path and the composite-defer path (composite captures
-     *  it for replay later).
+     *  it for replay later). Vanilla math, unmodified.
      */
-    const int predator_warp = vfx.is_predator
-                            ? Get_Predator_Offset_Vanilla(const_cast<TechnoClassExt*>(this))
-                            : 0;
-
-    const int final_brightness = const_cast<TechnoClassExt*>(this)->Apparent_Brightness(brightness);
+    const int predator_warp = vfx.is_predator ? Get_Predator_Offset() : 0;
+    const int final_brightness = Apparent_Brightness(brightness);
 
     if (House == nullptr) {
         return;
@@ -1262,8 +1306,8 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
      *  than full-voxel-poking-through.
      */
     if (RTTI == RTTI_UNIT) {
-        FootClass* foot = (FootClass*)const_cast<TechnoClassExt*>(this);
-        const UnitTypeClass* utype = ((UnitClass const*)this)->Class;
+        FootClass* foot = reinterpret_cast<FootClass*>(const_cast<TechnoClassExt*>(this));
+        const UnitTypeClass* utype = reinterpret_cast<UnitClass const*>(this)->Class;
         if (utype != nullptr && utype->IsTooBigToFitUnderBridge) {
             bool fudge = false;
             if (foot->Is_Z_Fudge_Bridge() && foot->Get_Z_Fudge_Column() == 0) {
@@ -1272,7 +1316,7 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
                 TechnoClass* contact = foot->Contact_With_Whom();
                 if (contact != nullptr
                     && contact->What_Am_I() == RTTI_BUILDING
-                    && ((BuildingClass*)contact)->Class->IsWeaponsFactory) {
+                    && static_cast<BuildingClass*>(contact)->Class->IsWeaponsFactory) {
                     fudge = true;
                 }
             }
@@ -1316,12 +1360,12 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
     if (LogicalSurface == EightBitSurface) {
         Composite_Push_Voxel(voxeldata, frame, matrix, point, effective_rect,
                              final_brightness, vfx.alpha, House->Scheme,
-                             const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment(),
+                             Get_Z_Adjustment(),
                              vfx.is_predator, predator_warp);
         return;
     }
 
-    const int z_adjust = const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment();
+    const int z_adjust = Get_Z_Adjustment();
 
     ConvertClass& converter = *ColorSchemes[House->Scheme]->Converter;
     Submit_Voxel_Object(voxeldata, frame, matrix, point, effective_rect, converter,
@@ -1361,7 +1405,7 @@ void BulletClassExt::_Draw_Voxel(VoxelObject const& voxeldata, Matrix3D const& t
 {
     if (Class == nullptr) return;
     ConvertClass& converter = *ColorSchemes[Class->Color]->Converter;
-    Submit_Voxel_Object(voxeldata, (unsigned int)frame, transform, drawpoint, cliprect,
+    Submit_Voxel_Object(voxeldata, static_cast<unsigned int>(frame), transform, drawpoint, cliprect,
                        converter, brightness, /*alpha*/ 1.0f, /*z_adjust*/ 0);
 }
 
@@ -1381,7 +1425,7 @@ void VoxelAnimClassExt::_Draw_It(Point2D& point, Rect& cliprect) const
      *                       ownerless debris).
      */
     ConvertClass* converter_ptr = nullptr;
-    int brightness = ((MapClass&)Map)[Position].Brightness;
+    int brightness = Map[Position].Brightness;
     if (House != nullptr) {
         ColorScheme* scheme = ColorSchemes[House->Scheme];
         if (scheme != nullptr) converter_ptr = scheme->Converter;

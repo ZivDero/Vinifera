@@ -34,16 +34,6 @@ namespace Vinifera::Gfx
 {
     namespace
     {
-        /**
-         *  Master feature gate for the SHP screen-space warp/distortion
-         *  effect on SHAPE_PREDATOR draws. When false, predator routing is
-         *  bypassed and cloaked SHPs fall back to plain SHAPE_TRANSLUCENT
-         *  rendering. The DistortionQueue and SceneCopy infrastructure stays
-         *  compiled in; flip back to true to re-enable the warp path.
-         */
-        constexpr bool kPredatorWarpEnabled = false;
-
-
         inline void Tint_From_Intensity_And_Flags(int intensity, ShapeFlags_Type flags, float out[4])
         {
             /**
@@ -222,20 +212,6 @@ namespace Vinifera::Gfx
          *  which produces a static (un-shimmering) cloak; Vinifera-native
          *  call sites with a TechnoClass* should pass the real value.
          */
-        if ((flags & SHAPE_PREDATOR) && !kPredatorWarpEnabled) {
-            /**
-             *  Warp disabled — fall back to plain translucency. Vanilla
-             *  pairs SHAPE_PREDATOR with a SHAPE_TRANSLUCENT* bit, but if
-             *  the caller didn't set one, default to 50% so the cloaked
-             *  unit at least shows up as half-transparent rather than
-             *  fully opaque.
-             */
-            if (!(flags & (SHAPE_TRANSLUCENT25 | SHAPE_TRANSLUCENT50 | SHAPE_TRANSLUCENT75))) {
-                flags = ShapeFlags_Type(flags | SHAPE_TRANSLUCENT50);
-            }
-            flags = ShapeFlags_Type(flags & ~SHAPE_PREDATOR);
-        }
-
         if (flags & SHAPE_PREDATOR) {
             /**
              *  Same `SHAPE_TRANSLUCENT75` collision risk as the tint path —
