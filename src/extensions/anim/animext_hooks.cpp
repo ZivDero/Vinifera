@@ -730,7 +730,7 @@ void Draw_Shape_Proxy(
     int z_shapenum = 0,
     Point2D z_off = Point2D(0, 0))
 {
-    Draw_Shape_Proxy_DX11(surface, convert, shapefile, shapenum, point, window, flags, remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
+    Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags, remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
 
     /**
      *  Make sure that we have a valid animation saved just in case.
@@ -752,7 +752,7 @@ void Draw_Shape_Proxy(
             ShapeFlags_Type shadow_flags = flags & ~SHAPE_ZGRAD;
             shadow_flags = (shadow_flags & ~SHAPE_TRANSLUCENT75) | (SHAPE_DARKEN | SHAPE_CENTER | SHAPE_WIN_REL);
 
-            Draw_Shape_Proxy_DX11(surface, convert, shapefile, shadow_shapenum, shadow_point, window, shadow_flags, nullptr, shadow_height_offset);
+            Draw_Shape(surface, convert, shapefile, shadow_shapenum, shadow_point, window, shadow_flags, nullptr, shadow_height_offset);
         }
 
         /**

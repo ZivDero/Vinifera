@@ -858,7 +858,7 @@ int SidebarStripView::Get_Item_Queue_Count(const TechnoTypeClass& object) const
 void SidebarStripView::Draw_Shape_Overlay(Surface& surface, const ShapeSet* shape, const Rect& rect, const Point2D& point, int frame, int flags)
 {
     if (shape != nullptr) {
-        Draw_Shape_Proxy_DX11(surface, *SidebarDrawer, shape, frame, point, rect, static_cast<ShapeFlags_Type>(SHAPE_WIN_REL | flags));
+        Draw_Shape(surface, *SidebarDrawer, shape, frame, point, rect, static_cast<ShapeFlags_Type>(SHAPE_WIN_REL | flags));
     }
 }
 
@@ -903,7 +903,7 @@ void SidebarStripView::Draw_Cameo(Surface& surface, const Rect& rect, const Buil
         Rect image_rect(rect.X + point.X, rect.Y + point.Y, image_surface->Get_Width(), image_surface->Get_Height());
         SpriteCollection.Draw(image_rect, surface, *image_surface);
     } else if (shapefile != nullptr) {
-        Draw_Shape_Proxy_DX11(surface, *CameoDrawer, shapefile, 0, point, rect, SHAPE_WIN_REL);
+        Draw_Shape(surface, *CameoDrawer, shapefile, 0, point, rect, SHAPE_WIN_REL);
     }
 }
 

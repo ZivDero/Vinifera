@@ -58,7 +58,7 @@ void Composite_Push_Voxel(VoxelObject const& voxeldata,
 
 /**
  *  Enqueue a Draw_Shape call captured under composite mode. Args mirror the
- *  inputs to Draw_Shape_Proxy_DX11 so replay can re-invoke with a translated
+ *  vanilla `Draw_Shape` signature so replay can re-invoke with a translated
  *  point and the real tactical window.
  *
  *  `convert` is stored as a raw pointer — ColorSchemes[] converters live for

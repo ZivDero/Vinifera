@@ -194,7 +194,7 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
                     }
                     object = object->Next;
                 }
-                Draw_Shape_Proxy_DX11(*LogicalSurface, *NormalDrawer, pip_shapes, pip, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+                Draw_Shape(*LogicalSurface, *NormalDrawer, pip_shapes, pip, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
             }
 
         }
@@ -264,7 +264,7 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
                     {
                         shape = pips_to_draw[index];
                     }
-                    Draw_Shape_Proxy_DX11(*LogicalSurface, *NormalDrawer, pip_shapes, shape, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+                    Draw_Shape(*LogicalSurface, *NormalDrawer, pip_shapes, shape, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
                 }
             }
             else if (ext->SpawnManager && ext->SpawnManager->SpawnCount > 0)
@@ -272,7 +272,7 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
                 for (int index = 0; index < ext->SpawnManager->SpawnCount; index++)
                 {
                     const int pip = index < ext->SpawnManager->Docked_Count() ? 1 : 0;
-                    Draw_Shape_Proxy_DX11(*LogicalSurface,* NormalDrawer, pip_shapes, pip, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+                    Draw_Shape(*LogicalSurface,* NormalDrawer, pip_shapes, pip, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
                 }
             }
             else if (TClass->PipScale == PIPSCALE_AMMO)
@@ -286,14 +286,14 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
 
                     for (int index = 0; index < ttype_ext->PipWrap; index++)
                     {
-                        Draw_Shape_Proxy_DX11(*LogicalSurface, *NormalDrawer, pips2, PIPSCALE_AMMO_WRAP_FIRST + wrap_count + (index < leftover), Point2D(drawx + dx * index, drawy + dy * index - 3), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+                        Draw_Shape(*LogicalSurface, *NormalDrawer, pips2, PIPSCALE_AMMO_WRAP_FIRST + wrap_count + (index < leftover), Point2D(drawx + dx * index, drawy + dy * index - 3), rect, SHAPE_WIN_REL | SHAPE_CENTER);
                     }
                 }
                 else
                 {
                     for (int index = 0; index < Class_Of()->Max_Pips() && pips > 0; index++, pips--)
                     {
-                        Draw_Shape_Proxy_DX11(*LogicalSurface,* NormalDrawer, pips2, 6, Point2D(drawx + dx * index, drawy + dy * index - 3), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+                        Draw_Shape(*LogicalSurface,* NormalDrawer, pips2, 6, Point2D(drawx + dx * index, drawy + dy * index - 3), rect, SHAPE_WIN_REL | SHAPE_CENTER);
                     }
                 }
                 
@@ -302,7 +302,7 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
             {
                 for (int index = 0; index < Class_Of()->Max_Pips(); index++)
                 {
-                    Draw_Shape_Proxy_DX11(*LogicalSurface,* NormalDrawer, pip_shapes, index < pips ? 1 : 0, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+                    Draw_Shape(*LogicalSurface,* NormalDrawer, pip_shapes, index < pips ? 1 : 0, Point2D(drawx + dx * index, drawy + dy * index), rect, SHAPE_WIN_REL | SHAPE_CENTER);
                 }
             }
         }
@@ -342,11 +342,11 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
         const int specialpip = Extension::Fetch(TClass)->SpecialPipIndex;
         if (specialpip >= 0)
         {
-            Draw_Shape_Proxy_DX11(*LogicalSurface, *NormalDrawer, pips1, specialpip, Point2D(drawx, drawy) + UIControls->Get_Special_Pip_Offset(RTTI), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+            Draw_Shape(*LogicalSurface, *NormalDrawer, pips1, specialpip, Point2D(drawx, drawy) + UIControls->Get_Special_Pip_Offset(RTTI), rect, SHAPE_WIN_REL | SHAPE_CENTER);
         }
         else if (RTTI == RTTI_INFANTRY && Combat_Damage() < 0)
         {
-            Draw_Shape_Proxy_DX11(*LogicalSurface,* NormalDrawer, pips1, 6, Point2D(drawx, drawy) + UIControls->Get_Special_Pip_Offset(RTTI), rect, SHAPE_WIN_REL | SHAPE_CENTER);
+            Draw_Shape(*LogicalSurface,* NormalDrawer, pips1, 6, Point2D(drawx, drawy) + UIControls->Get_Special_Pip_Offset(RTTI), rect, SHAPE_WIN_REL | SHAPE_CENTER);
         }
 
         /**
@@ -372,7 +372,7 @@ void TechnoClassExt::_Draw_Pips(Point2D& bottomleft, Point2D& center, Rect& rect
         {
             Point2D drawpoint = center;
             drawpoint += UIControls->Get_Veterancy_Pip_Offset(RTTI);
-            Draw_Shape_Proxy_DX11(*LogicalSurface, *NormalDrawer, pips1, veterancy_shape, drawpoint, rect, SHAPE_WIN_REL | SHAPE_CENTER);
+            Draw_Shape(*LogicalSurface, *NormalDrawer, pips1, veterancy_shape, drawpoint, rect, SHAPE_WIN_REL | SHAPE_CENTER);
         }
     }
 }

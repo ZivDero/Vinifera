@@ -105,14 +105,13 @@ namespace Vinifera::Gfx
                         SpriteDrawCmd*   out_cmd)
     {
         /**
-         *  Fall back to vanilla CPU draw when the GPU pipeline can't take
-         *  this call:
-         *    - Target surface isn't a `GpuSurface` — SDLSurface destinations
-         *      (HiddenSurface / AlternateSurface / VisibleSurface, menus,
-         *      cameos, hidden buffers) keep using vanilla's CPU blit.
-         *      `CompositeSurface` and `TileSurface` are both `GpuSurface`.
-         *    - GraphicsDevice not initialized yet (pre-video-mode boot path).
-         *    - Bad inputs (defensive).
+         *  Bail when the GPU pipeline can't take this call. Vanilla CPU
+         *  fallback is the caller's responsibility -- the `Draw_Shape`
+         *  function-entry intercept guards all paths into this function
+         *  with the GpuSurface / Device check, and the unit-composite
+         *  replay path only calls us with a known-valid `out_cmd`, so
+         *  any failure here is either pre-video-init or a genuine asset
+         *  problem with no useful CPU substitute.
          */
         GpuSurface* gpu_surface = dynamic_cast<GpuSurface*>(&surface);
         if (Vinifera::Gfx::Device == nullptr
@@ -120,11 +119,6 @@ namespace Vinifera::Gfx
             || shapefile == nullptr
             || shapenum < 0)
         {
-            if (out_cmd == nullptr) {
-                Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                           /*remap*/ nullptr,
-                           height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-            }
             return false;
         }
 
@@ -133,11 +127,6 @@ namespace Vinifera::Gfx
         ShpAsset*   asset   = ShpCache::Get().Get_Or_Load(device, shapefile);
         PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(device, &convert);
         if (asset == nullptr || palette == nullptr) {
-            if (out_cmd == nullptr) {
-                Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                           /*remap*/ nullptr,
-                           height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-            }
             return false;
         }
         const ShpFrameInfo* fi = asset->Get_Frame(shapenum);

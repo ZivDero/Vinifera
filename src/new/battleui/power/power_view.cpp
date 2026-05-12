@@ -492,14 +492,14 @@ void PowerView::Draw()
 
     int index;
     for (index = 0; index < num; index++) {
-        Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_EMPTY, Point2D(x, y), rect, SHAPE_WIN_REL);
+        Draw_Shape(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_EMPTY, Point2D(x, y), rect, SHAPE_WIN_REL);
         y += power_pip_height;
     }
 
     index = 0;
     if (FlashCount > 0) {
         if ((FlashCount % 2) == 0) {
-            Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_WHITE, Point2D(x, y), rect, SHAPE_WIN_REL);
+            Draw_Shape(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_WHITE, Point2D(x, y), rect, SHAPE_WIN_REL);
             y += power_pip_height;
             index++;
         }
@@ -507,7 +507,7 @@ void PowerView::Draw()
 
     if (GreenPipCount > 0) {
         while (index < GreenPipCount) {
-            Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_GREEN, Point2D(x, y), rect, SHAPE_WIN_REL);
+            Draw_Shape(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_GREEN, Point2D(x, y), rect, SHAPE_WIN_REL);
             y += power_pip_height;
             index++;
         }
@@ -516,7 +516,7 @@ void PowerView::Draw()
 
     if (YellowPipCount > 0) {
         while (index < YellowPipCount) {
-            Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_YELLOW, Point2D(x, y), rect, SHAPE_WIN_REL);
+            Draw_Shape(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_YELLOW, Point2D(x, y), rect, SHAPE_WIN_REL);
             y += power_pip_height;
             index++;
         }
@@ -525,7 +525,7 @@ void PowerView::Draw()
 
     if (RedPipCount > 0) {
         while (index < RedPipCount) {
-            Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_RED, Point2D(x, y), rect, SHAPE_WIN_REL);
+            Draw_Shape(*SidebarSurface, *SidebarDrawer, PowerPipShape, POWER_PIP_RED, Point2D(x, y), rect, SHAPE_WIN_REL);
             y += power_pip_height;
             index++;
         }

@@ -268,16 +268,16 @@ void ClassicSidebarView::Draw()
      *  fully refreshed before blitting.
      */
     int y = SidebarRect.Y;
-    Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, BackgroundTopShape, 0, Point2D(0, y), rect, SHAPE_WIN_REL);
+    Draw_Shape(*SidebarSurface, *SidebarDrawer, BackgroundTopShape, 0, Point2D(0, y), rect, SHAPE_WIN_REL);
     y += BackgroundTopShape->Get_Height();
 
     int rows = Background_Row_Count();
     for (int i = 0; i < rows; i++, y += BackgroundMiddleShape->Get_Height()) {
-        Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, BackgroundMiddleShape, 0, Point2D(0, y), rect, SHAPE_WIN_REL);
+        Draw_Shape(*SidebarSurface, *SidebarDrawer, BackgroundMiddleShape, 0, Point2D(0, y), rect, SHAPE_WIN_REL);
     }
 
-    Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, BackgroundBottomShape, 0, Point2D(0, y), rect, SHAPE_WIN_REL);
-    Draw_Shape_Proxy_DX11(*SidebarSurface, *SidebarDrawer, BackgroundAddonShape, 0, Point2D(0, y + BackgroundBottomShape->Get_Height()), rect, SHAPE_WIN_REL);
+    Draw_Shape(*SidebarSurface, *SidebarDrawer, BackgroundBottomShape, 0, Point2D(0, y), rect, SHAPE_WIN_REL);
+    Draw_Shape(*SidebarSurface, *SidebarDrawer, BackgroundAddonShape, 0, Point2D(0, y + BackgroundBottomShape->Get_Height()), rect, SHAPE_WIN_REL);
 
     /**
      *  Draw the strips.

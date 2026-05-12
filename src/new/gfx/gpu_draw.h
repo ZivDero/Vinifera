@@ -9,9 +9,9 @@
  *          functions, and can pass extra parameters the legacy ABI has no
  *          slot for (e.g. predator warp offset).
  *
- *          The vanilla-ABI proxies (`Draw_Shape_Proxy_DX11`, etc.) call into
- *          these functions with default values for the extras (e.g.
- *          `predator_offset = 0`), so legacy call sites get unchanged
+ *          The function-entry intercept on vanilla `Draw_Shape` (see
+ *          draw_shape/draw_shapeext_hooks.cpp) routes via this with
+ *          `predator_offset = 0`, so legacy call sites get unchanged
  *          behaviour. New call sites that have richer context (e.g. a
  *          TechnoClass with `Get_Predator_Offset()`) call these directly to
  *          unlock the full effect path.

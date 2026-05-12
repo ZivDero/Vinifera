@@ -160,7 +160,7 @@ void BeaconClass::Draw(Surface* surface, Rect const& cliprect) const
         /**
          *  Draw main beacon animation frame.
          */
-        Draw_Shape_Proxy_DX11(*surface, *scheme->Converter, BeaconManagerClass::BeaconArt, shapenum, drawpoint, cliprect, SHAPE_CENTER | SHAPE_WIN_REL);
+        Draw_Shape(*surface, *scheme->Converter, BeaconManagerClass::BeaconArt, shapenum, drawpoint, cliprect, SHAPE_CENTER | SHAPE_WIN_REL);
 
         if (!Text.empty()) {
             std::string text = Text;
@@ -219,7 +219,7 @@ void BeaconClass::Draw_On_Radar(Surface* surface, Rect const& cliprect, bool rem
     if (shapenum < BeaconManager.RadarBeaconFrameCount + 1 || removed) {
         Point2D drawpoint = Map.Coord_To_Radar_Pixel(Position, true);
         if (shapenum < BeaconManager.RadarBeaconFrameCount && !removed) {
-            Draw_Shape_Proxy_DX11(*surface, *ColorSchemes[Houses[House]->Scheme]->Converter, BeaconManagerClass::RadarBeaconArt, shapenum, drawpoint, cliprect, SHAPE_CENTER | SHAPE_WIN_REL);
+            Draw_Shape(*surface, *ColorSchemes[Houses[House]->Scheme]->Converter, BeaconManagerClass::RadarBeaconArt, shapenum, drawpoint, cliprect, SHAPE_CENTER | SHAPE_WIN_REL);
         }
 
         /**

@@ -72,28 +72,6 @@
 #include "voxel.hh"
 
 
-/**
- *  Forward declaration for re-entering the SHP path at replay time. Defined
- *  in draw_shape/draw_shapeext_hooks.cpp. We don't include its header here
- *  because that header (draw_shapeext_hooks.h) only exposes the install
- *  function; the proxy entry point is plain extern "C++" linkage.
- */
-void Draw_Shape_Proxy_DX11(
-    Surface& surface,
-    ConvertClass& convert,
-    const ShapeSet* shapefile,
-    int shapenum,
-    const Point2D& point,
-    const Rect& window,
-    ShapeFlags_Type flags,
-    const char* remap,
-    int height_offset,
-    ZGradientType zgrad,
-    int intensity,
-    const ShapeSet* z_shapefile,
-    int z_shapenum,
-    Point2D z_off);
-
 #include <algorithm>
 #include <cmath>
 
@@ -981,9 +959,9 @@ void Composite_Replay(Surface&       dst_surface,
      *      EightBitSurface scratch — it runs the warp blitter directly
      *      on the final scene buffer (see unit.cpp:2459-2470).
      *
-     *  SHP records in a predator unit re-issue via `Draw_Shape_Proxy_DX11`
-     *  (the same code path the legacy proxy uses), so cloaked SHP parts
-     *  stay on the SpriteQueue's normal translucent path.
+     *  SHP records in a predator unit re-issue via `Draw_Shape` (which
+     *  routes back through the function-entry intercept), so cloaked SHP
+     *  parts stay on the SpriteQueue's normal translucent path.
      */
     bool unit_is_predator = false;
     for (const PendingComposite& rec : g_pending_composite) {
@@ -1024,11 +1002,11 @@ void Composite_Replay(Surface&       dst_surface,
                 const ShapeFlags_Type replay_flags =
                     p.flags & ~SHAPE_WIN_REL;
 
-                Draw_Shape_Proxy_DX11(dst_surface, *convert, p.shapefile, p.shapenum,
-                                      real_point, rect, replay_flags,
-                                      /*remap*/ nullptr,
-                                      p.height_offset, p.zgrad, p.intensity,
-                                      p.z_shapefile, p.z_shapenum, p.z_off);
+                Draw_Shape(dst_surface, *convert, p.shapefile, p.shapenum,
+                           real_point, rect, replay_flags,
+                           /*remap*/ nullptr,
+                           p.height_offset, p.zgrad, p.intensity,
+                           p.z_shapefile, p.z_shapenum, p.z_off);
             }
         }
         g_pending_composite.clear();
@@ -1096,8 +1074,8 @@ namespace
         // The dst_surface arg threaded through GPU_Draw_Shape is only used
         // for clipping and the GpuSurface dynamic_cast check; the captured
         // composite already validated GpuSurface, so we can reuse the
-        // CompositeSurface as our dummy "destination" — Draw_Shape_Proxy_DX11
-        // takes a Surface& and only inspects rect bounds.
+        // CompositeSurface as our dummy "destination" — `Draw_Shape` takes
+        // a Surface& and only inspects rect bounds.
         Surface& dst_surface_dummy = *CompositeSurface;
 
         bool first_record = true;
