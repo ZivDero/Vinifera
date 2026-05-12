@@ -42,7 +42,10 @@
 #include "primitive_queue.h"
 #include "rect.h"
 #include "render_pass.h"
+#include "scene_copy.h"
 #include "sdlmouse.h"
+#include "unit_composite.h"
+#include "unit_scratch.h"
 #include "sdlsurface.h"
 #include "tibsun_functions.h"
 #include "tibsun_globals.h"
@@ -535,6 +538,14 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera DistortionQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::SceneCopy::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera SceneCopy could not be initialized.\n");
+    }
+
+    if (!Vinifera::Gfx::UnitScratch::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera UnitScratch could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -560,6 +571,8 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::VoxelQueue::Get().Shutdown();
     Vinifera::Gfx::VoxelAssetCache::Get().Shutdown();
     Vinifera::Gfx::DistortionQueue::Get().Shutdown();
+    Vinifera::Gfx::SceneCopy::Get().Shutdown();
+    Vinifera::Gfx::UnitScratch::Get().Shutdown();
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -986,6 +999,13 @@ bool SDL_Update_Screen(Surface* surface)
 
     Vinifera::Gfx::Device->Begin_Frame();
 
+    /**
+     *  Reset the per-frame SceneCopy guard so the first PostEffects-pass
+     *  caller (DistortionQueue or VoxelQueue's predator path) triggers a
+     *  fresh `CopyResource` of SceneRT into the snapshot.
+     */
+    Vinifera::Gfx::SceneCopy::Get().Begin_Frame();
+
     if (is_gpu) {
         Vinifera::Gfx::Device->Bind_Scene_Target();
 
@@ -1032,6 +1052,18 @@ bool SDL_Update_Screen(Surface* surface)
             Vinifera::Gfx::TileQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::SpriteQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::VoxelQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            /**
+             *  Drain the deferred composite-unit queue right after the regular
+             *  voxel/sprite flushes for this pass. By now terrain depth +
+             *  ObjectLayer voxels/sprites are all on the scene RT, so each
+             *  unit's scratch-composite blit gets correct terrain occlusion
+             *  and lands above same-pass content in the per-pixel SV_Depth
+             *  order. Only ObjectLayer carries composite captures today;
+             *  the function is a no-op for other passes (empty queue).
+             */
+            if (render_pass == Vinifera::Gfx::RenderPass::ObjectLayer) {
+                Composite_Process_Deferred(*Vinifera::Gfx::Device);
+            }
             Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);

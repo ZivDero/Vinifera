@@ -67,6 +67,43 @@ namespace Vinifera::Gfx
         RectF                   Clip = {};
         RenderPass              Pass = RenderPass::ObjectLayer;
         GpuRenderTarget         OutputTarget = GpuRenderTarget::Scene;
+
+        /**
+         *  Predator/cloak (VISUAL_RIPPLE). When true the cmd is routed via
+         *  `VoxelDistortionEffect` in the PostEffects pass; the PS samples
+         *  SceneCopy at `(SV_Position + (WarpPixels, 0))` and blends with
+         *  the shaded palette color by `BlendRatio`. Mutually exclusive
+         *  with `IsShadow`.
+         */
+        bool                    IsPredator         = false;
+        int                     PredatorWarpPixels = 0;
+        float                   PredatorBlendRatio = 0.5f;
+
+        /**
+         *  Composite-unit grouping. `-1` (the default) means the cmd is a
+         *  standalone draw and goes through the fast batched path. Any
+         *  other value means the cmd is one section of a multi-section /
+         *  translucent unit; all sections of the unit share the same ID.
+         *  `VoxelQueue::Flush_Pass` collects same-ID cmds and renders them
+         *  to a shared scratch RT (see `unit_scratch.h`) which is then
+         *  composited to the scene as a single quad — fixing the per-
+         *  pixel blend compounding that hits translucent voxels.
+         */
+        int                     UnitGroupID = -1;
+    };
+
+
+    /**
+     *  Per-unit metadata for composite groups. Built at submit time when
+     *  `Submit_Voxel_Object` allocates a UnitGroupID; consumed at flush
+     *  time by the composite path.
+     */
+    struct VoxelUnitGroup
+    {
+        Point2D Drawpoint   = { 0, 0 };
+        float   Alpha       = 1.0f;
+        float   SceneDepth  = 0.5f;
+        RectF   Clip        = {};
     };
 
 
@@ -84,6 +121,24 @@ namespace Vinifera::Gfx
         void Flush_Pass(GraphicsDevice& device, RenderPass pass);
         void Clear();
 
+        /**
+         *  Reserve a new UnitGroupID and register the unit's metadata.
+         *  Returns the allocated ID for stamping into VoxelDrawCmd. Caller
+         *  is responsible for submitting the cmds; the group's metadata
+         *  (drawpoint, alpha, depth) is used by the composite flush path.
+         */
+        int Allocate_Unit_Group(const VoxelUnitGroup& group);
+
+        /**
+         *  Render one voxel cmd synchronously against the currently bound
+         *  render target. Used by the composite-replay path (turreted units
+         *  composed via the EightBitSurface intercept) which needs to render
+         *  voxel and SHP parts to the unit-scratch in submission order, not
+         *  via the deferred per-queue flush.
+         */
+        void Render_Cmd_Immediate(GraphicsDevice& device, const VoxelDrawCmd& cmd,
+                                  int target_w, int target_h, bool is_sidebar);
+
         VoxelEffect&            Effect()    { return EffectInstance; }
         VoxelLightRemapTexture&  LightRemap() { return LightRemapInstance; }
 
@@ -92,10 +147,26 @@ namespace Vinifera::Gfx
 
         void Issue_Cmd(GraphicsDevice& device, const VoxelDrawCmd& cmd,
                        int target_w, int target_h, bool is_sidebar);
+        void Issue_Predator_Cmd(GraphicsDevice& device, const VoxelDrawCmd& cmd,
+                                int target_w, int target_h);
+
+        /**
+         *  Render `count` cmds of one composite unit group into the shared
+         *  scratch RT, then composite the scratch into the scene at the
+         *  group's drawpoint with the group's alpha. Used by Flush_Pass.
+         */
+        void Flush_Composite_Group(GraphicsDevice& device,
+                                   const VoxelDrawCmd* const* cmds,
+                                   size_t count,
+                                   const VoxelUnitGroup& group);
+
+        bool Has_Predator_Commands(RenderPass pass) const;
 
         VoxelEffect               EffectInstance;
+        VoxelDistortionEffect      DistortionEffectInstance;
         VoxelLightRemapTexture     LightRemapInstance;
         std::vector<VoxelDrawCmd> Commands;
+        std::vector<VoxelUnitGroup> UnitGroups;
         bool                      Initialized = false;
     };
 }

@@ -40,6 +40,9 @@ enum ZGradientType;
 
 namespace Vinifera::Gfx
 {
+    struct SpriteDrawCmd;
+
+
     /**
      *  GPU equivalent of vanilla's `Draw_Shape` with extras the old ABI
      *  doesn't carry. The function:
@@ -59,11 +62,18 @@ namespace Vinifera::Gfx
      *      `(unit_id + frame) % 400`. Pass 0 when no per-unit value is
      *      available — the result is a static (un-shimmering) cloak.
      *
+     *    `out_cmd` — when non-null, the function builds the SpriteDrawCmd as
+     *      usual but does NOT submit it to the SpriteQueue (or DistortionQueue)
+     *      — the prepared cmd is written to `*out_cmd` instead. Used by the
+     *      unit-scratch composite-replay path so SHP parts of turreted units
+     *      can be rendered immediately rather than going through the deferred
+     *      queue. Returns whether the cmd was successfully built.
+     *
      *    `remap` is intentionally not exposed: vanilla treats it as dead
      *      code (the GPU path likewise ignores it) and no Vinifera-native
      *      call site has a use for it.
      */
-    void GPU_Draw_Shape(Surface&         surface,
+    bool GPU_Draw_Shape(Surface&         surface,
                         ConvertClass&    convert,
                         const ShapeSet*  shapefile,
                         int              shapenum,
@@ -76,5 +86,6 @@ namespace Vinifera::Gfx
                         const ShapeSet*  z_shapefile,
                         int              z_shapenum,
                         Point2D          z_off,
-                        int              predator_offset);
+                        int              predator_offset,
+                        SpriteDrawCmd*   out_cmd = nullptr);
 }

@@ -37,7 +37,6 @@
 namespace Vinifera::Gfx
 {
     class GraphicsDevice;
-    class RenderTarget2D;
 
 
     struct DistortionDrawCmd
@@ -91,8 +90,8 @@ namespace Vinifera::Gfx
 
         /**
          *  Flushes nothing unless `pass == PostEffects` AND there are queued
-         *  commands. On flush: CopyResource(SceneCopy, SceneRT), bind
-         *  SceneCopy at t2, and issue one quad per command.
+         *  commands. On flush: triggers `SceneCopy::Ensure_Copied`, binds the
+         *  shared SceneCopy SRV at t2, and issues one quad per command.
          */
         void Flush_Pass(GraphicsDevice& device, RenderPass pass);
 
@@ -103,16 +102,9 @@ namespace Vinifera::Gfx
     private:
         DistortionQueue() = default;
 
-        bool Ensure_Scene_Copy(GraphicsDevice& device, int width, int height);
-        void Release_Scene_Copy();
-
         SpriteBatch                  Batch;
         DistortionEffect             FxEffect;
         std::vector<DistortionDrawCmd> Commands;
-
-        RenderTarget2D*              SceneCopy = nullptr;
-        int                          SceneCopyWidth = 0;
-        int                          SceneCopyHeight = 0;
 
         bool                         Initialized = false;
     };

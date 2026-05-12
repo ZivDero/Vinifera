@@ -15,7 +15,7 @@
 #include "gfx_utils.h"
 #include "graphics_device.h"
 #include "palette_array.h"
-#include "render_target_2d.h"
+#include "scene_copy.h"
 #include "shp_atlas.h"
 #include "shp_cache.h"
 
@@ -195,7 +195,6 @@ namespace Vinifera::Gfx
 
     void DistortionQueue::Shutdown()
     {
-        Release_Scene_Copy();
         FxEffect.Shutdown();
         Batch.Shutdown();
         Commands.clear();
@@ -218,39 +217,6 @@ namespace Vinifera::Gfx
     }
 
 
-    bool DistortionQueue::Ensure_Scene_Copy(GraphicsDevice& device, int width, int height)
-    {
-        if (SceneCopy != nullptr
-            && SceneCopyWidth == width && SceneCopyHeight == height) {
-            return true;
-        }
-        Release_Scene_Copy();
-        SceneCopy = new RenderTarget2D();
-        if (SceneCopy == nullptr) {
-            return false;
-        }
-        if (!SceneCopy->Initialize(device, width, height, DXGI_FORMAT_R8G8B8A8_UNORM)) {
-            DEBUG_ERROR("DistortionQueue: SceneCopy creation failed (%dx%d).\n", width, height);
-            Release_Scene_Copy();
-            return false;
-        }
-        SceneCopyWidth = width;
-        SceneCopyHeight = height;
-        return true;
-    }
-
-
-    void DistortionQueue::Release_Scene_Copy()
-    {
-        if (SceneCopy != nullptr) {
-            delete SceneCopy;
-            SceneCopy = nullptr;
-        }
-        SceneCopyWidth = 0;
-        SceneCopyHeight = 0;
-    }
-
-
     void DistortionQueue::Flush_Pass(GraphicsDevice& device, RenderPass pass)
     {
         if (!Initialized || pass != RenderPass::PostEffects || Commands.empty()) {
@@ -258,35 +224,21 @@ namespace Vinifera::Gfx
         }
 
         ID3D11DeviceContext* ctx = device.Get_Context();
-        ID3D11ShaderResourceView* scene_srv = device.Get_Scene_SRV();
-        if (ctx == nullptr || scene_srv == nullptr) {
+        if (ctx == nullptr) {
             return;
         }
 
         /**
-         *  Lazily (re)create the scene-copy texture to match the current
-         *  Scene RT. Logical resolution can change at runtime via the
-         *  graphics options menu — pick up the new size when it does.
+         *  Trigger (or reuse) the per-frame scene snapshot. VoxelQueue's
+         *  predator path also calls this — first caller wins.
          */
-        const int scene_w = device.Get_Scene_Target_Width();
-        const int scene_h = device.Get_Scene_Target_Height();
+        if (!SceneCopy::Get().Ensure_Copied(device)) {
+            return;
+        }
+        const int scene_w = SceneCopy::Get().Get_Width();
+        const int scene_h = SceneCopy::Get().Get_Height();
         if (scene_w <= 0 || scene_h <= 0) {
             return;
-        }
-        if (!Ensure_Scene_Copy(device, scene_w, scene_h)) {
-            return;
-        }
-
-        /**
-         *  Copy SceneRT → SceneCopy. CopyResource doesn't change pipeline
-         *  bindings; SceneRT remains the active RTV (set by the prior pass)
-         *  and the depth state stays intact.
-         */
-        ID3D11Resource* scene_tex = nullptr;
-        scene_srv->GetResource(&scene_tex);
-        if (scene_tex != nullptr) {
-            ctx->CopyResource(SceneCopy->Get_Texture(), scene_tex);
-            scene_tex->Release();
         }
 
         /**
@@ -338,7 +290,7 @@ namespace Vinifera::Gfx
              */
             ID3D11ShaderResourceView* pal_srv = PaletteArray::Get().Get_SRV();
             ctx->PSSetShaderResources(1, 1, &pal_srv);
-            ID3D11ShaderResourceView* copy_srv = SceneCopy->Get_SRV();
+            ID3D11ShaderResourceView* copy_srv = SceneCopy::Get().Get_SRV();
             ctx->PSSetShaderResources(2, 1, &copy_srv);
 
             DistortionEffect::Params fxp = {};

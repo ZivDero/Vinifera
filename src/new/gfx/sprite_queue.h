@@ -100,6 +100,15 @@ namespace Vinifera::Gfx
          */
         void Flush_Alpha_Lights(GraphicsDevice& device);
 
+        /**
+         *  Render one sprite cmd synchronously against the currently bound
+         *  render target. Used by the unit-scratch composite path so SHP
+         *  parts (turret, body) of a turreted unit can be drawn into the
+         *  scratch in submission order alongside voxel parts.
+         */
+        void Render_Sprite_Immediate(GraphicsDevice& device, const SpriteDrawCmd& cmd,
+                                     int target_w, int target_h);
+
         void Clear();
 
     private:

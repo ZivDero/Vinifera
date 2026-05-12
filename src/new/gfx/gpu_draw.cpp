@@ -34,6 +34,16 @@ namespace Vinifera::Gfx
 {
     namespace
     {
+        /**
+         *  Master feature gate for the SHP screen-space warp/distortion
+         *  effect on SHAPE_PREDATOR draws. When false, predator routing is
+         *  bypassed and cloaked SHPs fall back to plain SHAPE_TRANSLUCENT
+         *  rendering. The DistortionQueue and SceneCopy infrastructure stays
+         *  compiled in; flip back to true to re-enable the warp path.
+         */
+        constexpr bool kPredatorWarpEnabled = false;
+
+
         inline void Tint_From_Intensity_And_Flags(int intensity, ShapeFlags_Type flags, float out[4])
         {
             /**
@@ -50,9 +60,18 @@ namespace Vinifera::Gfx
              */
             const float t = Brightness_To_Tint(intensity);
             float a = 1.0f;
-            if (flags & SHAPE_TRANSLUCENT25) a *= 0.75f;
-            if (flags & SHAPE_TRANSLUCENT50) a *= 0.5f;
-            if (flags & SHAPE_TRANSLUCENT75) a *= 0.25f;
+            /**
+             *  `SHAPE_TRANSLUCENT75` is the bitwise OR of `SHAPE_TRANSLUCENT25 |
+             *  SHAPE_TRANSLUCENT50` (see tibsun_defines.h), so independent
+             *  `flags & SHAPE_TRANSLUCENT*` tests miscompare — a unit with
+             *  only SHAPE_TRANSLUCENT50 (bit 2) would also match the
+             *  TRANSLUCENT75 mask via that same bit and get an extra
+             *  `*= 0.25`. Compare the full 2-bit field once and dispatch.
+             */
+            const unsigned tmask = (unsigned)flags & (unsigned)SHAPE_TRANSLUCENT75;
+            if (tmask == (unsigned)SHAPE_TRANSLUCENT75)       a *= 0.25f;
+            else if (tmask == (unsigned)SHAPE_TRANSLUCENT50)  a *= 0.5f;
+            else if (tmask == (unsigned)SHAPE_TRANSLUCENT25)  a *= 0.75f;
             out[0] = t;
             out[1] = t;
             out[2] = t;
@@ -79,7 +98,7 @@ namespace Vinifera::Gfx
     }
 
 
-    void GPU_Draw_Shape(Surface&         surface,
+    bool GPU_Draw_Shape(Surface&         surface,
                         ConvertClass&    convert,
                         const ShapeSet*  shapefile,
                         int              shapenum,
@@ -92,7 +111,8 @@ namespace Vinifera::Gfx
                         const ShapeSet*  z_shapefile,
                         int              z_shapenum,
                         Point2D          z_off,
-                        int              predator_offset)
+                        int              predator_offset,
+                        SpriteDrawCmd*   out_cmd)
     {
         /**
          *  Fall back to vanilla CPU draw when the GPU pipeline can't take
@@ -110,10 +130,12 @@ namespace Vinifera::Gfx
             || shapefile == nullptr
             || shapenum < 0)
         {
-            Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                       /*remap*/ nullptr,
-                       height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-            return;
+            if (out_cmd == nullptr) {
+                Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
+                           /*remap*/ nullptr,
+                           height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
+            }
+            return false;
         }
 
         GraphicsDevice& device = *Vinifera::Gfx::Device;
@@ -121,14 +143,16 @@ namespace Vinifera::Gfx
         ShpAsset*   asset   = ShpCache::Get().Get_Or_Load(device, shapefile);
         PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(device, &convert);
         if (asset == nullptr || palette == nullptr) {
-            Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                       /*remap*/ nullptr,
-                       height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-            return;
+            if (out_cmd == nullptr) {
+                Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
+                           /*remap*/ nullptr,
+                           height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
+            }
+            return false;
         }
         const ShpFrameInfo* fi = asset->Get_Frame(shapenum);
         if (fi == nullptr || fi->W <= 0 || fi->H <= 0) {
-            return;
+            return false;
         }
 
         ShpAsset* z_asset = nullptr;
@@ -169,15 +193,17 @@ namespace Vinifera::Gfx
         float xscale = 1.0f;
         float yscale = 1.0f;
         if (!Logical_To_Render_Target(device, gpu_surface->Output_Target(), xscale, yscale)) {
-            Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                       /*remap*/ nullptr,
-                       height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-            return;
+            if (out_cmd == nullptr) {
+                Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
+                           /*remap*/ nullptr,
+                           height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
+            }
+            return false;
         }
 
         const Rect clipped_window = Intersect(window, surface.Get_Rect());
         if (!clipped_window.Is_Valid()) {
-            return;
+            return false;
         }
 
         /**
@@ -196,15 +222,30 @@ namespace Vinifera::Gfx
          *  which produces a static (un-shimmering) cloak; Vinifera-native
          *  call sites with a TechnoClass* should pass the real value.
          */
-        if (flags & SHAPE_PREDATOR) {
-            float blend_ratio = 0.5f;
-            if (flags & SHAPE_TRANSLUCENT75) {
-                blend_ratio = 0.75f;
-            } else if (flags & SHAPE_TRANSLUCENT25) {
-                blend_ratio = 0.25f;
-            } else if (flags & SHAPE_TRANSLUCENT50) {
-                blend_ratio = 0.5f;
+        if ((flags & SHAPE_PREDATOR) && !kPredatorWarpEnabled) {
+            /**
+             *  Warp disabled — fall back to plain translucency. Vanilla
+             *  pairs SHAPE_PREDATOR with a SHAPE_TRANSLUCENT* bit, but if
+             *  the caller didn't set one, default to 50% so the cloaked
+             *  unit at least shows up as half-transparent rather than
+             *  fully opaque.
+             */
+            if (!(flags & (SHAPE_TRANSLUCENT25 | SHAPE_TRANSLUCENT50 | SHAPE_TRANSLUCENT75))) {
+                flags = ShapeFlags_Type(flags | SHAPE_TRANSLUCENT50);
             }
+            flags = ShapeFlags_Type(flags & ~SHAPE_PREDATOR);
+        }
+
+        if (flags & SHAPE_PREDATOR) {
+            /**
+             *  Same `SHAPE_TRANSLUCENT75` collision risk as the tint path —
+             *  compare the 2-bit field once.
+             */
+            const unsigned tmask = (unsigned)flags & (unsigned)SHAPE_TRANSLUCENT75;
+            float blend_ratio = 0.5f;
+            if (tmask == (unsigned)SHAPE_TRANSLUCENT75)       blend_ratio = 0.75f;
+            else if (tmask == (unsigned)SHAPE_TRANSLUCENT50)  blend_ratio = 0.5f;
+            else if (tmask == (unsigned)SHAPE_TRANSLUCENT25)  blend_ratio = 0.25f;
 
             DistortionDrawCmd dcmd = {};
             dcmd.Asset       = asset;
@@ -232,8 +273,18 @@ namespace Vinifera::Gfx
             dcmd.DstZTop    = Depth_From_Screen_Y(top_y)    - kSpriteEpsilon;
             dcmd.DstZBottom = Depth_From_Screen_Y(bottom_y) - kSpriteEpsilon;
 
+            /**
+             *  Predator branch never feeds out_cmd — the unit-scratch
+             *  composite path doesn't currently support predator units (the
+             *  warp pipeline reads SceneCopy directly). If out_cmd was
+             *  requested, just return false without submitting; the caller
+             *  treats it as a build failure.
+             */
+            if (out_cmd != nullptr) {
+                return false;
+            }
             DistortionQueue::Get().Submit(dcmd);
-            return;
+            return true;
         }
 
         SpriteDrawCmd cmd = {};
@@ -342,6 +393,11 @@ namespace Vinifera::Gfx
 
         cmd.OutputTarget = gpu_surface->Output_Target();
 
+        if (out_cmd != nullptr) {
+            *out_cmd = cmd;
+            return true;
+        }
         SpriteQueue::Get().Submit(cmd);
+        return true;
     }
 }

@@ -54,6 +54,9 @@ namespace Vinifera::Gfx
      *      Tint             = (r, g, b, a)
      *      Misc             = (depth_baseline, depth_scale,
      *                          shadow_dark_amount, flags)
+     *      Predator         = (warp_offset_px, blend_ratio,
+     *                          scene_w, scene_h)
+     *                          — only sampled by VoxelDistortionEffect
      */
     struct VoxelEffectParams
     {
@@ -64,6 +67,7 @@ namespace Vinifera::Gfx
         float LightDir[4];
         float Tint[4];
         float Misc[4];
+        float Predator[4];
     };
 
 
@@ -101,6 +105,12 @@ namespace Vinifera::Gfx
          */
         void Bind_Normals(GraphicsDevice& device);
 
+        /**
+         *  Exposes the normals SRV so VoxelDistortionEffect can bind the same
+         *  game-wide normals buffer without owning its own copy.
+         */
+        ID3D11ShaderResourceView* Get_Normals_SRV() const { return NormalsSRV; }
+
     private:
         bool Build_Normals_Buffer(GraphicsDevice& device);
         void Release_Normals_Buffer();
@@ -108,5 +118,36 @@ namespace Vinifera::Gfx
         ID3D11Buffer*             ParamsCB = nullptr;
         ID3D11Buffer*             NormalsBuf = nullptr;
         ID3D11ShaderResourceView* NormalsSRV = nullptr;
+    };
+
+
+    /**
+     *  Predator/cloak variant of the voxel point-list effect. Same VS layout
+     *  and CB shape as `VoxelEffect`; the PS additionally samples a SceneCopy
+     *  texture at the rasterized pixel + warp offset and lerps with the
+     *  shaded palette color. Bound at slot t3 by the caller.
+     *
+     *  Used by `VoxelQueue` in the PostEffects pass for `VISUAL_RIPPLE`
+     *  (stealth-tank chassis); the equivalent of `BlitTransLucent*ZReadWarp`
+     *  from vanilla but on the GPU.
+     */
+    class VoxelDistortionEffect : public Effect
+    {
+    public:
+        VoxelDistortionEffect() = default;
+        ~VoxelDistortionEffect() = default;
+
+        bool Initialize(GraphicsDevice& device);
+        void Shutdown();
+
+        void Bind_Palette(GraphicsDevice& device, PaletteLUT& palette);
+        void Bind_Light_Remap(GraphicsDevice& device, Texture2D& light_remap_tex);
+        void Bind_Scene_Copy(GraphicsDevice& device, ID3D11ShaderResourceView* scene_copy_srv);
+        void Bind_Normals(GraphicsDevice& device, ID3D11ShaderResourceView* normals_srv);
+
+        void Set_Params(GraphicsDevice& device, const VoxelEffectParams& params);
+
+    private:
+        ID3D11Buffer* ParamsCB = nullptr;
     };
 }

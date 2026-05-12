@@ -168,8 +168,16 @@ namespace Vinifera::Gfx
             "    // we don't multiply rgba.rgb by Tint here — Tint.a still\n"
             "    // carries visual-character translucency (VISUAL_DARKEN etc.).\n"
             "    float4 rgba = Palette.Load(int3((int)shaded_idx, 0, 0));\n"
+            "    // Pre-multiply RGB by the final alpha. The queue binds an\n"
+            "    // EBlend::Premultiplied blend state which expects a pre-\n"
+            "    // multiplied source — without this the math collapses to\n"
+            "    // `src + (1-a)*dest` (unit full + partial terrain), making\n"
+            "    // translucent voxels look mostly opaque. Pre-multiplying\n"
+            "    // gives the correct `a*src + (1-a)*dest`. For opaque\n"
+            "    // voxels (a == 1) the multiply is a no-op.\n"
+            "    float a_final = rgba.a * Tint.a;\n"
             "    PSOut o;\n"
-            "    o.color = float4(rgba.rgb, rgba.a * Tint.a);\n"
+            "    o.color = float4(rgba.rgb * a_final, a_final);\n"
             "    // Per-UNIT depth (NOT per-pixel). v.unit_y carries the\n"
             "    // section's drawpoint Y from T0.w, identical across every\n"
             "    // voxel of this section. Using drawpoint Y instead of the\n"
@@ -180,7 +188,7 @@ namespace Vinifera::Gfx
             "    // per-section kObjectEps is sized on the CPU to cover the\n"
             "    // worst pixel below drawpoint, so voxels still stay in\n"
             "    // front of terrain across the full sprite footprint.\n"
-            "    const float kVoxelZScale = 1e-5;\n"
+            "    const float kVoxelZScale = 1e-4;\n"
             "    float kObjectEps = Misc.z;\n"
             "    float base = 1.0 - v.unit_y * Misc.y;\n"
             "    o.depth = base - kObjectEps - v.voxel_z * kVoxelZScale + Misc.x * Misc.y;\n"
@@ -335,6 +343,196 @@ namespace Vinifera::Gfx
 
 
     void VoxelEffect::Set_Params(GraphicsDevice& device, const VoxelEffectParams& params)
+    {
+        if (ParamsCB == nullptr) return;
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        if (FAILED(ctx->Map(ParamsCB, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+            return;
+        }
+        memcpy(mapped.pData, &params, sizeof(params));
+        ctx->Unmap(ParamsCB, 0);
+        ctx->VSSetConstantBuffers(1, 1, &ParamsCB);
+        ctx->PSSetConstantBuffers(1, 1, &ParamsCB);
+    }
+
+
+    namespace
+    {
+        /**
+         *  Predator variant. Same VS as VoxelEffect; PS adds a SceneCopy load
+         *  at SV_Position + Predator.x horizontal offset, then lerps the
+         *  shaded palette color toward the scene sample using Predator.y as
+         *  the blend ratio.
+         *
+         *  Vanilla `BlitTransLucent*ZReadWarp<ushort>` does this same lerp on
+         *  the CPU: `dest[i] = blend(palette[shp], dest[i + warp])`. Integer-
+         *  pixel offsets match vanilla's pointer arithmetic — use Load not
+         *  Sample so we don't smear across pixels.
+         */
+        const char VoxelDistortionShaderHLSL[] =
+            "cbuffer SpriteCB : register(b0) {\n"
+            "    float4x4 ProjMtx;\n"
+            "};\n"
+            "cbuffer EffectCB : register(b1) {\n"
+            "    float4 T0;\n"
+            "    float4 T1;\n"
+            "    float4 T2;\n"
+            "    float4 T3;\n"
+            "    float4 LightDir;\n"
+            "    float4 Tint;\n"
+            "    float4 Misc;\n"
+            "    float4 Predator;     // x = warp_offset_px, y = blend_ratio,\n"
+            "                          // z = scene_w,         w = scene_h\n"
+            "};\n"
+            "\n"
+            "Texture2D<float4>            Palette       : register(t0);\n"
+            "Texture2D<uint>              LightRemapTex : register(t1);\n"
+            "StructuredBuffer<float3>     Normals       : register(t2);\n"
+            "Texture2D<float4>            SceneCopy     : register(t3);\n"
+            "\n"
+            "struct VSIn  {\n"
+            "    uint4 pos       : POSITION;\n"
+            "    uint4 normal_w  : NORMALIDX;\n"
+            "};\n"
+            "struct VSOut {\n"
+            "    float4 pos        : SV_Position;\n"
+            "    nointerpolation uint  color_idx  : COLOR0;\n"
+            "    nointerpolation uint  normal_idx : COLOR1;\n"
+            "    nointerpolation float voxel_z    : VOXELZ;\n"
+            "    nointerpolation float unit_y     : UNITY;\n"
+            "};\n"
+            "\n"
+            "VSOut VSMain(VSIn i) {\n"
+            "    float vx = (float)i.pos.x;\n"
+            "    float vy = (float)i.pos.y;\n"
+            "    float vz = (float)i.pos.z;\n"
+            "    float screen_x = T0.x + vx * T1.x + vy * T2.x + vz * T3.x;\n"
+            "    float screen_y = T0.y + vx * T1.y + vy * T2.y + vz * T3.y;\n"
+            "    float voxel_z  = T0.z + vx * T1.z + vy * T2.z + vz * T3.z;\n"
+            "    float4 clip = mul(ProjMtx, float4(screen_x, screen_y, 0.0, 1.0));\n"
+            "    VSOut o;\n"
+            "    o.pos        = float4(clip.x, clip.y, 0.5, 1.0);\n"
+            "    o.color_idx  = i.pos.w;\n"
+            "    o.normal_idx = i.normal_w.x;\n"
+            "    o.voxel_z    = voxel_z;\n"
+            "    o.unit_y     = T0.w;\n"
+            "    return o;\n"
+            "}\n"
+            "\n"
+            "struct PSOut {\n"
+            "    float4 color : SV_Target;\n"
+            "    float  depth : SV_Depth;\n"
+            "};\n"
+            "\n"
+            "PSOut PSMain(VSOut v) {\n"
+            "    // Identical shading to VoxelEffect — normal lookup, Lambert,\n"
+            "    // VPL shade, palette LUT. Drop the shadow branch (predator\n"
+            "    // and shadow are disjoint).\n"
+            "    const float kNeutralShade = 16.0;\n"
+            "    int   table_base = (int)LightDir.w;\n"
+            "    float3 n = Normals.Load(table_base + (int)v.normal_idx);\n"
+            "    float  diffuse = saturate(dot(n, LightDir.xyz));\n"
+            "    float  shade_f = diffuse * kNeutralShade * Tint.r;\n"
+            "    int    shade = (int)shade_f;\n"
+            "    if (shade > 31) shade = 31;\n"
+            "    if (shade < 0)  shade = 0;\n"
+            "    uint shaded_idx = LightRemapTex.Load(int3((int)v.color_idx, shade, 0));\n"
+            "    if (shaded_idx == 0) discard;\n"
+            "    float4 rgba = Palette.Load(int3((int)shaded_idx, 0, 0));\n"
+            "\n"
+            "    // SceneCopy sample at rasterized pixel + horizontal warp.\n"
+            "    // Integer Load matches vanilla's pointer-offset displacement.\n"
+            "    int scene_w = (int)Predator.z;\n"
+            "    int scene_h = (int)Predator.w;\n"
+            "    int2 sample_px = int2(v.pos.x, v.pos.y) + int2((int)Predator.x, 0);\n"
+            "    sample_px.x = clamp(sample_px.x, 0, scene_w - 1);\n"
+            "    sample_px.y = clamp(sample_px.y, 0, scene_h - 1);\n"
+            "    float4 bg = SceneCopy.Load(int3(sample_px, 0));\n"
+            "\n"
+            "    // lerp(voxel, scene, blend) — same math as the SHP distortion\n"
+            "    // path. Tint.a (visual-character translucency) is ignored: the\n"
+            "    // predator blend replaces it entirely.\n"
+            "    float3 mixed = lerp(rgba.rgb, bg.rgb, Predator.y);\n"
+            "\n"
+            "    PSOut o;\n"
+            "    o.color = float4(mixed, 1.0);\n"
+            "    const float kVoxelZScale = 1e-4;\n"
+            "    float kObjectEps = Misc.z;\n"
+            "    float base = 1.0 - v.unit_y * Misc.y;\n"
+            "    o.depth = base - kObjectEps - v.voxel_z * kVoxelZScale + Misc.x * Misc.y;\n"
+            "    o.depth = clamp(o.depth, 0.0001, 0.9999);\n"
+            "    return o;\n"
+            "}\n";
+    }
+
+
+    bool VoxelDistortionEffect::Initialize(GraphicsDevice& device)
+    {
+        if (!Effect::Initialize(device,
+                VoxelDistortionShaderHLSL, sizeof(VoxelDistortionShaderHLSL) - 1,
+                "voxel_distortion",
+                VoxelIL, _countof(VoxelIL),
+                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
+            return false;
+        }
+
+        D3D11_BUFFER_DESC desc = {};
+        desc.ByteWidth      = sizeof(VoxelEffectParams);
+        desc.Usage          = D3D11_USAGE_DYNAMIC;
+        desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        if (FAILED(device.Get_Device()->CreateBuffer(&desc, nullptr, &ParamsCB))) {
+            DEBUG_ERROR("VoxelDistortionEffect: ParamsCB creation failed.\n");
+            Shutdown();
+            return false;
+        }
+        return true;
+    }
+
+
+    void VoxelDistortionEffect::Shutdown()
+    {
+        Safe_Release(ParamsCB);
+        Effect::Shutdown();
+    }
+
+
+    void VoxelDistortionEffect::Bind_Palette(GraphicsDevice& device, PaletteLUT& palette)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr) return;
+        ID3D11ShaderResourceView* srv = palette.Get_Palette_Texture().Get_SRV();
+        ctx->PSSetShaderResources(0, 1, &srv);
+    }
+
+
+    void VoxelDistortionEffect::Bind_Light_Remap(GraphicsDevice& device, Texture2D& light_remap_tex)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr) return;
+        ID3D11ShaderResourceView* srv = light_remap_tex.Get_SRV();
+        ctx->PSSetShaderResources(1, 1, &srv);
+    }
+
+
+    void VoxelDistortionEffect::Bind_Normals(GraphicsDevice& device, ID3D11ShaderResourceView* normals_srv)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr || normals_srv == nullptr) return;
+        ctx->PSSetShaderResources(2, 1, &normals_srv);
+    }
+
+
+    void VoxelDistortionEffect::Bind_Scene_Copy(GraphicsDevice& device, ID3D11ShaderResourceView* scene_copy_srv)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr) return;
+        ctx->PSSetShaderResources(3, 1, &scene_copy_srv);
+    }
+
+
+    void VoxelDistortionEffect::Set_Params(GraphicsDevice& device, const VoxelEffectParams& params)
     {
         if (ParamsCB == nullptr) return;
         ID3D11DeviceContext* ctx = device.Get_Context();

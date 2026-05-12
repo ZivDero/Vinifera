@@ -59,6 +59,9 @@
 #include "voxel.hh"
 #include "voxel_asset.h"
 #include "voxel_effect.h"
+#include "gpu_draw.h"
+#include "sprite_queue.h"
+#include "unit_scratch.h"
 #include "voxel_queue.h"
 #include "voxelanim.h"
 #include "voxelanimtype.h"
@@ -105,6 +108,11 @@ using Vinifera::Gfx::VoxelDrawCmd;
 using Vinifera::Gfx::VoxelEffectParams;
 using Vinifera::Gfx::VoxelQueue;
 using Vinifera::Gfx::VoxelSectionMesh;
+using Vinifera::Gfx::VoxelUnitGroup;
+using Vinifera::Gfx::kUnitScratchOrigin;
+using Vinifera::Gfx::SpriteDrawCmd;
+using Vinifera::Gfx::SpriteQueue;
+using Vinifera::Gfx::UnitScratch;
 
 
 namespace
@@ -136,6 +144,16 @@ namespace
         float              alpha;
         int                color_scheme;
         int                z_adjust;
+
+        /**
+         *  Predator (VISUAL_RIPPLE) carries through composite-defer to the
+         *  GPU queue. Captured at push time so `Composite_Replay` can re-
+         *  submit with the same warp offset (the offset reflects the unit
+         *  at draw time; reusing the captured value preserves the per-unit
+         *  shimmer phase even though replay runs later in the frame).
+         */
+        bool               is_predator;
+        int                predator_warp_pixels;
     };
 
     struct PendingShapeDraw
@@ -164,6 +182,22 @@ namespace
 
     static std::vector<PendingComposite> g_pending_composite;
     static const Point2D kCompositeOrigin(80, 80);
+
+
+    /**
+     *  GPU-deferred per-unit composite. `Composite_Replay` snapshots one
+     *  unit's captured records + drawpoint here; `Composite_Process_Deferred`
+     *  drains and renders them later in the GPU pass loop.
+     */
+    struct DeferredComposite
+    {
+        std::vector<PendingComposite> records;
+        Point2D                        xyoff;
+        Rect                           rect;
+        ConvertClass*                  shape_convert_override;
+    };
+
+    static std::vector<DeferredComposite> g_deferred_composites;
 
     /**
      *  Vanilla's `Unit_Blit_Voxel` composes the 160x160 scratch onto the real
@@ -199,30 +233,69 @@ namespace
 
 
     /**
-     *  Visual_Character → translucency alpha. Hidden returns false.
-     *  Predator displacement deferred (treated as plain translucency).
+     *  Master feature gate for the screen-space warp/distortion effect on
+     *  VISUAL_RIPPLE units. When false, predator routing is bypassed and
+     *  cloaked units fall back to plain 50% translucent rendering (same as
+     *  VISUAL_DARKEN). The infrastructure (VoxelDistortionEffect, SceneCopy,
+     *  PostEffects branch in VoxelQueue) remains compiled in; flipping this
+     *  back to true re-enables the warp path with no other code changes.
      */
-    bool Alpha_From_Visual(VisualType v, float& out_alpha)
+    static constexpr bool kPredatorWarpEnabled = false;
+
+
+    /**
+     *  Visual_Character → render-effect descriptor. `alpha` is the
+     *  conventional translucency for VISUAL_DARKEN / VISUAL_INDISTINCT;
+     *  `is_predator` flags VISUAL_RIPPLE which routes to the distortion
+     *  pass (scene-copy refraction + lerp). Returns false for VISUAL_HIDDEN
+     *  (don't render at all).
+     */
+    struct VisualFx
     {
-        out_alpha = 1.0f;
+        float alpha       = 1.0f;
+        bool  is_predator = false;
+    };
+
+    bool VisualFx_From_Visual(VisualType v, VisualFx& out)
+    {
+        out = VisualFx{};
         switch (v) {
         case VISUAL_NORMAL:
             return true;
         case VISUAL_INDISTINCT:
-            out_alpha = 0.75f;
+            out.alpha = 0.75f;
             return true;
         case VISUAL_DARKEN:
         case VISUAL_SHADOWY:
-            out_alpha = 0.5f;
+            out.alpha = 0.5f;
             return true;
         case VISUAL_RIPPLE:
-            out_alpha = 0.5f;
+            if (kPredatorWarpEnabled) {
+                // Alpha unused in the predator path — the PS owns the blend.
+                out.alpha       = 1.0f;
+                out.is_predator = true;
+            } else {
+                // Warp disabled — render as plain 50% translucent.
+                out.alpha       = 0.5f;
+                out.is_predator = false;
+            }
             return true;
         case VISUAL_HIDDEN:
         default:
             return false;
         }
     }
+
+
+    /**
+     *  Bind to vanilla's `TechnoClass::Get_Predator_Offset()` at 0x00638C70.
+     *  Returns the per-unit shimmer offset `(Fetch_ID + field_118) % 400`
+     *  used as the SceneCopy horizontal sample displacement. Vanilla mutates
+     *  `field_118` internally so each call advances the shimmer phase.
+     */
+    typedef int (__thiscall *Get_Predator_Offset_Fn)(TechnoClass*);
+    static const Get_Predator_Offset_Fn Get_Predator_Offset_Vanilla =
+        reinterpret_cast<Get_Predator_Offset_Fn>(0x00638C70);
 
 
     /**
@@ -447,7 +520,15 @@ namespace
         // (the second term accounts for back voxels whose negative absolute
         // iso_z adds to depth via the -voxel_z*kVZS term in the shader).
         // Take the max over all 8 corners.
-        const float kVoxelZScale = 1.0e-5f;
+        // Keep in lockstep with the HLSL voxel shader's kVoxelZScale —
+        // both must use the same value so the per-section kObjectEps we
+        // compute here actually covers the depth range the shader emits.
+        // Bumped from 1e-5 to 1e-4 to give voxel-vs-voxel within a section
+        // enough depth headroom to resolve iso-projection ties; the old
+        // value was barely above float precision near depth=0.98, leading
+        // to z-fighting "dithering" on dense voxel surfaces like the
+        // Disruptor's turret.
+        const float kVoxelZScale = 1.0e-4f;
         float max_eps_needed = 0.0f;
         for (int i = 0; i < VOXEL_BOUNDS_MAX; ++i) {
             Vector3 v = final_mtx * mesh.Bounds[i];
@@ -477,7 +558,9 @@ namespace
                              int brightness,
                              float alpha,
                              int z_adjust,
-                             int single_layer = -1)
+                             int single_layer = -1,
+                             bool is_predator = false,
+                             int predator_warp_pixels = 0)
     {
         if (Vinifera::Gfx::Device == nullptr) return;
         if (!VoxelQueue::Get().Is_Initialized()) return;
@@ -492,7 +575,14 @@ namespace
         PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(*Vinifera::Gfx::Device, &converter);
         if (palette == nullptr) return;
 
-        const RenderPass pass = Vinifera::Gfx::Current_Render_Pass();
+        /**
+         *  Predator commands always flush in PostEffects — they sample
+         *  SceneCopy which is only valid after the main scene is rendered.
+         *  Non-predator commands honor the current render-pass context.
+         */
+        const RenderPass pass = is_predator
+                              ? RenderPass::PostEffects
+                              : Vinifera::Gfx::Current_Render_Pass();
 
         float xscale = 1.0f, yscale = 1.0f;
         Vinifera::Gfx::Logical_To_Render_Target(*Vinifera::Gfx::Device, GpuRenderTarget::Scene, xscale, yscale);
@@ -510,6 +600,45 @@ namespace
         const int layer_count = voxlib->Get_Layer_Count();
         const int frame_lo = (single_layer >= 0) ? single_layer : 0;
         const int frame_hi = (single_layer >= 0) ? (single_layer + 1) : layer_count;
+
+        /**
+         *  Decide whether this draw goes through the composite (scratch RT)
+         *  path. Composite avoids per-pixel depth-blend compounding for
+         *  units where multiple voxels rasterize to the same screen pixel
+         *  (multi-section) and for translucent units where any compounding
+         *  would push effective alpha toward fully opaque.
+         *
+         *  Composite trigger: section count > 1 OR alpha < 1.
+         *
+         *  Bullets / debris / single-section opaque voxels stay on the fast
+         *  batched path (no scratch RT overhead).
+         *
+         *  Predator units don't currently use the scratch path — the warp
+         *  pipeline samples SceneCopy directly. If we re-enable predator
+         *  later this routing may need to merge.
+         */
+        const int draw_section_count = frame_hi - frame_lo;
+        const bool is_composite = !is_predator
+                               && (draw_section_count > 1 || alpha < 0.9999f);
+
+        int unit_group_id = -1;
+        if (is_composite) {
+            /**
+             *  Compute the unit's scene-side depth from its drawpoint Y,
+             *  same math used by single-voxel rendering. This is the
+             *  depth the composite blit tests against scene depth so the
+             *  unit gets occluded by closer geometry.
+             */
+            const float unit_depth = std::clamp(
+                1.0f - (float)point.Y * kPixelToDepth - 1.0e-4f,
+                1.0e-4f, 0.9999f);
+            VoxelUnitGroup group;
+            group.Drawpoint  = point;
+            group.Alpha      = alpha;
+            group.SceneDepth = unit_depth;
+            group.Clip       = clip;
+            unit_group_id = VoxelQueue::Get().Allocate_Unit_Group(group);
+        }
 
         for (int layer = frame_lo; layer < frame_hi && layer < layer_count; ++layer) {
             const VoxelSectionMesh* mesh = asset->Get_Section(layer, 0);
@@ -542,11 +671,152 @@ namespace
             cmd.Pass         = pass;
             cmd.OutputTarget = GpuRenderTarget::Scene;
 
-            Build_Section_Params(*mesh, section_world, point, brightness, alpha,
+            /**
+             *  For composite cmds, force per-section alpha to 1.0. The scratch
+             *  RT receives opaque writes (each section's fragment fully wins
+             *  the depth test); the unit's overall translucency is applied
+             *  once at composite-blit time. This is what avoids the per-
+             *  voxel-blend compounding.
+             */
+            const float section_alpha = is_composite ? 1.0f : alpha;
+            Build_Section_Params(*mesh, section_world, point, brightness, section_alpha,
                                  /*is_shadow*/ false, z_adjust, cmd.Params);
+
+            if (is_composite) {
+                /**
+                 *  Re-target the section's screen origin to scratch-local
+                 *  coords. T0.x/y currently encode the absolute scene
+                 *  drawpoint; subtract `(drawpoint - scratch_origin)` so
+                 *  voxel (0,0,0) lands at the scratch's local origin.
+                 *  T0.w (unit_y, used for depth baseline) keeps the real
+                 *  drawpoint Y — depth math is unchanged, only the screen
+                 *  projection shifts to local space.
+                 */
+                const float dx = (float)point.X - (float)kUnitScratchOrigin.X;
+                const float dy = (float)point.Y - (float)kUnitScratchOrigin.Y;
+                cmd.Params.T0[0] -= dx;
+                cmd.Params.T0[1] -= dy;
+                cmd.UnitGroupID   = unit_group_id;
+            }
+
+            /**
+             *  Stamp predator state. Build_Section_Params doesn't know about
+             *  predator (the shader-side fields live in Params.Predator),
+             *  so we fill those slots and the cmd-level flag here.
+             */
+            if (is_predator) {
+                cmd.IsPredator         = true;
+                cmd.PredatorWarpPixels = predator_warp_pixels;
+                cmd.PredatorBlendRatio = 0.5f;   // vanilla VISUAL_RIPPLE = 50/50
+                cmd.Params.Predator[0] = (float)predator_warp_pixels;
+                cmd.Params.Predator[1] = cmd.PredatorBlendRatio;
+                // Predator[2..3] (scene_w/h) patched in by VoxelQueue at issue.
+            }
 
             VoxelQueue::Get().Submit(cmd);
         }
+    }
+
+
+    /**
+     *  Render a voxel object's sections IMMEDIATELY into the currently-bound
+     *  RT (the unit scratch). Used by the composite-replay path so voxel and
+     *  SHP parts interleave in their captured submission order rather than
+     *  going through the two deferred queues (which flush at different times
+     *  and lose cross-queue ordering).
+     *
+     *  Mirrors `Submit_Voxel_Object`'s section iteration but with:
+     *    - T0 shifted to scratch-local origin (so voxel (0,0,0) lands at
+     *      kUnitScratchOrigin)
+     *    - alpha forced to 1.0 per-section (the unit's overall translucency
+     *      is applied once at composite-blit time)
+     *    - immediate `Render_Cmd_Immediate` instead of queue submission
+     *
+     *  Returns the unit's drawpoint (for the caller to assemble the composite
+     *  blit's scene origin).
+     */
+    void Render_Voxel_Object_To_Scratch_Immediate(VoxelObject const& voxeldata,
+                                                  unsigned int frame,
+                                                  const Matrix3D& matrix,
+                                                  const Point2D& point,
+                                                  const Rect& /*cliprect*/,
+                                                  ConvertClass& converter,
+                                                  int brightness,
+                                                  int z_adjust,
+                                                  int single_layer = -1)
+    {
+        if (Vinifera::Gfx::Device == nullptr) return;
+        if (!VoxelQueue::Get().Is_Initialized()) return;
+
+        VoxelLibraryClass* voxlib = voxeldata.VoxelLibrary;
+        MotionLibraryClass* motlib = voxeldata.MotionLibrary;
+        if (voxlib == nullptr || voxlib->Load_Failed()) return;
+
+        VoxelAsset* asset = VoxelAssetCache::Get().Get_Or_Build(*Vinifera::Gfx::Device, voxlib);
+        if (asset == nullptr) return;
+
+        PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(*Vinifera::Gfx::Device, &converter);
+        if (palette == nullptr) return;
+
+        const int layer_count = voxlib->Get_Layer_Count();
+        const int frame_lo = (single_layer >= 0) ? single_layer : 0;
+        const int frame_hi = (single_layer >= 0) ? (single_layer + 1) : layer_count;
+
+        for (int layer = frame_lo; layer < frame_hi && layer < layer_count; ++layer) {
+            const VoxelSectionMesh* mesh = asset->Get_Section(layer, 0);
+            if (mesh == nullptr || mesh->VertexCount == 0) continue;
+
+            Matrix3D section_world = matrix;
+            if (motlib != nullptr && !motlib->Load_Failed()) {
+                const Matrix3D* matrices = &motlib->Get_Layer_Matrices();
+                const int section_count = motlib->Get_Section_Count();
+                const int frame_count   = motlib->Get_Layer_Count();
+                if (section_count > 0 && frame_count > 0) {
+                    const int safe_frame = (int)(frame % (unsigned)frame_count);
+                    const Matrix3D& hva = matrices[layer + section_count * safe_frame];
+                    section_world = matrix * hva;
+                }
+            }
+
+            VoxelDrawCmd cmd;
+            cmd.Mesh         = mesh;
+            cmd.Palette      = palette;
+            cmd.IsShadow     = false;
+            cmd.WriteDepth   = true;
+            cmd.DisableDepth = false;
+            cmd.OutputTarget = GpuRenderTarget::Scene;   // unused on immediate path
+
+            /**
+             *  `point` is the section's SCRATCH-LOCAL position (caller did
+             *  the buffer_drawpoint → scratch translation). Build_Section_
+             *  Params writes T0.x = point.X + c0.X directly; no further
+             *  shift needed. Sections at different buffer_drawpoints
+             *  produce distinct scratch positions, preserving the per-
+             *  section layout from the vanilla composite capture.
+             */
+            Build_Section_Params(*mesh, section_world, point, brightness,
+                                 /*alpha*/ 1.0f, /*is_shadow*/ false, z_adjust, cmd.Params);
+
+            VoxelQueue::Get().Render_Cmd_Immediate(*Vinifera::Gfx::Device, cmd,
+                                                    Vinifera::Gfx::kUnitScratchWidth,
+                                                    Vinifera::Gfx::kUnitScratchHeight,
+                                                    /*is_sidebar*/ false);
+        }
+    }
+
+
+    /**
+     *  SHAPE_TRANSLUCENT* → effective alpha. Same masked-compare we use in
+     *  gpu_draw.cpp; SHAPE_TRANSLUCENT75 = bit1|bit2 so independent bit-tests
+     *  miscompare. Single 2-bit-field decode.
+     */
+    float Alpha_From_Sprite_Flags(ShapeFlags_Type flags)
+    {
+        const unsigned tmask = (unsigned)flags & (unsigned)SHAPE_TRANSLUCENT75;
+        if (tmask == (unsigned)SHAPE_TRANSLUCENT75)      return 0.25f;
+        if (tmask == (unsigned)SHAPE_TRANSLUCENT50)      return 0.5f;
+        if (tmask == (unsigned)SHAPE_TRANSLUCENT25)      return 0.75f;
+        return 1.0f;
     }
 
 
@@ -639,19 +909,23 @@ void Composite_Push_Voxel(VoxelObject const& voxeldata,
                           int                brightness,
                           float              alpha,
                           int                color_scheme,
-                          int                z_adjust)
+                          int                z_adjust,
+                          bool               is_predator,
+                          int                predator_warp_pixels)
 {
     PendingComposite rec;
     rec.kind = CompositeKind::Voxel;
-    rec.voxel.voxeldata        = &voxeldata;
-    rec.voxel.matrix           = matrix;
-    rec.voxel.buffer_drawpoint = buffer_drawpoint;
-    rec.voxel.cliprect         = cliprect;
-    rec.voxel.frame            = frame;
-    rec.voxel.brightness       = brightness;
-    rec.voxel.alpha            = alpha;
-    rec.voxel.color_scheme     = color_scheme;
-    rec.voxel.z_adjust         = z_adjust;
+    rec.voxel.voxeldata            = &voxeldata;
+    rec.voxel.matrix               = matrix;
+    rec.voxel.buffer_drawpoint     = buffer_drawpoint;
+    rec.voxel.cliprect             = cliprect;
+    rec.voxel.frame                = frame;
+    rec.voxel.brightness           = brightness;
+    rec.voxel.alpha                = alpha;
+    rec.voxel.color_scheme         = color_scheme;
+    rec.voxel.z_adjust             = z_adjust;
+    rec.voxel.is_predator          = is_predator;
+    rec.voxel.predator_warp_pixels = predator_warp_pixels;
     g_pending_composite.push_back(rec);
 }
 
@@ -711,71 +985,202 @@ void Composite_Replay(Surface&       dst_surface,
         return;
     }
 
-    for (const PendingComposite& rec : g_pending_composite) {
+    /**
+     *  Defer the actual GPU work — this function is called from inside
+     *  vanilla's CPU-side Tactical::Render via the Unit_Blit_Voxel hook,
+     *  BEFORE the scene RT has been bound/cleared and before any of the
+     *  queue flushes have laid down terrain/sprites. Snapshot the unit's
+     *  records and let `Composite_Process_Deferred` (called from the GPU
+     *  pass loop) do the actual rendering at the correct time.
+     */
+    DeferredComposite deferred;
+    deferred.records                = g_pending_composite;
+    deferred.xyoff                  = xyoff;
+    deferred.rect                   = rect;
+    deferred.shape_convert_override = shape_convert_override;
+    g_deferred_composites.push_back(std::move(deferred));
+    g_pending_composite.clear();
+}
+
+
+/**
+ *  Internal: render one deferred unit composite. Bound to be called from
+ *  `Composite_Process_Deferred` during the GPU pass loop, after the regular
+ *  tile/sprite/voxel flushes for ObjectLayer.
+ */
+namespace
+{
+    void Render_Deferred_Composite(Vinifera::Gfx::GraphicsDevice& device,
+                                    const DeferredComposite& deferred)
+    {
+        if (deferred.records.empty()) return;
+        if (!Vinifera::Gfx::UnitScratch::Get().Is_Initialized()) return;
+
+        /**
+         *  Determine the unit's overall translucency. Vanilla applies the
+         *  same visual-character alpha to every section (body, turret,
+         *  barrel) so the alpha is uniform across records. Scan for the
+         *  smallest alpha — voxel records hold it as a float; shape records
+         *  encode it via SHAPE_TRANSLUCENT* bits.
+         */
+        float unit_alpha = 1.0f;
+        for (const PendingComposite& rec : deferred.records) {
+            if (rec.kind == CompositeKind::Voxel) {
+                if (rec.voxel.alpha < unit_alpha) unit_alpha = rec.voxel.alpha;
+            } else {
+                const float a = Alpha_From_Sprite_Flags(rec.shape.flags);
+                if (a < unit_alpha) unit_alpha = a;
+            }
+        }
+
+        /**
+         *  Begin the scratch session. After this, the scratch RT+DSV are
+         *  bound with a 256x256 viewport; subsequent immediate-render
+         *  calls paint into the scratch.
+         */
+        if (!Vinifera::Gfx::UnitScratch::Get().Begin_Unit(device)) {
+            return;
+        }
+
+        const Rect& rect = deferred.rect;
+        const Point2D& xyoff = deferred.xyoff;
+        ConvertClass* shape_convert_override = deferred.shape_convert_override;
+        // The dst_surface arg threaded through GPU_Draw_Shape is only used
+        // for clipping and the GpuSurface dynamic_cast check; the captured
+        // composite already validated GpuSurface, so we can reuse the
+        // CompositeSurface as our dummy "destination" — Draw_Shape_Proxy_DX11
+        // takes a Surface& and only inspects rect bounds.
+        Surface& dst_surface_dummy = *CompositeSurface;
+
+        bool first_record = true;
+        for (const PendingComposite& rec : deferred.records) {
+        /**
+         *  Clear scratch depth before each record so subsequent records
+         *  paint in pure submission order without per-section depth
+         *  inversions. Within a single record's voxel sections, the
+         *  unchanged scratch depth gives correct front-most-voxel-wins
+         *  ordering.
+         */
+        if (!first_record) {
+            Vinifera::Gfx::UnitScratch::Get().Clear_Depth(device);
+        }
+        first_record = false;
         switch (rec.kind) {
         case CompositeKind::Voxel: {
             const PendingVoxelDraw& p = rec.voxel;
             if (p.voxeldata == nullptr) break;
 
-            const Point2D real_point(xyoff.X + (p.buffer_drawpoint.X - kCompositeOrigin.X),
-                                     xyoff.Y + (p.buffer_drawpoint.Y - kCompositeOrigin.Y));
-
             ColorScheme* scheme = ColorSchemes[p.color_scheme];
             if (scheme == nullptr || scheme->Converter == nullptr) break;
 
-            Submit_Voxel_Object(*p.voxeldata, p.frame, p.matrix, real_point, rect,
-                                *scheme->Converter, p.brightness, p.alpha, p.z_adjust);
+            /**
+             *  Translate the EightBitSurface-local buffer_drawpoint (centered
+             *  at (80,80)) to scratch-local coords (centered at (128,128)).
+             *  Each captured section keeps its relative offset to the unit
+             *  centroid; voxel barrel above turret etc. stays correctly
+             *  layered within the scratch.
+             */
+            const Point2D scratch_local(
+                kUnitScratchOrigin.X + (p.buffer_drawpoint.X - kCompositeOrigin.X),
+                kUnitScratchOrigin.Y + (p.buffer_drawpoint.Y - kCompositeOrigin.Y));
+
+            Render_Voxel_Object_To_Scratch_Immediate(
+                *p.voxeldata, p.frame, p.matrix, scratch_local, rect,
+                *scheme->Converter, p.brightness, p.z_adjust);
             break;
         }
         case CompositeKind::Shape: {
             const PendingShapeDraw& p = rec.shape;
             if (p.shapefile == nullptr) break;
 
-            /**
-             *  Vanilla draws body/turret SHPs into EightBitSurface using
-             *  `EightBitDrawer` (8-bit passthrough) and applies house
-             *  colors later during composite. We need house colors at
-             *  draw time, so override with the unit's converter passed
-             *  through by `_Unit_Blit_Voxel`. Fall back to the captured
-             *  converter only if the override is missing.
-             */
             ConvertClass* convert = shape_convert_override != nullptr
                                   ? shape_convert_override
                                   : p.convert;
             if (convert == nullptr) break;
 
-            /**
-             *  Add `kCompositeYBias` so the shape lands at the same
-             *  vertical offset vanilla's composite blit produces (and
-             *  where the unit's voxel sections render via the matching
-             *  `kVoxelYBias` in Build_Section_Params).
-             */
-            const Point2D real_point(xyoff.X + (p.buffer_point.X - kCompositeOrigin.X),
-                                     xyoff.Y + (p.buffer_point.Y - kCompositeOrigin.Y) + kCompositeYBias);
+            const Point2D scratch_local(
+                kUnitScratchOrigin.X + (p.buffer_point.X - kCompositeOrigin.X),
+                kUnitScratchOrigin.Y + (p.buffer_point.Y - kCompositeOrigin.Y) + kCompositeYBias);
 
             /**
-             *  SHAPE_WIN_REL was a no-op at capture time (the proxy's
-             *  `window` arg was the 160x160 scratch rect with X=Y=0). At
-             *  replay the window is the real tactical clip with non-zero
-             *  X,Y — re-applying WIN_REL would double-shift, so strip it.
-             *  SHAPE_CENTER is preserved: it's a logical-size offset, not
-             *  a window translation, and the captured buffer_point is the
-             *  unit's centroid which `real_point` translates correctly.
+             *  Strip SHAPE_WIN_REL (it was a no-op at capture time; re-
+             *  applying with a non-zero window double-shifts). Also strip
+             *  SHAPE_TRANSLUCENT* so the SHP renders OPAQUE into the
+             *  scratch; the unit's overall alpha is applied once at
+             *  composite-blit time by `End_Unit_Composite`. This is what
+             *  makes the per-pixel blend equivalent across voxel and SHP
+             *  parts of the unit.
              */
-            const ShapeFlags_Type replay_flags =
-                ShapeFlags_Type(p.flags & ~SHAPE_WIN_REL);
+            const ShapeFlags_Type replay_flags = ShapeFlags_Type(
+                p.flags & ~(SHAPE_WIN_REL | SHAPE_TRANSLUCENT75));
 
-            Draw_Shape_Proxy_DX11(dst_surface, *convert, p.shapefile, p.shapenum,
-                                  real_point, rect, replay_flags,
-                                  /*remap*/ nullptr,
-                                  p.height_offset, p.zgrad, p.intensity,
-                                  p.z_shapefile, p.z_shapenum, p.z_off);
+            /**
+             *  Build the SpriteDrawCmd without queuing — we render
+             *  immediately to the scratch. The scratch viewport is the
+             *  256x256 region the unit fits in, with no AlphaBuffer/DSV
+             *  bound for the SHP. Using a fake "scratch window" rect
+             *  reuses the SHAPE_WIN_REL-stripped flags; the window passed
+             *  is just for clipping, not positioning (SHAPE_CENTER
+             *  centers on `scratch_local` via fi->X/Y offsets).
+             */
+            const Rect scratch_window(0, 0, Vinifera::Gfx::kUnitScratchWidth,
+                                            Vinifera::Gfx::kUnitScratchHeight);
+
+            Vinifera::Gfx::SpriteDrawCmd built_cmd = {};
+            if (!Vinifera::Gfx::GPU_Draw_Shape(dst_surface_dummy, *convert, p.shapefile, p.shapenum,
+                                               scratch_local, scratch_window, replay_flags,
+                                               p.height_offset, p.zgrad, p.intensity,
+                                               p.z_shapefile, p.z_shapenum, p.z_off,
+                                               /*predator_offset*/ 0,
+                                               &built_cmd)) {
+                break;
+            }
+
+            /**
+             *  Force opaque per-section render to the scratch (alpha=1).
+             *  Composite blit applies `unit_alpha` once at scene merge.
+             */
+            built_cmd.Tint[3] = 1.0f;
+
+            /**
+             *  Disable scene-side depth-test against scratch depth so
+             *  the SHP always paints into the scratch in submission
+             *  order (vanilla's per-section paint order). Scratch
+             *  depth was cleared to 1.0; any z value works.
+             */
+            built_cmd.DisableDepth = true;
+            built_cmd.WriteDepth   = false;
+
+            Vinifera::Gfx::SpriteQueue::Get().Render_Sprite_Immediate(
+                device, built_cmd,
+                Vinifera::Gfx::kUnitScratchWidth,
+                Vinifera::Gfx::kUnitScratchHeight);
             break;
         }
         }
     }
 
-    g_pending_composite.clear();
+        /**
+         *  Composite the scratch onto the scene RT at the unit's drawpoint
+         *  with the determined unit alpha. End_Unit_Composite restores the
+         *  saved RT/DSV/viewport and emits per-pixel SV_Depth so the unit's
+         *  silhouette occludes correctly against terrain at every Y.
+         */
+        const Point2D scene_origin(xyoff.X - kUnitScratchOrigin.X,
+                                   xyoff.Y - kUnitScratchOrigin.Y);
+        Vinifera::Gfx::UnitScratch::Get().End_Unit_Composite(
+            device, scene_origin, unit_alpha, /*scene_depth*/ 0.5f);
+    }
+}  // anonymous namespace
+
+
+void Composite_Process_Deferred(Vinifera::Gfx::GraphicsDevice& device)
+{
+    if (g_deferred_composites.empty()) return;
+    for (const DeferredComposite& d : g_deferred_composites) {
+        Render_Deferred_Composite(device, d);
+    }
+    g_deferred_composites.clear();
 }
 
 
@@ -826,10 +1231,19 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
      *  same logic vanilla applies in its outer Draw_Voxel.
      */
     const VisualType visual = const_cast<TechnoClassExt*>(this)->Visual_Character(false, nullptr);
-    float visual_alpha = 1.0f;
-    if (!Alpha_From_Visual(visual, visual_alpha)) {
+    VisualFx vfx;
+    if (!VisualFx_From_Visual(visual, vfx)) {
         return;
     }
+
+    /**
+     *  Predator offset is computed up front so it's stable across both the
+     *  direct-submit path and the composite-defer path (composite captures
+     *  it for replay later).
+     */
+    const int predator_warp = vfx.is_predator
+                            ? Get_Predator_Offset_Vanilla(const_cast<TechnoClassExt*>(this))
+                            : 0;
 
     const int final_brightness = const_cast<TechnoClassExt*>(this)->Apparent_Brightness(brightness);
 
@@ -901,8 +1315,9 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
      */
     if (LogicalSurface == EightBitSurface) {
         Composite_Push_Voxel(voxeldata, frame, matrix, point, effective_rect,
-                             final_brightness, visual_alpha, House->Scheme,
-                             const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment());
+                             final_brightness, vfx.alpha, House->Scheme,
+                             const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment(),
+                             vfx.is_predator, predator_warp);
         return;
     }
 
@@ -910,7 +1325,9 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
 
     ConvertClass& converter = *ColorSchemes[House->Scheme]->Converter;
     Submit_Voxel_Object(voxeldata, frame, matrix, point, effective_rect, converter,
-                       final_brightness, visual_alpha, z_adjust);
+                       final_brightness, vfx.alpha, z_adjust,
+                       /*single_layer*/ -1,
+                       vfx.is_predator, predator_warp);
 }
 
 

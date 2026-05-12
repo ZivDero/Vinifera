@@ -36,6 +36,7 @@
  *  uses the composite queue.
  */
 struct VoxelObject;
+namespace Vinifera { namespace Gfx { class GraphicsDevice; } }
 
 
 /**
@@ -50,7 +51,9 @@ void Composite_Push_Voxel(VoxelObject const& voxeldata,
                           int                brightness,
                           float              alpha,
                           int                color_scheme,
-                          int                z_adjust);
+                          int                z_adjust,
+                          bool               is_predator         = false,
+                          int                predator_warp_pixels = 0);
 
 
 /**
@@ -95,6 +98,22 @@ void Composite_Replay(Surface&       dst_surface,
                       Point2D        xyoff,
                       const Rect&    rect,
                       ConvertClass*  shape_convert_override);
+
+
+/**
+ *  Drain the GPU-deferred composite-unit queue. `Composite_Replay` snapshots
+ *  each unit's pending records + drawpoint into this queue rather than doing
+ *  GPU work immediately — its caller (the vanilla `Unit_Blit_Voxel` hook)
+ *  runs during CPU-side `Tactical::Render`, before `Bind_Scene_Target` has
+ *  bound + cleared the scene RT and before any of the queue flushes have
+ *  written terrain/sprite content. Doing GPU work at that point would either
+ *  hit an unbound/stale RT or get overdrawn by the subsequent flushes.
+ *
+ *  This drain function must be called inside the per-pass loop, AFTER the
+ *  tile / sprite / voxel flushes for `ObjectLayer` so the unit composites
+ *  layer correctly with terrain depth and other ObjectLayer content.
+ */
+void Composite_Process_Deferred(Vinifera::Gfx::GraphicsDevice& device);
 
 
 /**

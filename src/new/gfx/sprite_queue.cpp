@@ -420,4 +420,66 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView* null_srvs[5] = {};
         device.Get_Context()->PSSetShaderResources(0, 5, null_srvs);
     }
+
+
+    void SpriteQueue::Render_Sprite_Immediate(GraphicsDevice& device, const SpriteDrawCmd& cmd,
+                                              int target_w, int target_h)
+    {
+        if (!Initialized) return;
+        if (cmd.Asset == nullptr) return;
+        const ShpFrameInfo* fi = cmd.Asset->Get_Frame(cmd.FrameIndex);
+        if (fi == nullptr || fi->W <= 0 || fi->H <= 0) return;
+
+        SpriteEffectParams params = {};
+        params.AtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+        params.AtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
+        params.ZShapeAtlasSize[0] = (float)ShpAtlas::Get().Page_Width();
+        params.ZShapeAtlasSize[1] = (float)ShpAtlas::Get().Page_Height();
+        params.ZShapeDepthScale = 1.0f / 16000.0f;
+        /**
+         *  Composite-replay targets the unit-scratch (no AlphaBuffer/DSV).
+         *  Disable alpha-buffer sampling so the shader doesn't read garbage
+         *  out of an unbound SRV. Match the sidebar path's flag.
+         */
+        params.Flags = SEF_NO_ALPHA_BUFFER;
+
+        /**
+         *  Honor the cmd's depth flags. Callers that want pure painter-order
+         *  rendering (e.g. unit-scratch composite, which clears depth between
+         *  records and uses submission order for layering) set
+         *  `cmd.DisableDepth = true`. Callers that want normal depth-tested
+         *  sprite behaviour leave the flags alone — same logic the regular
+         *  Flush_Pass uses.
+         */
+        const EDepthStencil depth_state = cmd.DisableDepth
+            ? EDepthStencil::None
+            : (cmd.WriteDepth
+                ? EDepthStencil::WriteLessEqual
+                : EDepthStencil::TestLessEqual_NoWrite);
+
+        Batch.Begin(device, EBlend::DualSourceBlend, ESampler::PointClamp, &PalEffect,
+                    target_w, target_h, depth_state);
+        PalEffect.Bind_Palette_Array(device);
+        PalEffect.Set_Params(device, params);
+
+        Texture2D& page_tex = ShpAtlas::Get().Get_Page(cmd.Asset->Atlas_Page());
+        ID3D11ShaderResourceView* z_srv = page_tex.Get_SRV();
+        device.Get_Context()->PSSetShaderResources(3, 1, &z_srv);
+
+        ID3D11ShaderResourceView* alpha_srv = device.Get_Alpha_SRV();
+        device.Get_Context()->PSSetShaderResources(4, 1, &alpha_srv);
+
+        const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY, (float)fi->W, (float)fi->H };
+        const uint32_t layer = (cmd.Palette != nullptr && cmd.Palette->Layer() >= 0)
+                             ? (uint32_t)cmd.Palette->Layer() : 0u;
+        uint32_t flags = cmd.EffectFlags;
+        if (cmd.ZAsset != nullptr) flags |= SEF_USE_ZSHAPE;
+
+        Batch.Draw(&page_tex, cmd.Dst, &src, cmd.Tint,
+                   cmd.DstZTop, cmd.DstZBottom,
+                   cmd.ZAsset != nullptr ? &cmd.ZSrcUV : nullptr,
+                   cmd.Clip.Is_Valid() ? &cmd.Clip : nullptr,
+                   layer, flags);
+        Batch.End(device);
+    }
 }
