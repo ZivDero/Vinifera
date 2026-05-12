@@ -102,6 +102,21 @@ namespace Vinifera::Gfx
         const float yscale = 1.0f;
 
         /**
+         *  AlphaBuffer covers the full LogicalSurface, but TacticalRect only
+         *  covers the tactical viewport (excluding e.g. the top tabs.shp bar
+         *  and any sidebar). Cells whose drawpoint lands in those non-tactical
+         *  regions would otherwise scribble shroud/fog into the alpha buffer
+         *  there, and bleed through translucent UI. Clip the rasterizer to
+         *  TacticalRect so the PS only runs inside the tactical viewport.
+         */
+        const RectF tactical_clip = {
+            (float)TacticalRect.X,
+            (float)TacticalRect.Y,
+            (float)TacticalRect.Width,
+            (float)TacticalRect.Height,
+        };
+
+        /**
          *  Sort by (Mode, Asset) so contiguous draws share the same
          *  EffectCB and atlas — collapses N per-cell submissions into one
          *  DrawIndexed per (Mode, Asset) group. Vanilla submits shroud +
@@ -171,7 +186,8 @@ namespace Vinifera::Gfx
                 const RectF src = { (float)fi->AtlasX, (float)fi->AtlasY,
                                     (float)fi->W,      (float)fi->H };
 
-                Batch.Draw(&page_tex, dst, &src, identity_tint, 0.0f, 0.0f);
+                Batch.Draw(&page_tex, dst, &src, identity_tint, 0.0f, 0.0f,
+                           /*z_uv*/ nullptr, &tactical_clip);
                 ++submitted;
             }
 

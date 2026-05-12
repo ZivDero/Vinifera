@@ -120,6 +120,18 @@ namespace Vinifera::Gfx
         const float yscale = 1.0f;
 
         /**
+         *  Clip alpha-shape writes to TacticalRect so they don't scribble
+         *  into the top tabs.shp bar / sidebar region of the alpha buffer
+         *  (which is sized to the full LogicalSurface).
+         */
+        const RectF tactical_clip = {
+            (float)TacticalRect.X,
+            (float)TacticalRect.Y,
+            (float)TacticalRect.Width,
+            (float)TacticalRect.Height,
+        };
+
+        /**
          *  TacPixelX/TacPixelY live at offset 0x5C/0x60 in `Tactical` (verified
          *  via the disasm of `Get_Relative_Tactical_Position` at 0x00612D70).
          *  The TSpp wrapper exposes the slot as `field_5C` (an IsoCoordinate /
@@ -185,7 +197,8 @@ namespace Vinifera::Gfx
             AlphaEffect.Set_Params(device, params);
 
             const float identity_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-            Batch.Draw(&page_tex, dst, &src, identity_tint, 0.0f, 0.0f);
+            Batch.Draw(&page_tex, dst, &src, identity_tint, 0.0f, 0.0f,
+                       /*z_uv*/ nullptr, &tactical_clip);
             Batch.End(device);
             ++submitted;
         }
