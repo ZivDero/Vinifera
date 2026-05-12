@@ -636,7 +636,7 @@ bool GpuSurface::Brighten_Line(Rect const& cliprect, Point2D const& startpoint, 
                                                   : EDepthStencil::TestLessEqual_NoWrite;
 
     return Submit_Tactical_Line(OutputTarget, s, e, rgba, rgba, z_start, z_end,
-                                flags, EBlend::Additive, depth_state);
+                                flags, EBlend::Brighten, depth_state);
 }
 
 

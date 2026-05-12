@@ -111,6 +111,21 @@ namespace Vinifera::Gfx
             bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_SRC1_ALPHA;
             bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
             break;
+        case EBlend::Brighten:
+            /**
+             *  result.rgb = dest + dest * src.rgb. Vanilla CPU brighten formula
+             *  (`dst = dst + dst * factor`). Dark pixels stay dark, bright ones
+             *  saturate -- avoids the "uniform gray stripe over dark terrain"
+             *  look of the simpler Additive blend. Alpha is preserved.
+             */
+            bd.RenderTarget[0].BlendEnable    = TRUE;
+            bd.RenderTarget[0].SrcBlend       = D3D11_BLEND_DEST_COLOR;
+            bd.RenderTarget[0].DestBlend      = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].BlendOp        = D3D11_BLEND_OP_ADD;
+            bd.RenderTarget[0].SrcBlendAlpha  = D3D11_BLEND_ZERO;
+            bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+            bd.RenderTarget[0].BlendOpAlpha   = D3D11_BLEND_OP_ADD;
+            break;
         case EBlend::MinSrcDest:
             /**
              *  output = min(src, dest). Idempotent darken — writing the same

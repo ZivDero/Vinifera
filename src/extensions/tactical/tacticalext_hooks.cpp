@@ -29,7 +29,7 @@
 #include "scenario.h"
 #include "render_pass.h"
 #include "sdlsurface.h"
-#include "spotlight.h"
+#include "ovrlight.h"
 #include "syringe.h"
 #include "tactical.h"
 #include "tacticalext.h"
@@ -170,7 +170,7 @@ void TacticalExt::_Draw_Rubber_Band_UI_Overlay()
 static void __fastcall SpotLight_Draw_All_Post_Effects()
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::PostEffects);
-    SpotlightClass::Draw_All();
+    SpotLightClass::Draw_All();
 }
 
 

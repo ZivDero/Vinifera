@@ -45,6 +45,7 @@
 #include "scene_copy.h"
 #include "sdlmouse.h"
 #include "unit_composite.h"
+#include "spotlight_queue.h"
 #include "unit_scratch.h"
 #include "wave_queue.h"
 #include "sdlsurface.h"
@@ -551,6 +552,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera WaveQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::SpotLightQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera SpotLightQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -579,6 +584,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::SceneCopy::Get().Shutdown();
     Vinifera::Gfx::UnitScratch::Get().Shutdown();
     Vinifera::Gfx::WaveQueue::Get().Shutdown();
+    Vinifera::Gfx::SpotLightQueue::Get().Shutdown();
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -1096,6 +1102,7 @@ bool SDL_Update_Screen(Surface* surface)
              *  gets overwritten; flipping the order makes the line visible.
              */
             Vinifera::Gfx::WaveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, (int)render_pass);
+            Vinifera::Gfx::SpotLightQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, (int)render_pass);
             Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::DistortionQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
@@ -1108,6 +1115,7 @@ bool SDL_Update_Screen(Surface* surface)
         Vinifera::Gfx::FontQueue::Get().Clear();
         Vinifera::Gfx::DistortionQueue::Get().Clear();
         Vinifera::Gfx::WaveQueue::Get().Clear();
+        Vinifera::Gfx::SpotLightQueue::Get().Clear();
         Vinifera::Gfx::Reset_Current_Render_Pass();
 
         SDL_Draw_Sidebar_RT_Compose(scale_mode);

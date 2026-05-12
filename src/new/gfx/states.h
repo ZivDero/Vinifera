@@ -36,6 +36,11 @@ namespace Vinifera::Gfx
                             // the same result. Used by voxel shadow rendering so
                             // overlapping shadow columns at cardinal facings don't
                             // compound-darken into bands.
+        Brighten,           // result = dest + dest * src.rgb. Vanilla's multiplicative
+                            // brighten (`dst = dst + dst * factor`) used by spotlight,
+                            // SHAPE_GLOW, and `Draw_Line_entry_38`. Dark pixels stay
+                            // dark; bright pixels saturate. Unlike Additive this does
+                            // NOT add a constant gray over dark terrain.
 
         Count
     };
