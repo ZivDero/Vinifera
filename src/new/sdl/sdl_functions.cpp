@@ -46,6 +46,7 @@
 #include "sdlmouse.h"
 #include "unit_composite.h"
 #include "unit_scratch.h"
+#include "wave_queue.h"
 #include "sdlsurface.h"
 #include "tibsun_functions.h"
 #include "tibsun_globals.h"
@@ -546,6 +547,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera UnitScratch could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::WaveQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera WaveQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -573,6 +578,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::DistortionQueue::Get().Shutdown();
     Vinifera::Gfx::SceneCopy::Get().Shutdown();
     Vinifera::Gfx::UnitScratch::Get().Shutdown();
+    Vinifera::Gfx::WaveQueue::Get().Shutdown();
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -1081,6 +1087,15 @@ bool SDL_Update_Screen(Surface* surface)
                 Composite_Process_Deferred(*Vinifera::Gfx::Device);
             }
             Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            /**
+             *  WaveQueue (sonic + laser shockwaves) runs BEFORE the tactical
+             *  line queue so that LaserDrawClass's thin inner beam — which
+             *  vanilla pairs with `WAVE_BIG_LASER` / `WAVE_LASER` for
+             *  `IsLaser=true` weapons — lands on top of the wide shockwave
+             *  glow. Wave shaders write opaque, so any line drawn beforehand
+             *  gets overwritten; flipping the order makes the line visible.
+             */
+            Vinifera::Gfx::WaveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, (int)render_pass);
             Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::DistortionQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
@@ -1092,6 +1107,7 @@ bool SDL_Update_Screen(Surface* surface)
         Vinifera::Gfx::TacticalLineQueue::Get().Clear();
         Vinifera::Gfx::FontQueue::Get().Clear();
         Vinifera::Gfx::DistortionQueue::Get().Clear();
+        Vinifera::Gfx::WaveQueue::Get().Clear();
         Vinifera::Gfx::Reset_Current_Render_Pass();
 
         SDL_Draw_Sidebar_RT_Compose(scale_mode);
