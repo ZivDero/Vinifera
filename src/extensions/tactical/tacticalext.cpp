@@ -341,8 +341,8 @@ bool TacticalExtension::Debug_Draw_Facings()
 
     Point2D screen = TacticalMap->func_60F150(coord);
 
-    screen.X -= TacticalMap->field_5C.X;
-    screen.Y -= TacticalMap->field_5C.Y;
+    screen.X -= TacticalMap->TacPixelX;
+    screen.Y -= TacticalMap->TacPixelY;
 
     screen.X += TacticalRect.X;
     screen.Y += TacticalRect.Y;

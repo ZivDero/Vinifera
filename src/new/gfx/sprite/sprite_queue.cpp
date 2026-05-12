@@ -131,12 +131,8 @@ namespace Vinifera::Gfx
             (float)TacticalRect.Height,
         };
 
-        /**
-         *  TacPixelX/TacPixelY are exposed via `TacticalMap->field_5C` by the
-         *  TSpp wrapper (IsoCoordinate / Point2D); .X = TacPixelX, .Y = TacPixelY.
-         */
-        const int tac_pixel_x = TacticalMap->field_5C.X;
-        const int tac_pixel_y = TacticalMap->field_5C.Y;
+        const int tac_pixel_x = TacticalMap->TacPixelX;
+        const int tac_pixel_y = TacticalMap->TacPixelY;
 
         /**
          *  Bind AlphaUAV (no RTV / DSV). Detach AlphaSRV first in case a

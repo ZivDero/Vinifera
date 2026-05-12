@@ -424,7 +424,7 @@ void TacticalExt::_Select_These(Rect& rect, void (*select_callback)(ObjectClass*
          *  Sweep through all selectable objects and select the ones within the
          *  bounding box.
          */
-        for (int index = 0; index < DirtyObjectCount; index++) {
+        for (int index = 0; index < SelectableCount; index++) {
             SelectData& sel = SelectableObjects[index];
             ObjectClass* obj = sel.Object;
 
@@ -432,7 +432,7 @@ void TacticalExt::_Select_These(Rect& rect, void (*select_callback)(ObjectClass*
                 continue;
             }
 
-            Point2D pos = sel.Position - field_5C;
+            Point2D pos = sel.Position - Point2D(TacPixelX, TacPixelY);
             if (!rect.Is_Point_Within(pos)) {
                 continue;
             }
@@ -599,7 +599,7 @@ void TacticalExt::_Draw_Rally_Points(bool blit)
                      */
                     Coord center_coord = bldg->Center_Coord();
                     Point2D start_pos = func_60F150(center_coord);
-                    start_pos += Point2D(TacticalRect.X, TacticalRect.Y) - field_5C;
+                    start_pos += Point2D(TacticalRect.X, TacticalRect.Y) - Point2D(TacPixelX, TacPixelY);
 
                     /**
                      *  Get the coordinate of the rally point and adjust it for cell height.
@@ -612,7 +612,7 @@ void TacticalExt::_Draw_Rally_Points(bool blit)
 
                     Point2D end_pos = func_60F0F0(Point2D(rally_coord.X, rally_coord.Y)) / 256;
                     end_pos.Y -= Z_Lepton_To_Pixel(rally_coord.Z);
-                    end_pos += Point2D(TacticalRect.X, TacticalRect.Y) - field_5C;
+                    end_pos += Point2D(TacticalRect.X, TacticalRect.Y) - Point2D(TacPixelX, TacPixelY);
 
                     /**
                      *  #issue-351
@@ -903,7 +903,7 @@ DEFINE_HOOK(0x00611BCB, _Tactical_Render_Overlay_Patch, 0)
 original_code:
     this_ptr->Draw_Screen_Text(this_ptr->ScreenText);
 
-    this_ptr->field_D30 = false;
+    this_ptr->SomeRedrawFlag = false;
     this_ptr->IsToRedraw = false;
 
     return(0x00611BE4);
