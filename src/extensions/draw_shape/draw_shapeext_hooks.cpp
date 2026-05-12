@@ -18,81 +18,29 @@
 
 #include "draw_shapeext_hooks.h"
 
-#include "brightness.h"
-#include "convert.h"
 #include "debughandler.h"
 #include "drawshape.h"
-#include "gpu_surface.h"
-#include "gpu_surface_target.h"
-#include "graphics_device.h"
+#include "gpu_draw.h"
 #include "hooker.h"
-#include "optionsext.h"
-#include "palette_lut.h"
-#include "render_pass.h"
-#include "shapeset.h"
-#include "shp_asset.h"
-#include "shp_atlas.h"
-#include "shp_cache.h"
-#include "sprite_queue.h"
 #include "surface.h"
 #include "tibsun_globals.h"
 #include "unit_composite.h"
-#include "vinifera_globals.h"
 
 
 using namespace Vinifera::Gfx;
-
-
-namespace
-{
-    inline void Tint_From_Intensity_And_Flags(int intensity, ShapeFlags_Type flags, float out[4])
-    {
-        /**
-         *  Vanilla `intensity` ranges 0..2000 with 1000 == 100% (full normal)
-         *  and 2000 == 2x overbright. Brightness_To_Tint maps that linearly
-         *  into a [0, 2] RGB multiplier; the float vertex tint preserves
-         *  values above 1.0 through to the shader (the RT format saturates
-         *  on store, but the math composes correctly in HLSL).
-         *
-         *  Translucency is folded into alpha here rather than passed as a
-         *  shader flag — the shader already does `c.a *= v.col.a` and the
-         *  premultiplied blend handles the rest, so this is mathematically
-         *  identical to the old SEF_TRANSLUCENT* branches while keeping
-         *  translucent shapes batchable with opaque ones.
-         */
-        const float t = Brightness_To_Tint(intensity);
-        float a = 1.0f;
-        if (flags & SHAPE_TRANSLUCENT25) a *= 0.75f;
-        if (flags & SHAPE_TRANSLUCENT50) a *= 0.5f;
-        if (flags & SHAPE_TRANSLUCENT75) a *= 0.25f;
-        out[0] = t;
-        out[1] = t;
-        out[2] = t;
-        out[3] = a;
-    }
-
-    inline uint32_t Effect_Flags_From_Shape(ShapeFlags_Type flags)
-    {
-        uint32_t out = 0;
-        if (flags & SHAPE_DARKEN) out |= SEF_DARKEN;
-        return out;
-    }
-
-    inline float Depth_From_Screen_Y(float y)
-    {
-        const float kMaxScreenY = 16000.0f;
-        float dz = 1.0f - (y / kMaxScreenY);
-        if (dz < 0.001f) dz = 0.001f;
-        if (dz > 0.999f) dz = 0.999f;
-        return dz;
-    }
-}
 
 
 /**
  *  Proxy entry point. Mirrors vanilla Draw_Shape's signature exactly so the
  *  /Gr (fastcall) ABI matches what the original binary's CALL instruction
  *  expects — same pattern as the existing animext Draw_Shape_Proxy.
+ *
+ *  Vinifera-native code wanting the GPU pipeline directly should call
+ *  `Vinifera::Gfx::GPU_Draw_Shape` (see gpu_draw.h) which takes extra
+ *  parameters this ABI-locked entry can't carry (predator offset, etc.).
+ *  This proxy passes `predator_offset = 0` — works for non-cloaked sprites
+ *  and degrades to a static cloak (no shimmer) for SHAPE_PREDATOR-flagged
+ *  legacy callers.
  *
  *  @author: Vinifera Stage 2b
  */
@@ -136,253 +84,17 @@ void Draw_Shape_Proxy_DX11(
     }
 
     /**
-     *  Fall-through cases that always run vanilla CPU code:
-     *    - Target surface isn't a `GpuSurface` — `SDLSurface` destinations
-     *      (HiddenSurface / AlternateSurface / VisibleSurface, plus the
-     *      menus / cameos / hidden buffers) keep using vanilla's CPU blit.
-     *      `CompositeSurface` and `TileSurface` are both `GpuSurface` and
-     *      get swapped during the tile pass — either one routes here.
-     *    - GraphicsDevice not initialized yet (pre-video-mode boot path).
-     *    - Bad inputs (defensive).
-     */
-    GpuSurface* gpu_surface = dynamic_cast<GpuSurface*>(&surface);
-    if (Vinifera::Gfx::Device == nullptr
-        || gpu_surface == nullptr
-        || shapefile == nullptr
-        || shapenum < 0)
-    {
-        Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                   remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-        return;
-    }
-
-    /**
-     *  Resolve the GPU-side asset and palette via process-wide caches. On a
-     *  miss we lazy-load; on a permanent failure (malformed SHP) the cache
-     *  returns nullptr — fall back to vanilla so the frame isn't visually
-     *  broken.
-     */
-    GraphicsDevice& device = *Vinifera::Gfx::Device;
-    ShpAsset* asset = ShpCache::Get().Get_Or_Load(device, shapefile);
-    PaletteLUT* palette = PaletteCache::Get().Get_Or_Build(device, &convert);
-    if (asset == nullptr || palette == nullptr) {
-        Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                   remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-        return;
-    }
-    const ShpFrameInfo* fi = asset->Get_Frame(shapenum);
-    if (fi == nullptr || fi->W <= 0 || fi->H <= 0) {
-        return;
-    }
-
-    ShpAsset* z_asset = nullptr;
-    const ShpFrameInfo* z_fi = nullptr;
-    if (z_shapefile != nullptr && z_shapenum >= 0) {
-        z_asset = ShpCache::Get().Get_Or_Load(device, z_shapefile);
-        if (z_asset != nullptr) {
-            z_fi = z_asset->Get_Frame(z_shapenum);
-            if (z_fi == nullptr || z_fi->W <= 0 || z_fi->H <= 0) {
-                z_asset = nullptr;
-                z_fi = nullptr;
-            }
-        }
-    }
-
-    /**
-     *  Reproduce Draw_Shape's logical-coords math from
-     *  D:/Projects/Tiberian-Sun/code/draw.cpp:65-118 to land the sprite at
-     *  the same logical position vanilla would have CPU-blitted to.
-     *
-     *  Note on `height_offset`: vanilla passes it to the inner blitter for
-     *  Z-test bias only and never applies it to the destination Y. The
-     *  visual effect of altitude (bullets in flight, raised animations) is
-     *  already baked into `point.Y` by the caller's screen-coord math, so
-     *  only the depth calculation below consumes it.
-     */
-    const int logical_w = shapefile->Get_Width();
-    const int logical_h = shapefile->Get_Height();
-    int x = point.X;
-    int y = point.Y;
-    if (flags & SHAPE_CENTER) {
-        x -= logical_w / 2;
-        y -= logical_h / 2;
-    }
-    if (flags & SHAPE_WIN_REL) {
-        x += window.X;
-        y += window.Y;
-    }
-    /**
-     *  Fold the per-frame X/Y origin offset (the shape sub-rect's logical
-     *  position relative to (0,0)).
-     */
-    x += fi->X;
-    y += fi->Y;
-
-    /**
-     *  Logical → backbuffer-pixel scale. CompositeSurface is rendered into at
-     *  logical (video) resolution; the present quad scales it up to the
-     *  backbuffer. To align our GPU sprite with the surrounding CPU-blitted
-     *  scene we apply the same scale to dst.
-     */
-    float xscale = 1.0f;
-    float yscale = 1.0f;
-    if (!Vinifera::Gfx::Logical_To_Render_Target(device, gpu_surface->Output_Target(), xscale, yscale)) {
-        Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
-                   remap, height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off);
-        return;
-    }
-
-    const Rect clipped_window = Intersect(window, surface.Get_Rect());
-    if (!clipped_window.Is_Valid()) {
-        return;
-    }
-
-    SpriteDrawCmd cmd = {};
-    cmd.Asset       = asset;
-    cmd.ZAsset      = z_asset;
-    cmd.Palette     = palette;
-    cmd.FrameIndex  = shapenum;
-    cmd.Dst.X       = x * xscale;
-    cmd.Dst.Y       = y * yscale;
-    cmd.Dst.W       = fi->W * xscale;
-    cmd.Dst.H       = fi->H * yscale;
-    cmd.Clip.X      = clipped_window.X * xscale;
-    cmd.Clip.Y      = clipped_window.Y * yscale;
-    cmd.Clip.W      = clipped_window.Width * xscale;
-    cmd.Clip.H      = clipped_window.Height * yscale;
-    cmd.Pass        = Current_Render_Pass();
-    cmd.EffectFlags = Effect_Flags_From_Shape(flags);
-    Tint_From_Intensity_And_Flags(intensity, flags, cmd.Tint);
-    const bool z_active = (flags & SHAPE_ZREAD) || (flags & SHAPE_ZGRAD) || (flags & SHAPE_ZREADWRITE);
-    const bool z_write = (flags & SHAPE_ZREADWRITE);
-    if (z_asset != nullptr && z_fi != nullptr) {
-        /**
-         *  Mirror vanilla Draw_Shape's z-shape sampling origin:
-         *    zpoint = z_off - ((logical_size / 2) - visible_frame.xy)
-         *    zpoint += z_frame.xy
-         *  The z-shape atlas stores only the frame's pixel rectangle, so the
-         *  final shader UV is z_frame_atlas_xy + zpoint + visible_local_xy.
-         */
-        Point2D zpoint = z_off;
-        zpoint.X -= logical_w / 2 - fi->X;
-        zpoint.Y -= logical_h / 2 - fi->Y;
-        zpoint.X += z_fi->X;
-        zpoint.Y += z_fi->Y;
-
-        const float ztw = (float)ShpAtlas::Get().Page_Width();
-        const float zth = (float)ShpAtlas::Get().Page_Height();
-        if (ztw > 0.0f && zth > 0.0f) {
-            cmd.ZSrcUV.X = ((float)z_fi->AtlasX + (float)zpoint.X) / ztw;
-            cmd.ZSrcUV.Y = ((float)z_fi->AtlasY + (float)zpoint.Y) / zth;
-            cmd.ZSrcUV.W = (float)fi->W / ztw;
-            cmd.ZSrcUV.H = (float)fi->H / zth;
-        } else {
-            cmd.ZAsset = nullptr;
-        }
-    }
-
-    /**
-     *  Depth: WAE-style screen-Y normalization. Larger screen Y means the
-     *  object is closer to the camera (front of the isometric view), so it
-     *  gets a smaller depth value. Map (0..16000) → (1.0..0.0); subtract a
-     *  per-class epsilon so identical-Y sprites of different categories
-     *  tiebreak deterministically (unit-vs-overlay, projectile-vs-unit, etc).
-     *  Tiles use the same scale (with epsilon=0), so sprites depth-test
-     *  correctly against terrain.
-     *
-     *  `height_offset` in vanilla is a Z-test bias on the cell side of the
-     *  per-pixel comparison — a *negative* value (e.g. for an aircraft at
-     *  altitude) effectively pulls the shape forward of the cell. Mirror
-     *  that here by adding `-height_offset` to bottom_y: larger screen Y →
-     *  smaller dz → closer to the camera.
-     *
-     *  Per-vertex Z gradient (DstZTop vs DstZBottom) is gated on SHAPE_ZGRAD
-     *  specifically — this flag is what tells the vanilla blitter to drive
-     *  per-pixel z from the screen-Y gradient. SHAPE_ZREAD / SHAPE_ZREADWRITE
-     *  without SHAPE_ZGRAD use a single constant z (used by overlays such as
-     *  low bridges, walls, tiberium):
-     *    - SHAPE_ZGRAD + ZGRAD_GROUND: full gradient. Top pixel maps to a
-     *      cell one sprite-height further back; smaller screen Y means
-     *      larger dz at the top vertex.
-     *    - SHAPE_ZGRAD + ZGRAD_45DEG: half gradient (cliff/ramp face).
-     *    - SHAPE_ZGRAD + ZGRAD_90DEG: no gradient (vertical structure;
-     *      every pixel sits at the cell-foot's depth).
-     *    - SHAPE_ZGRAD off, or ZGRAD_NONE: no gradient.
-     */
-    {
-        const float kSpriteEpsilon = 5e-5f;     // keeps equal-depth object pixels just in front of terrain
-        const float depth_bias_y = (float)-height_offset;
-        const float bottom_y = (float)(y + fi->H) + depth_bias_y;
-        float top_y = bottom_y;
-
-        if (flags & SHAPE_ZGRAD) {
-            if (zgrad == ZGRAD_GROUND) {
-                top_y = bottom_y - (float)fi->H;
-            } else if (zgrad == ZGRAD_45DEG) {
-                top_y = bottom_y - (float)fi->H * 0.5f;
-            }
-            /* ZGRAD_90DEG / ZGRAD_NONE: keep top_y = bottom_y. */
-        }
-
-        cmd.DstZTop = Depth_From_Screen_Y(top_y) - kSpriteEpsilon;
-        cmd.DstZBottom = Depth_From_Screen_Y(bottom_y) - kSpriteEpsilon;
-    }
-
-    /**
-     *  SHAPE_ZREADWRITE means vanilla's blitter writes per-pixel Z as it
-     *  draws (used by buildings and similar large vertical structures so
-     *  things drawn afterwards behind them are correctly occluded). Mark
-     *  this command so SpriteQueue::Flush picks the depth-write state.
-     */
-    cmd.WriteDepth = z_write;
-
-    /**
-     *  Vanilla never z-tests Draw_Shape calls that select a non-z blitter
-     *  (selection brackets, transport / ammo / health pips, build-state
-     *  overlays, cameos). They're 2D UI laid over the tactical view; their
-     *  quads extend down into screen rows belonging to the next-front cell,
-     *  whose tile depth is closer than the sprite's foot-derived depth, so
-     *  hardware depth-test would clip them at the bottom. Submission order
-     *  handles inter-overlay layering. SHAPE_ZREAD, SHAPE_ZGRAD, and
-     *  SHAPE_ZREADWRITE all select vanilla z blitters.
-     */
-    cmd.DisableDepth = !z_active;
-    if (Is_Cell_Shadow_Pass(cmd.Pass)) {
-        cmd.DisableDepth = false;
-    }
-    if (cmd.DisableDepth) {
-        cmd.WriteDepth = false;
-    }
-
-    /**
-     *  Alpha-buffer write modes. SHAPE_WRITE_ALPHA / SHAPE_WRITE_ALPHA_MULT
-     *  redirect the draw away from the backbuffer and into the alpha buffer
-     *  (vanilla's alpha-light path — vehicle headlights, muzzle flashes,
-     *  building searchlight cones). The shape doesn't output color and
-     *  doesn't interact with depth.
-     */
-    if (flags & SHAPE_WRITE_ALPHA) {
-        cmd.Mode = SpriteDrawMode::AlphaWriteAdd;
-        cmd.DisableDepth = true;
-        cmd.WriteDepth = false;
-    } else if (flags & SHAPE_WRITE_ALPHA_MULT) {
-        cmd.Mode = SpriteDrawMode::AlphaWriteMult;
-        cmd.DisableDepth = true;
-        cmd.WriteDepth = false;
-    } else {
-        cmd.Mode = SpriteDrawMode::Color;
-    }
-
-    /**
-     *  Vanilla's `remap` argument is dead code — TS bakes per-house colors
-     *  into the converter at scenario init and never relies on SHAPE_REMAP /
-     *  the 16-byte runtime override. We drop it entirely.
+     *  Forward to the Vinifera-native draw entry. The vanilla `remap` arg is
+     *  dead code (TS bakes per-house colors into the converter at scenario
+     *  init) so we don't pass it through. `predator_offset = 0` produces a
+     *  static (un-shimmering) cloak for SHAPE_PREDATOR draws coming from
+     *  legacy call sites; Vinifera-native sites with a TechnoClass should
+     *  bypass this proxy and call GPU_Draw_Shape with the real offset.
      */
     (void)remap;
-
-    cmd.OutputTarget = gpu_surface->Output_Target();
-
-    SpriteQueue::Get().Submit(cmd);
+    GPU_Draw_Shape(surface, convert, shapefile, shapenum, point, window, flags,
+                   height_offset, zgrad, intensity, z_shapefile, z_shapenum, z_off,
+                   /*predator_offset*/ 0);
 }
 
 

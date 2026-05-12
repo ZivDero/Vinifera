@@ -18,6 +18,7 @@
 #include "cdctrl.h"
 #include "command.h"
 #include "convert.h"
+#include "distortion_queue.h"
 #include "font_cache.h"
 #include "font_queue.h"
 #include "gpu_surface.h"
@@ -530,6 +531,10 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
         DEBUG_ERROR("Vinifera VoxelQueue could not be initialized.\n");
     }
 
+    if (!Vinifera::Gfx::DistortionQueue::Get().Initialize(*Vinifera::Gfx::Device)) {
+        DEBUG_ERROR("Vinifera DistortionQueue could not be initialized.\n");
+    }
+
     return true;
 }
 
@@ -554,6 +559,7 @@ void SDL_Reset_Video_Mode()
     Vinifera::Gfx::TacticalLineQueue::Get().Shutdown();
     Vinifera::Gfx::VoxelQueue::Get().Shutdown();
     Vinifera::Gfx::VoxelAssetCache::Get().Shutdown();
+    Vinifera::Gfx::DistortionQueue::Get().Shutdown();
     Vinifera::Gfx::IsoTileCache::Get().Clear();
     Vinifera::Gfx::IsoTileAtlas::Get().Shutdown();
     Vinifera::Gfx::ShpCache::Get().Clear();
@@ -1029,6 +1035,7 @@ bool SDL_Update_Screen(Surface* surface)
             Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::TacticalLineQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             Vinifera::Gfx::FontQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
+            Vinifera::Gfx::DistortionQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
         }
         Vinifera::Gfx::TileQueue::Get().Clear();
         Vinifera::Gfx::SpriteQueue::Get().Clear();
@@ -1036,6 +1043,7 @@ bool SDL_Update_Screen(Surface* surface)
         Vinifera::Gfx::PrimitiveQueue::Get().Clear();
         Vinifera::Gfx::TacticalLineQueue::Get().Clear();
         Vinifera::Gfx::FontQueue::Get().Clear();
+        Vinifera::Gfx::DistortionQueue::Get().Clear();
         Vinifera::Gfx::Reset_Current_Render_Pass();
 
         SDL_Draw_Sidebar_RT_Compose(scale_mode);
