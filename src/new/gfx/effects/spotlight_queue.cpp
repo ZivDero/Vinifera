@@ -27,102 +27,8 @@ namespace Vinifera::Gfx
     namespace
     {
         /**
-         *  SpotLight shader. VS projects scene-pixel vertices through the
-         *  standard pixel→NDC matrix. PS computes the radial mask intensity
-         *  analytically in the quad's local coords and applies vanilla's
-         *  per-pixel multiplicative brighten.
-         *
-         *  Vanilla's mask construction (One_Time):
-         *    surf = 256x256, Fill(0)
-         *    R = 2*index + 1, color = -2
-         *    while irad > 0:
-         *      Draw_Circle outline at radius `irad`, color `max(0, color)`
-         *      irad -= 2, color += 4
-         *    blit 2:1 vertical-compressed to 256x128 final mask
-         *
-         *  Net pixel value at distance d from center (in 1:1 source space):
-         *    mask = max(0, 2*(R - d) - 2) clamped to [0, 255]
-         *  After 2:1 compression: source y = 2 * dst_y, so for a 256x128 PS
-         *  pixel (xd, yd) the effective distance is
-         *    d = sqrt((xd - 128)^2 + (2*(yd - 64))^2)
-         *
-         *  Brighten math (vanilla): `out.rgb = sat(bg.rgb + bg.rgb * mask/256)`.
-         *  Applied per channel via the PS, with the dest read coming from
-         *  `SceneCopy` (the per-frame snapshot).
+         *  SpotLight shader — see `src/new/gfx/shaders/spotlight.hlsl`.
          */
-        const char SpotLightShaderHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer SpotLightCB : register(b1) {\n"
-            "    float4 Misc;   // x=EffectiveRadius, y=QuadTopLeft.x, z=QuadTopLeft.y, w=SceneW\n"
-            "    float4 Geom;   // x=SceneH, y=UniformMask (-1 => concentric falloff), zw=unused\n"
-            "};\n"
-            "\n"
-            "struct VSIn  { float2 pos : POSITION; };\n"
-            "struct VSOut { float4 pos : SV_Position; float2 scene_xy : TEXCOORD0; };\n"
-            "\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    // Depth slightly less than terrain at the same screen-Y so\n"
-            "    // the spotlight beats terrain. Spotlight isn't z-tested in\n"
-            "    // vanilla (the CPU blitter writes unconditionally inside\n"
-            "    // its 256x128 area), so this is just to keep ordering sane\n"
-            "    // against other PostEffects content.\n"
-            "    const float kPixelToDepth = 1.0 / 16000.0;\n"
-            "    float z = clamp(1.0 - i.pos.y * kPixelToDepth - 1.0e-4, 1.0e-4, 0.9999);\n"
-            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0.0, 1.0));\n"
-            "    o.pos = float4(p.x, p.y, z, 1.0);\n"
-            "    o.scene_xy = i.pos.xy;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "Texture2D<float4> SceneCopy : register(t0);\n"
-            "\n"
-            "float4 PSMain(VSOut v) : SV_Target {\n"
-            "    int scene_w = (int)Misc.w;\n"
-            "    int scene_h = (int)Geom.x;\n"
-            "    int2 px = int2(v.scene_xy);\n"
-            "\n"
-            "    // Quad-local coords (256 wide x 128 tall, top-left at Misc.yz).\n"
-            "    float2 quad_local = v.scene_xy - Misc.yz;\n"
-            "    float  dx = quad_local.x - 128.0;\n"
-            "    float  dy = 2.0 * (quad_local.y - 64.0);   // 2:1 vertical compensation\n"
-            "    float  dist = sqrt(dx * dx + dy * dy);\n"
-            "\n"
-            "    float R = Misc.x;\n"
-            "    float uniform_mask = Geom.y;               // -1 => concentric falloff\n"
-            "    float mask;\n"
-            "    if (uniform_mask >= 0.0) {\n"
-            "        // Uniform-disc case (BuildingLight extra surfaces). Vanilla's\n"
-            "        // One_Time draws a single filled circle of constant colour --\n"
-            "        // a flat bright disc, not a gradient.\n"
-            "        if (dist > R) discard;\n"
-            "        mask = uniform_mask;\n"
-            "    } else {\n"
-            "        // Concentric-ring case (warhead spotlights). Vanilla draws\n"
-            "        // nested filled circles with brightness 0, 2, 6, ..., 4i-2.\n"
-            "        // Channel quantization in 16-bit RGB565 made boosts below ~6%\n"
-            "        // imperceptible -- the faint outer rings effectively vanished.\n"
-            "        // Our 32-bit pipeline shows them as a soft halo, so drop the\n"
-            "        // weak half to keep only the visibly-bright core.\n"
-            "        float steps = floor((R - dist) * 0.5);\n"
-            "        if (steps <= 0.0) discard;\n"
-            "        mask = 4.0 * steps - 2.0;\n"
-            "        float peak = 2.0 * R - 2.0;\n"
-            "        if (mask < peak * 0.5) discard;\n"
-            "    }\n"
-            "    mask = min(mask, 255.0);\n"
-            "\n"
-            "    int2 sample_px = clamp(px, int2(0, 0), int2(scene_w - 1, scene_h - 1));\n"
-            "    float4 bg = SceneCopy.Load(int3(sample_px, 0));\n"
-            "\n"
-            "    float boost = mask / 256.0;\n"
-            "    float3 out_rgb = saturate(bg.rgb + bg.rgb * boost);\n"
-            "    return float4(out_rgb, 1.0);\n"
-            "}\n";
-
-
         const D3D11_INPUT_ELEMENT_DESC SpotLightIL[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
@@ -131,11 +37,9 @@ namespace Vinifera::Gfx
 
     bool SpotLightEffect::Initialize(GraphicsDevice& device)
     {
-        if (!Effect::Initialize(device,
-                SpotLightShaderHLSL, sizeof(SpotLightShaderHLSL) - 1,
-                "spotlight",
-                SpotLightIL, _countof(SpotLightIL),
-                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
+        if (!Effect::Initialize(device, "SPOTLIGHT",
+                                SpotLightIL, _countof(SpotLightIL),
+                                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
             return false;
         }
 

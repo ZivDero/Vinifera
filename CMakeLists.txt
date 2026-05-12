@@ -328,12 +328,41 @@ GitWatcher_SetupInitial()  # Running the script function again forces the file t
 					       # created locally so the file can be added to the filters.
 
 ################################################################################
+# Compile HLSL shaders into pre-built .cso bytecode and generate the resource
+# script that embeds them into the DLL. Each shader's VS+PS pair is loaded at
+# runtime via FindResource(<NAME>_VS / <NAME>_PS, RT_RCDATA) by
+# `Effect::Initialize`. See cmake/modules/CompileShaders.cmake.
+################################################################################
+include(CompileShaders)
+set(SHADER_MANIFEST
+    default_sprite    vs_4_0 ps_4_0
+    present           vs_4_0 ps_4_0
+    unit_composite    vs_4_0 ps_4_0
+    palette_sprite    vs_4_0 ps_4_0
+    tile              vs_4_0 ps_4_0
+    voxel             vs_4_0 ps_4_0
+    voxel_distortion  vs_4_0 ps_4_0
+    font              vs_4_0 ps_4_0
+    shroud_fog        vs_5_0 ps_5_0   # UAV write
+    alpha_write       vs_5_0 ps_5_0   # UAV write
+    wave              vs_4_0 ps_4_0
+    spotlight         vs_4_0 ps_4_0
+    distortion        vs_4_0 ps_4_0
+    tactical_line     vs_4_0 ps_4_0
+    primitive         vs_4_0 ps_4_0
+    z_buffer_debug    vs_4_0 ps_4_0
+    alpha_buffer_debug vs_4_0 ps_4_0
+)
+compile_shaders_from_manifest(SHADER_MANIFEST
+    SHADER_CSO_FILES SHADERS_RC SHADER_HLSL_FILES)
+
+################################################################################
 # Create the DLL.
 ################################################################################
 message(STATUS "Configuring ${PROJECT_NAME} DLL.")
 
 add_library(${PROJECT_NAME} SHARED
-		${VINIFERA_HEADERS} 
+		${VINIFERA_HEADERS}
 		${VINIFERA_SOURCES}
 		${HOOKER_HEADERS} ${HOOKER_SOURCES}
 		${VINIFERA_RESOURCES}
@@ -342,6 +371,9 @@ add_library(${PROJECT_NAME} SHARED
 		${CMAKE_SOURCE_DIR}/res/dialog.rc
 		${CMAKE_SOURCE_DIR}/res/icon.rc
 		${CMAKE_SOURCE_DIR}/res/version.rc
+		${SHADERS_RC}
+		${SHADER_CSO_FILES}
+		${SHADER_HLSL_FILES}
 )
 target_include_directories(${PROJECT_NAME} BEFORE PUBLIC
 		${VINIFERA_INCLUDE_DIRS}
@@ -647,6 +679,12 @@ SetCustomProjectFilters("Resource Files"
 
 # Filter the configured git version source file manually.
 SetCustomProjectFilters("Generated Files" ${GIT_POST_CONFIGURE_FILE})
+
+# Filter shader sources, pre-compiled bytecode, and the generated RC file so
+# they don't clutter the project root.
+SetCustomProjectFilters("Shaders\\Sources"  ${SHADER_HLSL_FILES})
+SetCustomProjectFilters("Shaders\\Compiled" ${SHADER_CSO_FILES})
+SetCustomProjectFilters("Shaders"           ${SHADERS_RC})
 
 # Force the default startup project.
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Vinifera)

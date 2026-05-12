@@ -281,31 +281,6 @@ namespace Vinifera::Gfx::Gfx_Debug
                 float Pad;
             };
 
-            static const char ZDebugHLSL[] =
-                "cbuffer ZDebugCB : register(b0) {\n"
-                "    float MinDepth;\n"
-                "    float MaxDepth;\n"
-                "    float Invert;\n"
-                "    float Pad;\n"
-                "};\n"
-                "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };\n"
-                "VSOut VSMain(uint id : SV_VertexID) {\n"
-                "    VSOut o;\n"
-                "    float2 uv = float2((id << 1) & 2, id & 2);\n"
-                "    o.pos = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);\n"
-                "    o.uv = uv;\n"
-                "    return o;\n"
-                "}\n"
-                "Texture2D<float> DepthTex : register(t0);\n"
-                "SamplerState Smp : register(s0);\n"
-                "float4 PSMain(VSOut v) : SV_Target {\n"
-                "    float depth = DepthTex.SampleLevel(Smp, v.uv, 0);\n"
-                "    float denom = max(MaxDepth - MinDepth, 0.000001);\n"
-                "    float value = saturate((depth - MinDepth) / denom);\n"
-                "    if (Invert > 0.5) value = 1.0 - value;\n"
-                "    return float4(value, value, value, 1.0);\n"
-                "}\n";
-
             static Vinifera::Gfx::RenderTarget2D z_preview;
             static Vinifera::Gfx::Effect z_effect;
             static ID3D11Device* resource_device = nullptr;
@@ -364,8 +339,8 @@ namespace Vinifera::Gfx::Gfx_Debug
 
                     if (resource_device == nullptr) {
                         resource_device = d3d_device;
-                        if (!z_effect.Initialize(device, ZDebugHLSL, sizeof(ZDebugHLSL) - 1,
-                                                 "z_buffer_debug", nullptr, 0, sizeof(ZDebugParams))) {
+                        if (!z_effect.Initialize(device, "Z_BUFFER_DEBUG",
+                                                 nullptr, 0, sizeof(ZDebugParams))) {
                             resource_device = nullptr;
                         }
                     }
@@ -438,29 +413,6 @@ namespace Vinifera::Gfx::Gfx_Debug
                 float Pad2;
             };
 
-            static const char AlphaDebugHLSL[] =
-                "cbuffer AlphaDebugCB : register(b0) {\n"
-                "    float Invert;\n"
-                "    float Pad0;\n"
-                "    float Pad1;\n"
-                "    float Pad2;\n"
-                "};\n"
-                "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };\n"
-                "VSOut VSMain(uint id : SV_VertexID) {\n"
-                "    VSOut o;\n"
-                "    float2 uv = float2((id << 1) & 2, id & 2);\n"
-                "    o.pos = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);\n"
-                "    o.uv = uv;\n"
-                "    return o;\n"
-                "}\n"
-                "Texture2D<float> AlphaTex : register(t0);\n"
-                "SamplerState Smp : register(s0);\n"
-                "float4 PSMain(VSOut v) : SV_Target {\n"
-                "    float a = AlphaTex.SampleLevel(Smp, v.uv, 0);\n"
-                "    if (Invert > 0.5) a = 1.0 - a;\n"
-                "    return float4(a, a, a, 1.0);\n"
-                "}\n";
-
             static Vinifera::Gfx::RenderTarget2D a_preview;
             static Vinifera::Gfx::Effect a_effect;
             static ID3D11Device* resource_device = nullptr;
@@ -498,8 +450,8 @@ namespace Vinifera::Gfx::Gfx_Debug
 
                     if (resource_device == nullptr) {
                         resource_device = d3d_device;
-                        if (!a_effect.Initialize(device, AlphaDebugHLSL, sizeof(AlphaDebugHLSL) - 1,
-                                                 "alpha_buffer_debug", nullptr, 0, sizeof(AlphaDebugParams))) {
+                        if (!a_effect.Initialize(device, "ALPHA_BUFFER_DEBUG",
+                                                 nullptr, 0, sizeof(AlphaDebugParams))) {
                             resource_device = nullptr;
                         }
                     }

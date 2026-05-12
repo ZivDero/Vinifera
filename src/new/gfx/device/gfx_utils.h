@@ -10,7 +10,6 @@
 #pragma once
 
 #include <d3d11.h>
-#include <d3dcompiler.h>
 
 
 namespace Vinifera::Gfx
@@ -23,11 +22,4 @@ namespace Vinifera::Gfx
             obj = nullptr;
         }
     }
-
-    /**
-     *  Compile an HLSL source string with D3DCompile. Logs and returns false on
-     *  failure. The caller owns the returned blob.
-     */
-    bool Compile_HLSL(const char* source, size_t source_size, const char* source_name,
-                      const char* entry, const char* target, ID3DBlob** out_blob);
 }

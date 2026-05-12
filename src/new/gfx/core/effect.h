@@ -30,17 +30,15 @@ namespace Vinifera::Gfx
         Effect& operator=(const Effect&) = delete;
 
         /**
-         *  Compile from a single HLSL source string with VS entry "VSMain" and
-         *  PS entry "PSMain". Profiles default to vs_4_0/ps_4_0; pass
-         *  ps_5_0/vs_5_0 for shader features that need it (UAV writes from
-         *  pixel shader, etc.).
+         *  Load pre-compiled bytecode embedded in the DLL as RCDATA resources.
+         *  `shader_name` is the unqualified manifest name (uppercase by
+         *  convention, e.g. "WAVE"); the helper looks up `<NAME>_VS` and
+         *  `<NAME>_PS` via `FindResource`. Profiles are baked into the
+         *  bytecode at build time — no runtime D3DCompile.
          */
-        bool Initialize(GraphicsDevice& device, const char* hlsl_source, size_t source_size,
-                        const char* debug_name,
+        bool Initialize(GraphicsDevice& device, const char* shader_name,
                         const D3D11_INPUT_ELEMENT_DESC* input_elements, UINT input_element_count,
-                        size_t constant_buffer_size = 0,
-                        const char* vs_profile = "vs_4_0",
-                        const char* ps_profile = "ps_4_0");
+                        size_t constant_buffer_size = 0);
 
         void Shutdown();
 

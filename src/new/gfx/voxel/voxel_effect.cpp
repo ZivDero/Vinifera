@@ -43,158 +43,6 @@ namespace Vinifera::Gfx
         };
 
 
-        const char VoxelShaderHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer EffectCB : register(b1) {\n"
-            "    float4 T0;\n"
-            "    float4 T1;\n"
-            "    float4 T2;\n"
-            "    float4 T3;\n"
-            "    float4 LightDir;     // xyz = light, w = normal-table base offset\n"
-            "    float4 Tint;\n"
-            "    float4 Misc;         // x = z_adjust (pixels, object) or 0 (shadow);\n"
-            "                         // y = depth scale (1/16000);\n"
-            "                         // z = per-section kObjectEps (object) or shadow alpha;\n"
-            "                         // w = flags (VEF_SHADOW = 1)\n"
-            "};\n"
-            "\n"
-            "Texture2D<float4>            Palette      : register(t0);\n"
-            "Texture2D<uint>              LightRemapTex : register(t1);\n"
-            "StructuredBuffer<float3>     Normals      : register(t2);\n"
-            "\n"
-            "struct VSIn  {\n"
-            "    uint4 pos       : POSITION;    // x, y, z, color_idx\n"
-            "    uint4 normal_w  : NORMALIDX;   // normal_idx, _, _, _\n"
-            "};\n"
-            "struct VSOut {\n"
-            "    float4 pos        : SV_Position;\n"
-            "    nointerpolation uint  color_idx  : COLOR0;\n"
-            "    nointerpolation uint  normal_idx : COLOR1;\n"
-            "    nointerpolation float voxel_z    : VOXELZ;\n"
-            "    nointerpolation float unit_y     : UNITY;\n"
-            "};\n"
-            "\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    float vx = (float)i.pos.x;\n"
-            "    float vy = (float)i.pos.y;\n"
-            "    float vz = (float)i.pos.z;\n"
-            "\n"
-            "    // Per-section transform: screen = T0 + x*T1 + y*T2 + z*T3.\n"
-            "    float screen_x = T0.x + vx * T1.x + vy * T2.x + vz * T3.x;\n"
-            "    float screen_y = T0.y + vx * T1.y + vy * T2.y + vz * T3.y;\n"
-            "    float voxel_z  = T0.z + vx * T1.z + vy * T2.z + vz * T3.z;\n"
-            "\n"
-            "    // Object voxels: depth = base - kObjectEps - voxel_z*kVZS +\n"
-            "    // z_adjust/16000. The z_adjust term carries vanilla's\n"
-            "    // Get_Z_Adjustment() (negative for elevated objects) so a\n"
-            "    // flying unit sorts at the ground cell beneath rather than\n"
-            "    // where its raised screen_y happens to land. A final min()\n"
-            "    // clamp guarantees every voxel sits ahead of terrain by\n"
-            "    // at least `kBackClamp` regardless of |voxel_z| magnitude.\n"
-            "    //\n"
-            "    // Shadow voxels: VS leaves SV_Position.z as the per-vertex\n"
-            "    // computed value but the PIXEL SHADER overrides depth via\n"
-            "    // SV_Depth, computing it from the fragment's pixel-center\n"
-            "    // Y. This makes shadow depth a function of which pixel was\n"
-            "    // hit, not which vertex hit it — so every shadow voxel\n"
-            "    // rasterized to the same pixel (across body/turret/barrel\n"
-            "    // sections and across iso-squashed adjacent voxels) gets\n"
-            "    // the SAME depth value. WriteLess then keeps only the\n"
-            "    // first write and DestMultiplyHalf can't compound-darken.\n"
-            "    // Depth is computed in the PIXEL shader (see PSMain). The\n"
-            "    // VS just produces SV_Position with a placeholder z; the\n"
-            "    // PS overrides via SV_Depth using SV_Position.y (the\n"
-            "    // fragment's pixel-center Y) so all voxels rasterizing\n"
-            "    // to the same pixel — across body/turret/barrel sections\n"
-            "    // and overlapping iso-projected voxels — get identical\n"
-            "    // base. voxel_z then alone decides front-to-back order.\n"
-            "    float4 clip = mul(ProjMtx, float4(screen_x, screen_y, 0.0, 1.0));\n"
-            "\n"
-            "    VSOut o;\n"
-            "    o.pos        = float4(clip.x, clip.y, 0.5, 1.0);\n"
-            "    o.color_idx  = i.pos.w;\n"
-            "    o.normal_idx = i.normal_w.x;\n"
-            "    o.voxel_z    = voxel_z;\n"
-            "    o.unit_y     = T0.w;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "struct PSOut {\n"
-            "    float4 color : SV_Target;\n"
-            "    float  depth : SV_Depth;\n"
-            "};\n"
-            "\n"
-            "PSOut PSMain(VSOut v) {\n"
-            "    uint flags = (uint)Misc.w;\n"
-            "    if (flags & 1u) {\n"
-            "        // Shadow path: emit dark gray. Caller uses DestMultiplyHalf\n"
-            "        // blend so the scene RT darkens to ~50% under the shadow.\n"
-            "        // Depth from pixel-center Y (SV_Position.y in PS) so all\n"
-            "        // shadow voxels landing in this pixel — regardless of\n"
-            "        // which vertex/section produced them — share one depth\n"
-            "        // value; WriteLess+dedup then prevents compound darken.\n"
-            "        const float kShadowEps = 5e-5;\n"
-            "        PSOut so;\n"
-            "        so.color = float4(0.5, 0.5, 0.5, Misc.z);\n"
-            "        so.depth = 1.0 - v.pos.y * Misc.y - kShadowEps;\n"
-            "        so.depth = clamp(so.depth, 0.0001, 0.9999);\n"
-            "        return so;\n"
-            "    }\n"
-            "\n"
-            "    // Lambertian shade. Vanilla maps diffuse to the VPL ramp via\n"
-            "    // VOXEL_PALETTE_LOOKUP_NEUTRAL (=16), and the VPL has 32 rows\n"
-            "    // total: 0..15 = darkened, 16 = neutral, 17..31 = overbright.\n"
-            "    // Cell brightness modulates the SHADE INDEX (not the output\n"
-            "    // color) — dark cells pull shade down, lit cells pull it up.\n"
-            "    // Tint.r carries brightness/1000 from the CPU side.\n"
-            "    const float kNeutralShade = 16.0;\n"
-            "    int   table_base = (int)LightDir.w;\n"
-            "    float3 n = Normals.Load(table_base + (int)v.normal_idx);\n"
-            "    float  diffuse = saturate(dot(n, LightDir.xyz));\n"
-            "    float  shade_f = diffuse * kNeutralShade * Tint.r;\n"
-            "    int    shade = (int)shade_f;\n"
-            "    if (shade > 31) shade = 31;\n"
-            "    if (shade < 0)  shade = 0;\n"
-            "\n"
-            "    // VPL shade ramp: (shade, voxel color) -> theatre-palette index.\n"
-            "    uint shaded_idx = LightRemapTex.Load(int3((int)v.color_idx, shade, 0));\n"
-            "    if (shaded_idx == 0) discard;  // transparent palette entry\n"
-            "\n"
-            "    // House-aware palette LUT (ColorScheme converter baked the\n"
-            "    // remap-range slots into the unit's faction colors already).\n"
-            "    // Brightness has already been applied via the shade index, so\n"
-            "    // we don't multiply rgba.rgb by Tint here — Tint.a still\n"
-            "    // carries visual-character translucency (VISUAL_DARKEN etc.).\n"
-            "    float4 rgba = Palette.Load(int3((int)shaded_idx, 0, 0));\n"
-            "    // Pre-multiply RGB by the final alpha. The queue binds an\n"
-            "    // EBlend::Premultiplied blend state which expects a pre-\n"
-            "    // multiplied source — without this the math collapses to\n"
-            "    // `src + (1-a)*dest` (unit full + partial terrain), making\n"
-            "    // translucent voxels look mostly opaque. Pre-multiplying\n"
-            "    // gives the correct `a*src + (1-a)*dest`. For opaque\n"
-            "    // voxels (a == 1) the multiply is a no-op.\n"
-            "    float a_final = rgba.a * Tint.a;\n"
-            "    PSOut o;\n"
-            "    o.color = float4(rgba.rgb * a_final, a_final);\n"
-            "    // Per-UNIT depth (NOT per-pixel). v.unit_y carries the\n"
-            "    // section's drawpoint Y from T0.w, identical across every\n"
-            "    // voxel of this section. Using drawpoint Y instead of the\n"
-            "    // fragment's screen_y means two units that overlap on the\n"
-            "    // same pixel sort by their drawpoint difference (which is\n"
-            "    // what we want: closer-to-camera drawpoint wins) rather\n"
-            "    // than by which voxel happens to have larger voxel_z. The\n"
-            "    // per-section kObjectEps is sized on the CPU to cover the\n"
-            "    // worst pixel below drawpoint, so voxels still stay in\n"
-            "    // front of terrain across the full sprite footprint.\n"
-            "    const float kVoxelZScale = 1e-4;\n"
-            "    float kObjectEps = Misc.z;\n"
-            "    float base = 1.0 - v.unit_y * Misc.y;\n"
-            "    o.depth = base - kObjectEps - v.voxel_z * kVoxelZScale + Misc.x * Misc.y;\n"
-            "    o.depth = clamp(o.depth, 0.0001, 0.9999);\n"
-            "    return o;\n"
-            "}\n";
 
 
         /**
@@ -216,11 +64,9 @@ namespace Vinifera::Gfx
 
     bool VoxelEffect::Initialize(GraphicsDevice& device)
     {
-        if (!Effect::Initialize(device,
-                VoxelShaderHLSL, sizeof(VoxelShaderHLSL) - 1,
-                "voxel_palette",
-                VoxelIL, _countof(VoxelIL),
-                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
+        if (!Effect::Initialize(device, "VOXEL",
+                                VoxelIL, _countof(VoxelIL),
+                                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
             return false;
         }
 
@@ -357,123 +203,19 @@ namespace Vinifera::Gfx
     }
 
 
-    namespace
-    {
-        /**
-         *  Predator variant. Same VS as VoxelEffect; PS adds a SceneCopy load
-         *  at SV_Position + Predator.x horizontal offset, then lerps the
-         *  shaded palette color toward the scene sample using Predator.y as
-         *  the blend ratio.
-         *
-         *  Vanilla `BlitTransLucent*ZReadWarp<ushort>` does this same lerp on
-         *  the CPU: `dest[i] = blend(palette[shp], dest[i + warp])`. Integer-
-         *  pixel offsets match vanilla's pointer arithmetic — use Load not
-         *  Sample so we don't smear across pixels.
-         */
-        const char VoxelDistortionShaderHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer EffectCB : register(b1) {\n"
-            "    float4 T0;\n"
-            "    float4 T1;\n"
-            "    float4 T2;\n"
-            "    float4 T3;\n"
-            "    float4 LightDir;\n"
-            "    float4 Tint;\n"
-            "    float4 Misc;\n"
-            "    float4 Predator;     // x = warp_offset_px, y = blend_ratio,\n"
-            "                          // z = scene_w,         w = scene_h\n"
-            "};\n"
-            "\n"
-            "Texture2D<float4>            Palette       : register(t0);\n"
-            "Texture2D<uint>              LightRemapTex : register(t1);\n"
-            "StructuredBuffer<float3>     Normals       : register(t2);\n"
-            "Texture2D<float4>            SceneCopy     : register(t3);\n"
-            "\n"
-            "struct VSIn  {\n"
-            "    uint4 pos       : POSITION;\n"
-            "    uint4 normal_w  : NORMALIDX;\n"
-            "};\n"
-            "struct VSOut {\n"
-            "    float4 pos        : SV_Position;\n"
-            "    nointerpolation uint  color_idx  : COLOR0;\n"
-            "    nointerpolation uint  normal_idx : COLOR1;\n"
-            "    nointerpolation float voxel_z    : VOXELZ;\n"
-            "    nointerpolation float unit_y     : UNITY;\n"
-            "};\n"
-            "\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    float vx = (float)i.pos.x;\n"
-            "    float vy = (float)i.pos.y;\n"
-            "    float vz = (float)i.pos.z;\n"
-            "    float screen_x = T0.x + vx * T1.x + vy * T2.x + vz * T3.x;\n"
-            "    float screen_y = T0.y + vx * T1.y + vy * T2.y + vz * T3.y;\n"
-            "    float voxel_z  = T0.z + vx * T1.z + vy * T2.z + vz * T3.z;\n"
-            "    float4 clip = mul(ProjMtx, float4(screen_x, screen_y, 0.0, 1.0));\n"
-            "    VSOut o;\n"
-            "    o.pos        = float4(clip.x, clip.y, 0.5, 1.0);\n"
-            "    o.color_idx  = i.pos.w;\n"
-            "    o.normal_idx = i.normal_w.x;\n"
-            "    o.voxel_z    = voxel_z;\n"
-            "    o.unit_y     = T0.w;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "struct PSOut {\n"
-            "    float4 color : SV_Target;\n"
-            "    float  depth : SV_Depth;\n"
-            "};\n"
-            "\n"
-            "PSOut PSMain(VSOut v) {\n"
-            "    // Identical shading to VoxelEffect — normal lookup, Lambert,\n"
-            "    // VPL shade, palette LUT. Drop the shadow branch (predator\n"
-            "    // and shadow are disjoint).\n"
-            "    const float kNeutralShade = 16.0;\n"
-            "    int   table_base = (int)LightDir.w;\n"
-            "    float3 n = Normals.Load(table_base + (int)v.normal_idx);\n"
-            "    float  diffuse = saturate(dot(n, LightDir.xyz));\n"
-            "    float  shade_f = diffuse * kNeutralShade * Tint.r;\n"
-            "    int    shade = (int)shade_f;\n"
-            "    if (shade > 31) shade = 31;\n"
-            "    if (shade < 0)  shade = 0;\n"
-            "    uint shaded_idx = LightRemapTex.Load(int3((int)v.color_idx, shade, 0));\n"
-            "    if (shaded_idx == 0) discard;\n"
-            "    float4 rgba = Palette.Load(int3((int)shaded_idx, 0, 0));\n"
-            "\n"
-            "    // SceneCopy sample at rasterized pixel + horizontal warp.\n"
-            "    // Integer Load matches vanilla's pointer-offset displacement.\n"
-            "    int scene_w = (int)Predator.z;\n"
-            "    int scene_h = (int)Predator.w;\n"
-            "    int2 sample_px = int2(v.pos.x, v.pos.y) + int2((int)Predator.x, 0);\n"
-            "    sample_px.x = clamp(sample_px.x, 0, scene_w - 1);\n"
-            "    sample_px.y = clamp(sample_px.y, 0, scene_h - 1);\n"
-            "    float4 bg = SceneCopy.Load(int3(sample_px, 0));\n"
-            "\n"
-            "    // lerp(voxel, scene, blend) — same math as the SHP distortion\n"
-            "    // path. Tint.a (visual-character translucency) is ignored: the\n"
-            "    // predator blend replaces it entirely.\n"
-            "    float3 mixed = lerp(rgba.rgb, bg.rgb, Predator.y);\n"
-            "\n"
-            "    PSOut o;\n"
-            "    o.color = float4(mixed, 1.0);\n"
-            "    const float kVoxelZScale = 1e-4;\n"
-            "    float kObjectEps = Misc.z;\n"
-            "    float base = 1.0 - v.unit_y * Misc.y;\n"
-            "    o.depth = base - kObjectEps - v.voxel_z * kVoxelZScale + Misc.x * Misc.y;\n"
-            "    o.depth = clamp(o.depth, 0.0001, 0.9999);\n"
-            "    return o;\n"
-            "}\n";
-    }
-
-
+    /**
+     *  Predator variant. Same VS as VoxelEffect; PS adds a SceneCopy load
+     *  at SV_Position + Predator.x horizontal offset, then lerps the shaded
+     *  palette color toward the scene sample using Predator.y as the blend
+     *  ratio. Vanilla `BlitTransLucent*ZReadWarp<ushort>` does this same
+     *  lerp on the CPU: `dest[i] = blend(palette[shp], dest[i + warp])`.
+     *  See `src/new/gfx/shaders/voxel_distortion.hlsl`.
+     */
     bool VoxelDistortionEffect::Initialize(GraphicsDevice& device)
     {
-        if (!Effect::Initialize(device,
-                VoxelDistortionShaderHLSL, sizeof(VoxelDistortionShaderHLSL) - 1,
-                "voxel_distortion",
-                VoxelIL, _countof(VoxelIL),
-                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
+        if (!Effect::Initialize(device, "VOXEL_DISTORTION",
+                                VoxelIL, _countof(VoxelIL),
+                                /* SpriteCB at b0 — float4x4 ProjMtx, 64 bytes */ 64)) {
             return false;
         }
 

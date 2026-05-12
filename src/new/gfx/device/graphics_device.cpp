@@ -25,18 +25,37 @@ namespace Vinifera::Gfx
 
     namespace
     {
-        const char PresentShaderHLSL[] =
-            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };\n"
-            "VSOut VSMain(uint id : SV_VertexID) {\n"
-            "    VSOut o;\n"
-            "    float2 uv = float2((id << 1) & 2, id & 2);\n"
-            "    o.pos = float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);\n"
-            "    o.uv = uv;\n"
-            "    return o;\n"
-            "}\n"
-            "Texture2D Tex : register(t0);\n"
-            "SamplerState Smp : register(s0);\n"
-            "float4 PSMain(VSOut v) : SV_Target { return Tex.Sample(Smp, v.uv); }\n";
+        /**
+         *  Resolve the Vinifera.dll HMODULE (not the host EXE) and load an
+         *  embedded shader bytecode blob by RCDATA resource name. Mirrors
+         *  the same trick used inside `Effect::Initialize`.
+         */
+        HMODULE Get_Self_Module_Present()
+        {
+            HMODULE mod = nullptr;
+            GetModuleHandleExA(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+              | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCSTR>(&Get_Self_Module_Present),
+                &mod);
+            return mod;
+        }
+
+        bool Load_Present_Blob(const char* resource_name,
+                               const void*& out_data, DWORD& out_size)
+        {
+            out_data = nullptr;
+            out_size = 0;
+            HMODULE mod = Get_Self_Module_Present();
+            if (mod == nullptr) return false;
+            HRSRC h = FindResourceA(mod, resource_name, MAKEINTRESOURCEA(RT_RCDATA));
+            if (h == nullptr) return false;
+            HGLOBAL g = LoadResource(mod, h);
+            if (g == nullptr) return false;
+            out_data = LockResource(g);
+            out_size = SizeofResource(mod, h);
+            return out_data != nullptr && out_size != 0;
+        }
     }
 
 
@@ -371,21 +390,18 @@ namespace Vinifera::Gfx
 
     bool GraphicsDevice::Create_Present_Pipeline()
     {
-        ID3DBlob* vs_blob = nullptr;
-        ID3DBlob* ps_blob = nullptr;
-        if (!Compile_HLSL(PresentShaderHLSL, sizeof(PresentShaderHLSL) - 1, "present_quad", "VSMain", "vs_4_0", &vs_blob)) {
-            return false;
-        }
-        if (!Compile_HLSL(PresentShaderHLSL, sizeof(PresentShaderHLSL) - 1, "present_quad", "PSMain", "ps_4_0", &ps_blob)) {
-            vs_blob->Release();
-            return false;
-        }
-        HRESULT hr = Device->CreateVertexShader(vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), nullptr, &PresentVS);
-        vs_blob->Release();
-        if (FAILED(hr)) { ps_blob->Release(); return false; }
+        const void* vs_bytes = nullptr;
+        DWORD       vs_size  = 0;
+        if (!Load_Present_Blob("PRESENT_VS", vs_bytes, vs_size)) return false;
 
-        hr = Device->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &PresentPS);
-        ps_blob->Release();
+        const void* ps_bytes = nullptr;
+        DWORD       ps_size  = 0;
+        if (!Load_Present_Blob("PRESENT_PS", ps_bytes, ps_size)) return false;
+
+        HRESULT hr = Device->CreateVertexShader(vs_bytes, vs_size, nullptr, &PresentVS);
+        if (FAILED(hr)) return false;
+
+        hr = Device->CreatePixelShader(ps_bytes, ps_size, nullptr, &PresentPS);
         return SUCCEEDED(hr);
     }
 

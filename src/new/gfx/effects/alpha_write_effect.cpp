@@ -34,46 +34,6 @@ namespace Vinifera::Gfx
         };
 
 
-        const char AlphaWriteHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer EffectCB : register(b1) {\n"
-            "    float2 AtlasSize;\n"
-            "    uint2  _pad;\n"
-            "};\n"
-            "\n"
-            "Texture2D<uint>          Atlas    : register(t0);\n"
-            "RWTexture2D<unorm float> AlphaUAV : register(u0);\n"
-            "\n"
-            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float2 zuv : TEXCOORD1; float4 col : COLOR0; };\n"
-            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };\n"
-            "\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
-            "    o.pos = float4(p.x, p.y, 0, 1);\n"
-            "    o.uv  = i.uv;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "/**\n"
-            " * Vanilla `AlphaShapeClass::BrightnessTable[shape][old]` is\n"
-            " *   out_byte = clamp(shape * old / 127, 0, 255).\n"
-            " * Both shape and old are 0..255 byte values. We read `old` from\n"
-            " * the UNORM UAV (already 0..1), reconstruct the byte, apply the\n"
-            " * formula, and write back the saturating result.\n"
-            " */\n"
-            "void PSMain(VSOut v) {\n"
-            "    int2 px = int2(v.uv * AtlasSize);\n"
-            "    uint shape_byte = Atlas.Load(int3(px, 0));\n"
-            "    if (shape_byte == 0) discard;\n"
-            "\n"
-            "    int2 dst = int2(v.pos.xy);\n"
-            "    float old = AlphaUAV[dst];\n"
-            "    float new_val = saturate(shape_byte * old / 127.0);\n"
-            "    AlphaUAV[dst] = new_val;\n"
-            "}\n";
     }
 
 
@@ -81,15 +41,12 @@ namespace Vinifera::Gfx
     {
         /**
          *  PS_5_0 required for `RWTexture2D` writes from a pixel shader. The
-         *  device is created at FL 11.0+ so this is always available.
+         *  device is created at FL 11.0+ so this is always available. The
+         *  profile is baked into the .cso at build time via SHADER_MANIFEST.
          */
-        if (!Effect::Initialize(device,
-                AlphaWriteHLSL, sizeof(AlphaWriteHLSL) - 1,
-                "alpha_write",
-                AlphaWriteIL, _countof(AlphaWriteIL),
-                /* SpriteCB at b0 */ 64,
-                /* vs_profile */ "vs_5_0",
-                /* ps_profile */ "ps_5_0")) {
+        if (!Effect::Initialize(device, "ALPHA_WRITE",
+                                AlphaWriteIL, _countof(AlphaWriteIL),
+                                /* SpriteCB at b0 */ 64)) {
             return false;
         }
 

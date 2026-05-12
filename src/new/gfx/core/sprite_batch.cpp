@@ -24,22 +24,6 @@ namespace Vinifera::Gfx
 {
     namespace
     {
-        const char DefaultSpriteShaderHLSL[] =
-            "cbuffer SpriteCB : register(b0) { float4x4 ProjMtx; };\n"
-            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float2 zuv : TEXCOORD1; float4 col : COLOR0; };\n"
-            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; float4 col : COLOR0; };\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
-            "    o.pos = float4(p.x, p.y, i.pos.z, 1);\n"
-            "    o.uv  = i.uv;\n"
-            "    o.col = i.col;\n"
-            "    return o;\n"
-            "}\n"
-            "Texture2D    Tex : register(t0);\n"
-            "SamplerState Smp : register(s0);\n"
-            "float4 PSMain(VSOut v) : SV_Target { return Tex.Sample(Smp, v.uv) * v.col; }\n";
-
         const D3D11_INPUT_ELEMENT_DESC SpriteIL[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -99,12 +83,9 @@ namespace Vinifera::Gfx
 
     bool SpriteBatch::Create_Default_Effect(GraphicsDevice& device)
     {
-        return DefaultEffect.Initialize(
-            device,
-            DefaultSpriteShaderHLSL, sizeof(DefaultSpriteShaderHLSL) - 1,
-            "sprite_default",
-            SpriteIL, _countof(SpriteIL),
-            sizeof(SpriteCB));
+        return DefaultEffect.Initialize(device, "DEFAULT_SPRITE",
+                                        SpriteIL, _countof(SpriteIL),
+                                        sizeof(SpriteCB));
     }
 
 

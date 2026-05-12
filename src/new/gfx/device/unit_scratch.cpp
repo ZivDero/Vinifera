@@ -25,74 +25,6 @@ namespace Vinifera::Gfx
     namespace
     {
         /**
-         *  Composite blit shader. Samples the scratch RT (premultiplied RGBA
-         *  output from the voxel/SHP pipeline that drew INTO it) and scales
-         *  by a unit-level alpha. Outputs the result with premultiplied alpha
-         *  so the caller's `EBlend::Premultiplied` blend state produces the
-         *  correct `scratch*unit_alpha + (1 - scratch.a*unit_alpha)*scene`.
-         */
-        const char UnitCompositeHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer EffectCB : register(b1) {\n"
-            "    float Alpha;\n"
-            "    float3 _Pad;\n"
-            "};\n"
-            "\n"
-            "struct VSIn {\n"
-            "    float3 pos    : POSITION;\n"
-            "    float2 uv     : TEXCOORD0;\n"
-            "    float2 zuv    : TEXCOORD1;\n"
-            "    float4 col    : COLOR0;\n"
-            "    uint   layer  : TEXCOORD2;\n"
-            "    uint   pflags : TEXCOORD3;\n"
-            "};\n"
-            "struct VSOut {\n"
-            "    float4 pos : SV_Position;\n"
-            "    float2 uv  : TEXCOORD0;\n"
-            "};\n"
-            "\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
-            "    o.pos = float4(p.x, p.y, i.pos.z, 1);\n"
-            "    o.uv  = i.uv;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "Texture2D<float4> Scratch : register(t0);\n"
-            "SamplerState      PointS  : register(s0);\n"
-            "\n"
-            "struct PSOut {\n"
-            "    float4 color : SV_Target;\n"
-            "    float  depth : SV_Depth;\n"
-            "};\n"
-            "\n"
-            "PSOut PSMain(VSOut v) {\n"
-            "    float4 c = Scratch.Sample(PointS, v.uv);\n"
-            "    // Discard fully-transparent scratch pixels so we don't trip\n"
-            "    // the depth test on empty unit area outside the unit's actual\n"
-            "    // voxel footprint.\n"
-            "    if (c.a <= 0.0) discard;\n"
-            "    PSOut o;\n"
-            "    // Scratch is already premultiplied. Scale by unit alpha so\n"
-            "    // the final scene blend is `(scratch*unit_a) + (1 - scratch.a*unit_a)*scene`.\n"
-            "    o.color = c * Alpha;\n"
-            "    // Per-pixel SV_Depth: emit a depth value that just barely beats\n"
-            "    // terrain at THIS pixel's screen-Y. Terrain depth at pixel Y is\n"
-            "    // `1 - Y * kPixelToDepth` (1/16000); subtract\n"
-            "    // a small eps so composite consistently wins LessEqual against\n"
-            "    // terrain across the whole 256x256 unit footprint. Without this,\n"
-            "    // a single per-unit depth value misses on roughly half the unit\n"
-            "    // (where terrain happens to be closer than our chosen baseline).\n"
-            "    const float kPixelToDepth = 1.0 / 16000.0;\n"
-            "    o.depth = clamp(1.0 - v.pos.y * kPixelToDepth - 1.0e-4, 1.0e-4, 0.9999);\n"
-            "    return o;\n"
-            "}\n";
-
-
-        /**
          *  Matches the SpriteIL layout from sprite_effect.cpp so SpriteBatch
          *  can drive this effect with its standard `Draw(...)` overloads.
          */
@@ -109,11 +41,9 @@ namespace Vinifera::Gfx
 
     bool UnitCompositeEffect::Initialize(GraphicsDevice& device)
     {
-        if (!Effect::Initialize(device,
-                UnitCompositeHLSL, sizeof(UnitCompositeHLSL) - 1,
-                "unit_composite",
-                UnitCompositeIL, _countof(UnitCompositeIL),
-                /* SpriteCB at b0 */ 64)) {
+        if (!Effect::Initialize(device, "UNIT_COMPOSITE",
+                                UnitCompositeIL, _countof(UnitCompositeIL),
+                                /* SpriteCB at b0 */ 64)) {
             return false;
         }
 

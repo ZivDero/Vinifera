@@ -24,17 +24,6 @@ namespace Vinifera::Gfx
 {
     namespace
     {
-        const char PrimitiveShaderHLSL[] =
-            "cbuffer PrimitiveCB : register(b0) { float4x4 ProjMtx; };\n"
-            "struct VSIn  { float2 pos : POSITION; float4 col : COLOR0; };\n"
-            "struct VSOut { float4 pos : SV_Position; float4 col : COLOR0; };\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    o.pos = mul(ProjMtx, float4(i.pos.xy, 0.0f, 1.0f));\n"
-            "    o.col = i.col;\n"
-            "    return o;\n"
-            "}\n"
-            "float4 PSMain(VSOut v) : SV_Target { return v.col; }\n";
 
         const D3D11_INPUT_ELEMENT_DESC PrimitiveIL[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -70,12 +59,9 @@ namespace Vinifera::Gfx
 
     bool PrimitiveQueue::Create_Effect(GraphicsDevice& device)
     {
-        return PrimitiveEffect.Initialize(
-            device,
-            PrimitiveShaderHLSL, sizeof(PrimitiveShaderHLSL) - 1,
-            "primitive_solid",
-            PrimitiveIL, _countof(PrimitiveIL),
-            sizeof(PrimitiveCB));
+        return PrimitiveEffect.Initialize(device, "PRIMITIVE",
+                                          PrimitiveIL, _countof(PrimitiveIL),
+                                          sizeof(PrimitiveCB));
     }
 
 

@@ -34,55 +34,6 @@ namespace Vinifera::Gfx
         };
 
 
-        /**
-         *  Vanilla shroud/fog formulas from `CellClass::Draw_Shroud_Or_Fog_Shape`
-         *  and `CellClass::Draw_Fog_Shape`.
-         */
-        const char ShroudFogHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer EffectCB : register(b1) {\n"
-            "    float2 AtlasSize;\n"
-            "    uint   Mode;       /* 0 = ShroudOverwrite, 1 = FogAdditive */\n"
-            "    uint   _pad;\n"
-            "};\n"
-            "\n"
-            "Texture2D<uint>          Atlas    : register(t0);\n"
-            "RWTexture2D<unorm float> AlphaUAV : register(u0);\n"
-            "\n"
-            "struct VSIn  { float3 pos : POSITION; float2 uv : TEXCOORD0; float2 zuv : TEXCOORD1; float4 col : COLOR0; };\n"
-            "struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };\n"
-            "\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
-            "    o.pos = float4(p.x, p.y, 0, 1);\n"
-            "    o.uv  = i.uv;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "void PSMain(VSOut v) {\n"
-            "    int2 px = int2(v.uv * AtlasSize);\n"
-            "    uint shape = Atlas.Load(int3(px, 0));\n"
-            "    int2 dst = int2(v.pos.xy);\n"
-            "    if (Mode == 0) {\n"
-            "        /* ShroudOverwrite — CellClass::Draw_Shroud_Or_Fog_Shape. */\n"
-            "        if (shape == 0xFE) discard;\n"
-            "        AlphaUAV[dst] = (float)shape / 255.0;\n"
-            "    } else {\n"
-            "        /* FogAdditive — CellClass::Draw_Fog_Shape. */\n"
-            "        if (shape > 0x7F) discard;\n"
-            "        float old_byte = AlphaUAV[dst] * 255.0;\n"
-            "        float new_byte;\n"
-            "        if (abs(old_byte - 127.0) < 0.5) {\n"
-            "            new_byte = (float)shape;\n"
-            "        } else {\n"
-            "            new_byte = max(0.0, old_byte + (float)shape - 127.0);\n"
-            "        }\n"
-            "        AlphaUAV[dst] = new_byte / 255.0;\n"
-            "    }\n"
-            "}\n";
     }
 
 
@@ -90,15 +41,13 @@ namespace Vinifera::Gfx
     {
         /**
          *  PS_5_0 required for `RWTexture2D` writes from a pixel shader. The
-         *  device is created at FL 11.0+ so this is always available.
+         *  device is created at FL 11.0+ so this is always available. The
+         *  profile is baked into the .cso at build time via the SHADER_MANIFEST
+         *  in the root CMakeLists.txt.
          */
-        if (!Effect::Initialize(device,
-                ShroudFogHLSL, sizeof(ShroudFogHLSL) - 1,
-                "shroud_fog",
-                ShroudFogIL, _countof(ShroudFogIL),
-                /* SpriteCB at b0 */ 64,
-                /* vs_profile */ "vs_5_0",
-                /* ps_profile */ "ps_5_0")) {
+        if (!Effect::Initialize(device, "SHROUD_FOG",
+                                ShroudFogIL, _countof(ShroudFogIL),
+                                /* SpriteCB at b0 */ 64)) {
             return false;
         }
 

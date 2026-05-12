@@ -27,89 +27,14 @@ namespace Vinifera::Gfx
     namespace
     {
         /**
-         *  Distortion shader. Inputs match the standard SpriteVertex layout so
-         *  the queue can drive draws through `SpriteBatch::Draw` (saving us
-         *  from writing yet another quad batcher). The COLOR0 attribute is
+         *  Distortion shader — see `src/new/gfx/shaders/distortion.hlsl`.
+         *
+         *  Inputs match the standard SpriteVertex layout so the queue can
+         *  drive draws through `SpriteBatch::Draw`. The COLOR0 attribute is
          *  REPURPOSED:
          *    col.r = blend_ratio (0..1; 1 = full background, 0 = full sprite)
          *    col.g = warp_offset_pixels (signed; horizontal sample offset)
          *    col.b, col.a = unused
-         *
-         *  PS samples the SceneCopy texture at the rasterized pixel center +
-         *  warp offset, then blends with the SHP's palette color via lerp.
-         *  Transparent palette index (0) discards so the sprite's alpha mask
-         *  is honored.
-         */
-        const char DistortionHLSL[] =
-            "cbuffer SpriteCB : register(b0) {\n"
-            "    float4x4 ProjMtx;\n"
-            "};\n"
-            "cbuffer EffectCB : register(b1) {\n"
-            "    float2 AtlasSize;\n"
-            "    float2 SceneSize;\n"
-            "};\n"
-            "\n"
-            "struct VSIn {\n"
-            "    float3 pos    : POSITION;\n"
-            "    float2 uv     : TEXCOORD0;\n"
-            "    float2 zuv    : TEXCOORD1;\n"   // unused
-            "    float4 col    : COLOR0;\n"      // col.r = blend, col.g = warp_offset_px
-            "    uint   layer  : TEXCOORD2;\n"
-            "    uint   pflags : TEXCOORD3;\n"   // unused
-            "};\n"
-            "struct VSOut {\n"
-            "    float4 pos       : SV_Position;\n"
-            "    float2 uv        : TEXCOORD0;\n"
-            "    nointerpolation float blend  : COLOR0;\n"
-            "    nointerpolation float warp   : COLOR1;\n"
-            "    nointerpolation uint  layer  : TEXCOORD2;\n"
-            "};\n"
-            "VSOut VSMain(VSIn i) {\n"
-            "    VSOut o;\n"
-            "    float4 p = mul(ProjMtx, float4(i.pos.xy, 0, 1));\n"
-            "    o.pos    = float4(p.x, p.y, i.pos.z, 1);\n"
-            "    o.uv     = i.uv;\n"
-            "    o.blend  = i.col.r;\n"
-            "    o.warp   = i.col.g;\n"
-            "    o.layer  = i.layer;\n"
-            "    return o;\n"
-            "}\n"
-            "\n"
-            "Texture2D<uint>          Atlas      : register(t0);\n"
-            "Texture2DArray<float4>   PaletteArr : register(t1);\n"
-            "Texture2D<float4>        SceneCopy  : register(t2);\n"
-            "SamplerState             PointS     : register(s0);\n"
-            "\n"
-            "float4 PSMain(VSOut v) : SV_Target {\n"
-            "    int2 px = int2(v.uv * AtlasSize);\n"
-            "    uint idx = Atlas.Load(int3(px, 0));\n"
-            "    if (idx == 0) discard;\n"
-            "    float4 shp = PaletteArr.Load(int4((int)idx, 0, (int)v.layer, 0));\n"
-            "    /**\n"
-            "     * SV_Position.xy in the PS is the rasterized pixel center;\n"
-            "     * divide by the scene RT size to get a [0,1] UV. The warp is\n"
-            "     * a fixed horizontal offset in pixel units (matches vanilla's\n"
-            "     * `dest[warp_offset]` integer-step displacement). Saturate so\n"
-            "     * edges of the screen don't wrap into garbage.\n"
-            "     */\n"
-            "    float2 base_uv = v.pos.xy / SceneSize;\n"
-            "    float2 warp_uv = saturate(base_uv + float2(v.warp / SceneSize.x, 0));\n"
-            "    float4 bg = SceneCopy.Sample(PointS, warp_uv);\n"
-            "    bg.a = 1.0;\n"
-            "    /**\n"
-            "     * lerp(shp, bg, blend) — blend=0.75 mirrors vanilla 75% (more\n"
-            "     * background, less sprite); blend=0.25 mirrors vanilla 25%.\n"
-            "     */\n"
-            "    float4 c = lerp(shp, bg, v.blend);\n"
-            "    c.a = 1.0;\n"
-            "    return c;\n"
-            "}\n";
-
-
-        /**
-         *  Matches `SpriteIL` from sprite_effect.cpp exactly so the same
-         *  `SpriteBatch::Draw(..., tint, ...)` overload writes the right slots
-         *  for our shader's VSIn.
          */
         const D3D11_INPUT_ELEMENT_DESC DistortionIL[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -124,11 +49,9 @@ namespace Vinifera::Gfx
 
     bool DistortionEffect::Initialize(GraphicsDevice& device)
     {
-        if (!Effect::Initialize(device,
-                DistortionHLSL, sizeof(DistortionHLSL) - 1,
-                "distortion",
-                DistortionIL, _countof(DistortionIL),
-                /* SpriteCB at b0 — float4x4 ProjMtx */ 64)) {
+        if (!Effect::Initialize(device, "DISTORTION",
+                                DistortionIL, _countof(DistortionIL),
+                                /* SpriteCB at b0 — float4x4 ProjMtx */ 64)) {
             return false;
         }
 
