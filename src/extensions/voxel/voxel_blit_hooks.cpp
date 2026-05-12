@@ -180,14 +180,17 @@ namespace
     static std::vector<DeferredComposite> g_deferred_composites;
 
     /**
-     *  Vanilla's `Unit_Blit_Voxel` composes the 160x160 scratch onto the real
-     *  surface with a ~16 px Y shift baked in (origin not fully traced; the
-     *  same constant the voxel transform already adds via `kVoxelYBias` for
-     *  non-composite voxels). Voxels in composite mode pick it up automa-
-     *  tically through `Build_Section_Params`; SHP replays need it added
-     *  explicitly to land in the same place.
+     *  `xyoff` / `point` come from vanilla as TacticalRect-relative pixel
+     *  coords. Our scene RT covers the full `LogicalSurface` (which includes
+     *  the top tabs.shp bar and any sidebar), so we add `TacticalRect.TopLeft`
+     *  to land at the right screen position. Voxels in composite mode pick
+     *  this up automatically through `Build_Section_Params` (same shift on
+     *  the voxel transform); SHP replays need it added explicitly here.
      */
-    static constexpr int kCompositeYBias = 16;
+    static inline Point2D Composite_Tactical_To_Scene_RT(int x, int y)
+    {
+        return Point2D(x + TacticalRect.X, y + TacticalRect.Y);
+    }
 
 
     /**
@@ -369,15 +372,14 @@ namespace
         // BBL with no centroid subtraction. For T0.Z we DO subtract the
         // centroid so voxel_z = 0 at the section centroid (for depth).
         //
-        // TUNABLE: kVoxelYBias shifts every voxel down on screen. Empirically
-        // observed ~17 px constant offset across unit types. Source not yet
-        // traced through vanilla — likely a fixed offset in the voxel-art
-        // pipeline or rendering hook we haven't found. Constant means it's
-        // probably tied to a static value (LEVEL_PIXEL_H, half tile height,
-        // etc.) rather than per-section bounds.
-        constexpr float kVoxelYBias = 16.0f;
-        out.T0[0] = static_cast<float>(point.X) + c0.X;
-        out.T0[1] = static_cast<float>(point.Y) + c0.Y + kVoxelYBias;
+        // `point` is TacticalRect-relative; the scene RT covers the full
+        // LogicalSurface (incl. the top tabs.shp bar and any sidebar), so
+        // we shift by TacticalRect.TopLeft here. Matches what the wave +
+        // spotlight queues do for their tactical-relative inputs.
+        const float kTacticalX = static_cast<float>(TacticalRect.X);
+        const float kTacticalY = static_cast<float>(TacticalRect.Y);
+        out.T0[0] = static_cast<float>(point.X) + c0.X + kTacticalX;
+        out.T0[1] = static_cast<float>(point.Y) + c0.Y + kTacticalY;
         // T0.z = ABSOLUTE projected iso_z of BBL (no centroid subtraction).
         // This makes voxel_z in the shader an absolute iso_z value shared
         // across all sections of the unit, so a turret sitting on top of
@@ -394,7 +396,7 @@ namespace
         // at overlapping pixels — without this, back-unit top voxels would
         // beat front-unit body voxels because they happen to have a larger
         // voxel_z at the same pixel.
-        out.T0[3] = static_cast<float>(point.Y);
+        out.T0[3] = static_cast<float>(point.Y) + kTacticalY;
 
         // Shadow: shift the entire shadow along the shadow-light vector so the
         // shadow falls away from the unit in the light direction (vanilla
@@ -484,7 +486,7 @@ namespace
         float max_eps_needed = 0.0f;
         for (int i = 0; i < VOXEL_BOUNDS_MAX; ++i) {
             Vector3 v = final_mtx * mesh.Bounds[i];
-            const float screen_y_offset = -v.Y + kVoxelYBias;
+            const float screen_y_offset = -v.Y + kTacticalY;
             const float back_z_contribution = std::max(0.0f, -v.Z) * kVoxelZScale;
             const float eps_this_corner = std::max(0.0f, screen_y_offset) * kPixelToDepth + back_z_contribution;
             max_eps_needed = std::max(eps_this_corner, max_eps_needed);
@@ -995,9 +997,9 @@ void Composite_Replay(Surface&       dst_surface,
                                       : p.convert;
                 if (convert == nullptr) continue;
 
-                const Point2D real_point(
+                const Point2D real_point = Composite_Tactical_To_Scene_RT(
                     xyoff.X + (p.buffer_point.X - kCompositeOrigin.X),
-                    xyoff.Y + (p.buffer_point.Y - kCompositeOrigin.Y) + kCompositeYBias);
+                    xyoff.Y + (p.buffer_point.Y - kCompositeOrigin.Y));
 
                 const ShapeFlags_Type replay_flags =
                     p.flags & ~SHAPE_WIN_REL;
@@ -1124,9 +1126,9 @@ namespace
                                   : p.convert;
             if (convert == nullptr) break;
 
-            const Point2D scratch_local(
+            const Point2D scratch_local = Composite_Tactical_To_Scene_RT(
                 kUnitScratchOrigin.X + (p.buffer_point.X - kCompositeOrigin.X),
-                kUnitScratchOrigin.Y + (p.buffer_point.Y - kCompositeOrigin.Y) + kCompositeYBias);
+                kUnitScratchOrigin.Y + (p.buffer_point.Y - kCompositeOrigin.Y));
 
             /**
              *  Strip SHAPE_WIN_REL (it was a no-op at capture time; re-
