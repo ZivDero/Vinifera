@@ -62,16 +62,16 @@ public:
     bool _Clamp_To_Tactical_Rect(Point2D& pixel);
     HRESULT STDMETHODCALLTYPE _Save(IStream* stream, BOOL cleardirty);
     void _Draw_Screen_Text(char const* text);
-    void _Render_Objects_Near_Shroud(bool full_redraw, int xoffset, int yoffset, const Rect& bounds);
-    void _Render_Shroud_In_Area(const Rect& area1, const Rect& area2, const Rect& bounds, bool full_redraw);
-    void _Render_Cells_In_Area(const Rect& area1, const Rect& area2, bool full_redraw);
-    void _Render_Fog_In_Area(const Rect& area1, const Rect& area2, bool full_redraw);
-    void _Render_Overlays_In_Area(const Rect& area1, const Rect& area2, bool full_redraw);
-    void _Render_Terrain_Objects_In_Area(const Rect& area1, const Rect& area2, bool full_redraw);
-    void _Render_Cell_Shadows_In_Area_1(const Rect& area1, const Rect& area2, bool full_redraw);
-    void _Render_Buildings_In_Area(const Rect& area1, const Rect& area2, bool full_redraw);
+    void _Wipe_Depth(bool full_redraw, int xoffset, int yoffset, const Rect& bounds);
+    void _Render_Shroud(const Rect& area1, const Rect& area2, const Rect& bounds, bool full_redraw);
+    void _Render_Tiles(const Rect& area1, const Rect& area2, bool full_redraw);
+    void _Render_Fogged_Objects(const Rect& area1, const Rect& area2, bool full_redraw);
+    void _Render_Overlays(const Rect& area1, const Rect& area2, bool full_redraw);
+    void _Render_Terrain(const Rect& area1, const Rect& area2, bool full_redraw);
+    void _Render_Tile_Shadows(const Rect& area1, const Rect& area2, bool full_redraw);
+    void _Render_Buildings(const Rect& area1, const Rect& area2, bool full_redraw);
     void _Draw_Waypoints_Pre_Object_UI(bool draw_on_top);
-    void _Render_Objects_On_Layers(bool include_aircraft);
+    void _Draw_Objects(bool include_aircraft);
     void _Draw_Rubber_Band_UI_Overlay();
 
 public:
@@ -90,59 +90,59 @@ int TacticalExt::SelectedCount = 0;
 bool TacticalExt::FilterSelection = false;
 
 
-void TacticalExt::_Render_Objects_Near_Shroud(bool full_redraw, int xoffset, int yoffset, const Rect& bounds)
+void TacticalExt::_Wipe_Depth(bool full_redraw, int xoffset, int yoffset, const Rect& bounds)
 {
     //Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::ObjectsNearShroud);
-    //Render_Objects_Near_Shroud(full_redraw, xoffset, yoffset, bounds);
+    //Wipe_Depth(full_redraw, xoffset, yoffset, bounds);
 }
 
 
-void TacticalExt::_Render_Shroud_In_Area(const Rect& area1, const Rect& area2, const Rect& bounds, bool full_redraw)
+void TacticalExt::_Render_Shroud(const Rect& area1, const Rect& area2, const Rect& bounds, bool full_redraw)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::Shroud);
-    Render_Shroud_In_Area(area1, area2, bounds, full_redraw);
+    Render_Shroud(area1, area2, bounds, full_redraw);
 }
 
 
-void TacticalExt::_Render_Cells_In_Area(const Rect& area1, const Rect& area2, bool full_redraw)
+void TacticalExt::_Render_Tiles(const Rect& area1, const Rect& area2, bool full_redraw)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::TerrainCells);
-    Render_Cells_In_Area(area1, area2, full_redraw);
+    Render_Tiles(area1, area2, full_redraw);
 }
 
 
-void TacticalExt::_Render_Fog_In_Area(const Rect& area1, const Rect& area2, bool full_redraw)
+void TacticalExt::_Render_Fogged_Objects(const Rect& area1, const Rect& area2, bool full_redraw)
 {
-    Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::Fog);
-    Render_Fog_In_Area(area1, area2, full_redraw);
+    Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::FoggedObjects);
+    Render_Fogged_Objects(area1, area2, full_redraw);
 }
 
 
-void TacticalExt::_Render_Overlays_In_Area(const Rect& area1, const Rect& area2, bool full_redraw)
+void TacticalExt::_Render_Overlays(const Rect& area1, const Rect& area2, bool full_redraw)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::Overlays);
-    Render_Overlays_In_Area(area1, area2, full_redraw);
+    Render_Overlays(area1, area2, full_redraw);
 }
 
 
-void TacticalExt::_Render_Terrain_Objects_In_Area(const Rect& area1, const Rect& area2, bool full_redraw)
+void TacticalExt::_Render_Terrain(const Rect& area1, const Rect& area2, bool full_redraw)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::TerrainObjects);
-    Render_Terrain_Objects_In_Area(area1, area2, full_redraw);
+    Render_Terrain(area1, area2, full_redraw);
 }
 
 
-void TacticalExt::_Render_Cell_Shadows_In_Area_1(const Rect& area1, const Rect& area2, bool full_redraw)
+void TacticalExt::_Render_Tile_Shadows(const Rect& area1, const Rect& area2, bool full_redraw)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::CellShadows);
-    Render_Cell_Shadows_In_Area_1(area1, area2, full_redraw);
+    Render_Tile_Shadows(area1, area2, full_redraw);
 }
 
 
-void TacticalExt::_Render_Buildings_In_Area(const Rect& area1, const Rect& area2, bool full_redraw)
+void TacticalExt::_Render_Buildings(const Rect& area1, const Rect& area2, bool full_redraw)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::Buildings);
-    Render_Buildings_In_Area(area1, area2, full_redraw);
+    Render_Buildings(area1, area2, full_redraw);
 }
 
 
@@ -153,10 +153,10 @@ void TacticalExt::_Draw_Waypoints_Pre_Object_UI(bool draw_on_top)
 }
 
 
-void TacticalExt::_Render_Objects_On_Layers(bool include_aircraft)
+void TacticalExt::_Draw_Objects(bool include_aircraft)
 {
     Vinifera::Gfx::Set_Current_Render_Pass(Vinifera::Gfx::RenderPass::ObjectLayer);
-    Render_Objects_On_Layers(include_aircraft);
+    Draw_Objects(include_aircraft);
 }
 
 
@@ -1089,16 +1089,16 @@ void TacticalExtension_Hooks()
     Patch_Jump(0x00610D61, _TacticalClass_SubRender7_Patch);
     Patch_Jump(0x00610FB1, _TacticalClass_SubRender8_Patch);
 
-    Patch_Call(0x00611908, &TacticalExt::_Render_Objects_Near_Shroud);
-    Patch_Call(0x00611922, &TacticalExt::_Render_Shroud_In_Area);
-    Patch_Call(0x00611934, &TacticalExt::_Render_Cells_In_Area);
-    Patch_Call(0x00611946, &TacticalExt::_Render_Fog_In_Area);
-    Patch_Call(0x00611958, &TacticalExt::_Render_Overlays_In_Area);
-    Patch_Call(0x0061196A, &TacticalExt::_Render_Terrain_Objects_In_Area);
-    Patch_Call(0x0061197C, &TacticalExt::_Render_Cell_Shadows_In_Area_1);
-    Patch_Call(0x0061198E, &TacticalExt::_Render_Buildings_In_Area);
+    Patch_Call(0x00611908, &TacticalExt::_Wipe_Depth);
+    Patch_Call(0x00611922, &TacticalExt::_Render_Shroud);
+    Patch_Call(0x00611934, &TacticalExt::_Render_Tiles);
+    Patch_Call(0x00611946, &TacticalExt::_Render_Fogged_Objects);
+    Patch_Call(0x00611958, &TacticalExt::_Render_Overlays);
+    Patch_Call(0x0061196A, &TacticalExt::_Render_Terrain);
+    Patch_Call(0x0061197C, &TacticalExt::_Render_Tile_Shadows);
+    Patch_Call(0x0061198E, &TacticalExt::_Render_Buildings);
     Patch_Call(0x00611ACA, &TacticalExt::_Draw_Waypoints_Pre_Object_UI);
-    Patch_Call(0x00611AEF, &TacticalExt::_Render_Objects_On_Layers);
+    Patch_Call(0x00611AEF, &TacticalExt::_Draw_Objects);
     Patch_Call(0x00611AF4, &SpotLight_Draw_All_Post_Effects);
     Patch_Call(0x00611B4A, &TacticalExt::_Draw_Rubber_Band_UI_Overlay);
 }

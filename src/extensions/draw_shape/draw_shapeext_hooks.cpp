@@ -36,6 +36,7 @@
 #include "sprite_queue.h"
 #include "surface.h"
 #include "tibsun_globals.h"
+#include "unit_composite.h"
 #include "vinifera_globals.h"
 
 
@@ -111,6 +112,29 @@ void Draw_Shape_Proxy_DX11(
     int z_shapenum,
     Point2D z_off)
 {
+    /**
+     *  Turreted-unit composite mode capture. Vanilla swaps LogicalSurface
+     *  to the 160x160 EightBitSurface scratch and draws every section
+     *  (body / turret / barrel — SHP or voxel) at (80, 80)-relative coords;
+     *  the final composite reaches the screen via UnitClass::Unit_Blit_Voxel.
+     *
+     *  Vanilla CPU-rasterizing into that scratch would be wasted work
+     *  (Unit_Blit_Voxel is hooked to a no-op for GpuSurface destinations
+     *  and the composite is replayed through the GPU pipeline instead),
+     *  so we defer the call into the shared pending queue and bail. The
+     *  queue is drained from `_Unit_Blit_Voxel` in voxel_blit_hooks.cpp,
+     *  which translates each captured buffer point to its real screen
+     *  position and re-invokes this proxy with the real tactical surface
+     *  — at which point `&surface == EightBitSurface` is false and we
+     *  take the normal GPU path below. No recursion.
+     */
+    if (&surface == EightBitSurface) {
+        Composite_Push_Shape(&convert, shapefile, shapenum, point, flags,
+                             height_offset, zgrad, intensity,
+                             z_shapefile, z_shapenum, z_off);
+        return;
+    }
+
     /**
      *  Fall-through cases that always run vanilla CPU code:
      *    - Target surface isn't a `GpuSurface` — `SDLSurface` destinations

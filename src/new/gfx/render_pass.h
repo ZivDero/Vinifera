@@ -19,7 +19,7 @@ namespace Vinifera::Gfx
         ObjectsNearShroud = 0,
         Shroud,
         TerrainCells,
-        Fog,
+        FoggedObjects,
         Overlays,
         TerrainObjects,
         CellShadows,

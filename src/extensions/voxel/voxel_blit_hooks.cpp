@@ -29,26 +29,33 @@
 
 #include "voxel_blit_hooks.h"
 
+#include "building.h"
+#include "buildingtype.h"
 #include "bullet.h"
 #include "bullettype.h"
 #include "colorscheme.h"
 #include "convert.h"
 #include "debughandler.h"
 #include "drawshape.h"
+#include "foot.h"
 #include "graphics_device.h"
 #include "gpu_surface.h"
 #include "gpu_surface_target.h"
 #include "hooker.h"
 #include "house.h"
+#include "map.h"
 #include "matrix3d.h"
 #include "motionlib.h"
 #include "objecttype.h"
 #include "render_pass.h"
 #include "shp_cache.h"
 #include "sprite_batch.h"
+#include "tactical.h"
 #include "techno.h"
 #include "tibsun_globals.h"
 #include "unit.h"
+#include "unit_composite.h"
+#include "unittype.h"
 #include "voxel.hh"
 #include "voxel_asset.h"
 #include "voxel_effect.h"
@@ -58,6 +65,29 @@
 #include "voxelinit.h"
 #include "voxellib.h"
 #include "voxelobj.h"
+
+
+/**
+ *  Forward declaration for re-entering the SHP path at replay time. Defined
+ *  in draw_shape/draw_shapeext_hooks.cpp. We don't include its header here
+ *  because that header (draw_shapeext_hooks.h) only exposes the install
+ *  function; the proxy entry point is plain extern "C++" linkage.
+ */
+void Draw_Shape_Proxy_DX11(
+    Surface& surface,
+    ConvertClass& convert,
+    const ShapeSet* shapefile,
+    int shapenum,
+    const Point2D& point,
+    const Rect& window,
+    ShapeFlags_Type flags,
+    const char* remap,
+    int height_offset,
+    ZGradientType zgrad,
+    int intensity,
+    const ShapeSet* z_shapefile,
+    int z_shapenum,
+    Point2D z_off);
 
 #include <algorithm>
 #include <cmath>
@@ -80,17 +110,20 @@ using Vinifera::Gfx::VoxelSectionMesh;
 namespace
 {
     /**
-     *  Capture buffer for turreted-unit composite mode. Vanilla's
-     *  `Unit_Draw_Voxel` swaps `LogicalSurface` to a 160x160 `EightBitSurface`
-     *  and calls `Draw_Voxel(...)` with `drawpoint=(80,80)+offset` for each
-     *  section (body / turret / barrel). After all sections are drawn,
-     *  `Unit_Blit_Voxel` blits the composited scratch to the real tactical
-     *  surface at the unit's actual screen position `xdrawpoint`.
+     *  Capture buffer for turreted-unit composite mode. Vanilla swaps
+     *  `LogicalSurface` to a 160x160 `EightBitSurface` and draws every
+     *  section (body / turret / barrel — SHP or voxel) at (80,80)-relative
+     *  coords; `Unit_Blit_Voxel` then composes the scratch onto the real
+     *  tactical surface at the unit's actual screen position `xdrawpoint`.
      *
      *  When we detect we're being called in this composite mode, we capture
-     *  the section's args instead of submitting immediately. `Unit_Blit_Voxel`
-     *  then replays the captured queue with the screen drawpoint adjusted by
-     *  `xdrawpoint + (captured.drawpoint - (80, 80))`.
+     *  each section's args into ONE shared FIFO instead of submitting. The
+     *  single queue preserves the interleave between SHP and voxel calls
+     *  within a single Titan-style unit (vanilla `unit.cpp:2838-2852` mixes
+     *  body shape, optional voxel barrel, turret shape, optional voxel
+     *  barrel-above-turret) — parallel queues would lose that layering.
+     *  `_Unit_Blit_Voxel` drains the queue in order and replays each entry
+     *  at `xyoff + (buffer_dp - (80, 80))`.
      */
     struct PendingVoxelDraw
     {
@@ -104,8 +137,43 @@ namespace
         int                color_scheme;
         int                z_adjust;
     };
-    static std::vector<PendingVoxelDraw> g_pending_voxels;
+
+    struct PendingShapeDraw
+    {
+        ConvertClass*   convert;
+        const ShapeSet* shapefile;
+        int             shapenum;
+        Point2D         buffer_point;
+        ShapeFlags_Type flags;
+        int             height_offset;
+        ZGradientType   zgrad;
+        int             intensity;
+        const ShapeSet* z_shapefile;
+        int             z_shapenum;
+        Point2D         z_off;
+    };
+
+    enum class CompositeKind { Voxel, Shape };
+
+    struct PendingComposite
+    {
+        CompositeKind    kind;
+        PendingVoxelDraw voxel;
+        PendingShapeDraw shape;
+    };
+
+    static std::vector<PendingComposite> g_pending_composite;
     static const Point2D kCompositeOrigin(80, 80);
+
+    /**
+     *  Vanilla's `Unit_Blit_Voxel` composes the 160x160 scratch onto the real
+     *  surface with a ~16 px Y shift baked in (origin not fully traced; the
+     *  same constant the voxel transform already adds via `kVoxelYBias` for
+     *  non-composite voxels). Voxels in composite mode pick it up automa-
+     *  tically through `Build_Section_Params`; SHP replays need it added
+     *  explicitly to land in the same place.
+     */
+    static constexpr int kCompositeYBias = 16;
 
 
     /**
@@ -282,10 +350,17 @@ namespace
         // pipeline or rendering hook we haven't found. Constant means it's
         // probably tied to a static value (LEVEL_PIXEL_H, half tile height,
         // etc.) rather than per-section bounds.
-        constexpr float kVoxelYBias = 17.0f;
+        constexpr float kVoxelYBias = 16.0f;
         out.T0[0] = (float)point.X + c0.X;
         out.T0[1] = (float)point.Y + c0.Y + kVoxelYBias;
-        out.T0[2] = c0.Z - center.Z;
+        // T0.z = ABSOLUTE projected iso_z of BBL (no centroid subtraction).
+        // This makes voxel_z in the shader an absolute iso_z value shared
+        // across all sections of the unit, so a turret sitting on top of
+        // the body gets larger voxel_z than the body's voxels and sorts in
+        // front. With per-section centroid relative voxel_z, both sections'
+        // voxel_z ranges were centered on zero and inter-section ordering
+        // was arbitrary.
+        out.T0[2] = c0.Z;
         // T0.w = unit drawpoint Y in screen pixels. Shader uses this as the
         // depth baseline so every voxel of a section shares one base depth,
         // anchored to the unit's drawpoint rather than its individual screen
@@ -366,19 +441,22 @@ namespace
         //   - shadow path: 0.5, used as the shadow's output alpha.
         //
         // Misc.w = bitflags (VEF_SHADOW = 1).
+        // kObjEps must satisfy depth < terrain_at_pixel for every voxel of
+        // the section. The constraint at each corner is:
+        //   kObjEps > screen_y_offset / 16000 + max(0, -voxel_z) * kVZS
+        // (the second term accounts for back voxels whose negative absolute
+        // iso_z adds to depth via the -voxel_z*kVZS term in the shader).
+        // Take the max over all 8 corners.
         const float kVoxelZScale = 1.0e-5f;
-        float max_y_below_drawpoint = 0.0f;
-        float max_abs_voxel_z       = 0.0f;
+        float max_eps_needed = 0.0f;
         for (int i = 0; i < VOXEL_BOUNDS_MAX; ++i) {
             Vector3 v = final_mtx * mesh.Bounds[i];
-            const float screen_y_offset = -v.Y + kVoxelYBias;   // post Y-flip; +ve = below drawpoint
-            if (screen_y_offset > max_y_below_drawpoint) max_y_below_drawpoint = screen_y_offset;
-            const float dz = std::fabs(v.Z - center.Z);
-            if (dz > max_abs_voxel_z) max_abs_voxel_z = dz;
+            const float screen_y_offset = -v.Y + kVoxelYBias;
+            const float back_z_contribution = std::max(0.0f, -v.Z) * kVoxelZScale;
+            const float eps_this_corner = std::max(0.0f, screen_y_offset) * kPixelToDepth + back_z_contribution;
+            if (eps_this_corner > max_eps_needed) max_eps_needed = eps_this_corner;
         }
-        const float kObjectEps_section = max_y_below_drawpoint * kPixelToDepth
-                                       + max_abs_voxel_z * kVoxelZScale
-                                       + 1.0e-4f;
+        const float kObjectEps_section = max_eps_needed + 1.0e-4f;
 
         out.Misc[0] = is_shadow ? 0.0f : (float)z_adjust;
         out.Misc[1] = kPixelToDepth;
@@ -547,6 +625,161 @@ namespace
 
 
 /**
+ *  Composite queue API. Implementations live outside the anonymous namespace
+ *  so they can satisfy the external-linkage declarations in
+ *  `unit_composite.h`, but they freely reference the anon-namespace storage
+ *  (`g_pending_composite`, `kCompositeOrigin`) and the file-local helpers
+ *  (`Submit_Voxel_Object`).
+ */
+void Composite_Push_Voxel(VoxelObject const& voxeldata,
+                          unsigned int       frame,
+                          const Matrix3D&    matrix,
+                          const Point2D&     buffer_drawpoint,
+                          const Rect&        cliprect,
+                          int                brightness,
+                          float              alpha,
+                          int                color_scheme,
+                          int                z_adjust)
+{
+    PendingComposite rec;
+    rec.kind = CompositeKind::Voxel;
+    rec.voxel.voxeldata        = &voxeldata;
+    rec.voxel.matrix           = matrix;
+    rec.voxel.buffer_drawpoint = buffer_drawpoint;
+    rec.voxel.cliprect         = cliprect;
+    rec.voxel.frame            = frame;
+    rec.voxel.brightness       = brightness;
+    rec.voxel.alpha            = alpha;
+    rec.voxel.color_scheme     = color_scheme;
+    rec.voxel.z_adjust         = z_adjust;
+    g_pending_composite.push_back(rec);
+}
+
+
+void Composite_Push_Shape(ConvertClass*       convert,
+                          const ShapeSet*     shapefile,
+                          int                 shapenum,
+                          const Point2D&      buffer_point,
+                          ShapeFlags_Type     flags,
+                          int                 height_offset,
+                          ZGradientType       zgrad,
+                          int                 intensity,
+                          const ShapeSet*     z_shapefile,
+                          int                 z_shapenum,
+                          const Point2D&      z_off)
+{
+    PendingComposite rec;
+    rec.kind = CompositeKind::Shape;
+    rec.shape.convert       = convert;
+    rec.shape.shapefile     = shapefile;
+    rec.shape.shapenum      = shapenum;
+    rec.shape.buffer_point  = buffer_point;
+    rec.shape.flags         = flags;
+    rec.shape.height_offset = height_offset;
+    rec.shape.zgrad         = zgrad;
+    rec.shape.intensity     = intensity;
+    rec.shape.z_shapefile   = z_shapefile;
+    rec.shape.z_shapenum    = z_shapenum;
+    rec.shape.z_off         = z_off;
+    g_pending_composite.push_back(rec);
+}
+
+
+bool Composite_Is_Empty()
+{
+    return g_pending_composite.empty();
+}
+
+
+void Composite_Replay(Surface&       dst_surface,
+                      Point2D        xyoff,
+                      const Rect&    rect,
+                      ConvertClass*  shape_convert_override)
+{
+    if (g_pending_composite.empty()) {
+        return;
+    }
+
+    /**
+     *  Non-GpuSurface destination (cameos, hidden buffers): we'd need to
+     *  fall back to vanilla CPU compositing — out of scope. Just drop the
+     *  captures to avoid them leaking into the next composite.
+     */
+    GpuSurface* gpu_dest = dynamic_cast<GpuSurface*>(&dst_surface);
+    if (gpu_dest == nullptr) {
+        g_pending_composite.clear();
+        return;
+    }
+
+    for (const PendingComposite& rec : g_pending_composite) {
+        switch (rec.kind) {
+        case CompositeKind::Voxel: {
+            const PendingVoxelDraw& p = rec.voxel;
+            if (p.voxeldata == nullptr) break;
+
+            const Point2D real_point(xyoff.X + (p.buffer_drawpoint.X - kCompositeOrigin.X),
+                                     xyoff.Y + (p.buffer_drawpoint.Y - kCompositeOrigin.Y));
+
+            ColorScheme* scheme = ColorSchemes[p.color_scheme];
+            if (scheme == nullptr || scheme->Converter == nullptr) break;
+
+            Submit_Voxel_Object(*p.voxeldata, p.frame, p.matrix, real_point, rect,
+                                *scheme->Converter, p.brightness, p.alpha, p.z_adjust);
+            break;
+        }
+        case CompositeKind::Shape: {
+            const PendingShapeDraw& p = rec.shape;
+            if (p.shapefile == nullptr) break;
+
+            /**
+             *  Vanilla draws body/turret SHPs into EightBitSurface using
+             *  `EightBitDrawer` (8-bit passthrough) and applies house
+             *  colors later during composite. We need house colors at
+             *  draw time, so override with the unit's converter passed
+             *  through by `_Unit_Blit_Voxel`. Fall back to the captured
+             *  converter only if the override is missing.
+             */
+            ConvertClass* convert = shape_convert_override != nullptr
+                                  ? shape_convert_override
+                                  : p.convert;
+            if (convert == nullptr) break;
+
+            /**
+             *  Add `kCompositeYBias` so the shape lands at the same
+             *  vertical offset vanilla's composite blit produces (and
+             *  where the unit's voxel sections render via the matching
+             *  `kVoxelYBias` in Build_Section_Params).
+             */
+            const Point2D real_point(xyoff.X + (p.buffer_point.X - kCompositeOrigin.X),
+                                     xyoff.Y + (p.buffer_point.Y - kCompositeOrigin.Y) + kCompositeYBias);
+
+            /**
+             *  SHAPE_WIN_REL was a no-op at capture time (the proxy's
+             *  `window` arg was the 160x160 scratch rect with X=Y=0). At
+             *  replay the window is the real tactical clip with non-zero
+             *  X,Y — re-applying WIN_REL would double-shift, so strip it.
+             *  SHAPE_CENTER is preserved: it's a logical-size offset, not
+             *  a window translation, and the captured buffer_point is the
+             *  unit's centroid which `real_point` translates correctly.
+             */
+            const ShapeFlags_Type replay_flags =
+                ShapeFlags_Type(p.flags & ~SHAPE_WIN_REL);
+
+            Draw_Shape_Proxy_DX11(dst_surface, *convert, p.shapefile, p.shapenum,
+                                  real_point, rect, replay_flags,
+                                  /*remap*/ nullptr,
+                                  p.height_offset, p.zgrad, p.intensity,
+                                  p.z_shapefile, p.z_shapenum, p.z_off);
+            break;
+        }
+        }
+    }
+
+    g_pending_composite.clear();
+}
+
+
+/**
  *  Replacement classes — Patch_Jump targets. ABI-compatible with vanilla
  *  member functions (thiscall, matching args).
  */
@@ -605,6 +838,60 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
     }
 
     /**
+     *  Bridge z-fudge for `IsTooBigToFitUnderBridge` units (Mammoth-class).
+     *  Mirrors vanilla unit.cpp:2431-2440: when such a unit is either
+     *  passing under a low bridge (`Is_Z_Fudge_Bridge && Get_Z_Fudge_Column == 0`)
+     *  or docking into a Weapons Factory door, vanilla swaps the voxel
+     *  render for a 32×32 placeholder sprite. We can't easily reproduce
+     *  that placeholder on the GPU sprite path, so we skip the voxel
+     *  render entirely — invisible-under-bridge is closer to correct
+     *  than full-voxel-poking-through.
+     */
+    if (RTTI == RTTI_UNIT) {
+        FootClass* foot = (FootClass*)const_cast<TechnoClassExt*>(this);
+        const UnitTypeClass* utype = ((UnitClass const*)this)->Class;
+        if (utype != nullptr && utype->IsTooBigToFitUnderBridge) {
+            bool fudge = false;
+            if (foot->Is_Z_Fudge_Bridge() && foot->Get_Z_Fudge_Column() == 0) {
+                fudge = true;
+            } else if (foot->NavCom != nullptr) {
+                TechnoClass* contact = foot->Contact_With_Whom();
+                if (contact != nullptr
+                    && contact->What_Am_I() == RTTI_BUILDING
+                    && ((BuildingClass*)contact)->Class->IsWeaponsFactory) {
+                    fudge = true;
+                }
+            }
+            if (fudge) {
+                return;
+            }
+        }
+    }
+
+    /**
+     *  Sinking offset for ice-cracker units. Vanilla sets `IsSinking = true`
+     *  when a heavy unit cracks ice, then `Calculate_Sinking_Offset` lazily
+     *  populates `SinkingYOffset`. The render path then intersects the
+     *  cliprect with a screen-Y ceiling so the bottom rows of the voxel
+     *  get clipped — the unit appears to sink.
+     *
+     *  Vanilla's `region.Bounds.Height` arg to Calculate_Sinking_Offset is
+     *  the CPU-rasterized voxel bbox height; we approximate with a 32 px
+     *  constant. The facing fudge inside the function (-8 to -12 px) is on
+     *  the same scale, so the visual error is small.
+     */
+    Rect effective_rect = rect;
+    if (IsSinking) {
+        if (SinkingYOffset == 0) {
+            const_cast<TechnoClassExt*>(this)->Calculate_Sinking_Offset(32, point.Y);
+        }
+        if (SinkingYOffset > 0) {
+            const Rect sink_clip(0, 0, TacticalRect.Width, SinkingYOffset - TacticalRect.Y);
+            effective_rect = Intersect(rect, sink_clip);
+        }
+    }
+
+    /**
      *  Detect turreted-unit composite mode. Vanilla swaps `LogicalSurface`
      *  to the 160x160 `EightBitSurface` scratch before calling Draw_Voxel
      *  for each section, then `Unit_Blit_Voxel` blits the composite to the
@@ -613,24 +900,16 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
      *  real xdrawpoint.
      */
     if (LogicalSurface == EightBitSurface) {
-        PendingVoxelDraw p;
-        p.voxeldata        = &voxeldata;
-        p.matrix           = matrix;
-        p.buffer_drawpoint = point;
-        p.cliprect         = rect;
-        p.frame            = frame;
-        p.brightness       = final_brightness;
-        p.alpha            = visual_alpha;
-        p.color_scheme     = House->Scheme;
-        p.z_adjust         = const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment();
-        g_pending_voxels.push_back(p);
+        Composite_Push_Voxel(voxeldata, frame, matrix, point, effective_rect,
+                             final_brightness, visual_alpha, House->Scheme,
+                             const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment());
         return;
     }
 
     const int z_adjust = const_cast<TechnoClassExt*>(this)->Get_Z_Adjustment();
 
     ConvertClass& converter = *ColorSchemes[House->Scheme]->Converter;
-    Submit_Voxel_Object(voxeldata, frame, matrix, point, rect, converter,
+    Submit_Voxel_Object(voxeldata, frame, matrix, point, effective_rect, converter,
                        final_brightness, visual_alpha, z_adjust);
 }
 
@@ -677,29 +956,39 @@ void VoxelAnimClassExt::_Draw_It(Point2D& point, Rect& cliprect) const
     if (Class->Voxel.VoxelLibrary->Load_Failed()) return;
 
     /**
-     *  We skip vanilla's fog/under-bridge position adjustments; the
-     *  `point` arg already comes from those calculations upstream.
-     *  Color scheme selection: prefer owner's scheme; fall back to a
-     *  neutral (scheme 0) palette for ownerless / Tiberium voxels.
+     *  Mirror vanilla's vanim.cpp:182-193 owner/Tiberium/ownerless branching:
+     *    - House != NULL  → house scheme converter, cell brightness.
+     *    - IsTiberium     → TiberiumDrawer, cell brightness.
+     *    - Otherwise      → VoxelDrawer (we substitute neutral scheme 0),
+     *                       brightness pinned to 1000 (vanilla quirk for
+     *                       ownerless debris).
      */
-    ColorScheme* scheme = (House != nullptr) ? ColorSchemes[House->Scheme] : ColorSchemes[0];
-    if (scheme == nullptr || scheme->Converter == nullptr) return;
-    ConvertClass& converter = *scheme->Converter;
+    ConvertClass* converter_ptr = nullptr;
+    int brightness = ((MapClass&)Map)[Position].Brightness;
+    if (House != nullptr) {
+        ColorScheme* scheme = ColorSchemes[House->Scheme];
+        if (scheme != nullptr) converter_ptr = scheme->Converter;
+    } else if (Class->IsTiberium) {
+        converter_ptr = TiberiumDrawer;
+    } else {
+        ColorScheme* scheme = ColorSchemes[0];
+        if (scheme != nullptr) converter_ptr = scheme->Converter;
+        brightness = 1000;
+    }
+    if (converter_ptr == nullptr) return;
+    ConvertClass& converter = *converter_ptr;
 
     const int layer = Class->VoxelIndex;
-    const int brightness = (House != nullptr) ? 1000 : 1000;   // TODO: cell brightness
 
     /**
      *  Shadow first, then object — mirrors vanilla's draw order so the
      *  shadow lands under the body.
      *
-     *  TODO: vanilla pulls `BounceClass::Get_Matrix()` for the per-frame
-     *  rotation/bounce; that accessor isn't in TSpp. For now use identity,
-     *  so VoxelAnim renders at the screen point but without the bounce
-     *  rotation. Visual regression on tumbling debris until we wire it up.
+     *  Vanilla's `vanim.cpp:161,170` pulls `BounceClass::Get_Matrix()` for
+     *  the per-frame rotation/bounce. TSpp now exposes that accessor; use
+     *  it so tumbling debris carries the right orientation.
      */
-    Matrix3D anim_matrix;
-    anim_matrix.Make_Identity();
+    const Matrix3D anim_matrix = Bouncer.Get_Matrix();
     Submit_Voxel_Shadow(Class->Voxel, layer, anim_matrix, point, cliprect, converter);
     Submit_Voxel_Object(Class->Voxel, 0u, anim_matrix, point, cliprect,
                        converter, brightness, /*alpha*/ Class->IsTranslucent ? 0.5f : 1.0f,
@@ -710,41 +999,20 @@ void VoxelAnimClassExt::_Draw_It(Point2D& point, Rect& cliprect) const
 void UnitClassExt::_Unit_Blit_Voxel(Surface& surface, Point2D xyoff, Rect rect, int /*alpha*/) const
 {
     /**
-     *  Replay captured per-section draws with the unit's actual screen
-     *  position. Each captured `buffer_drawpoint` is in the 160x160
-     *  EightBitSurface's coord space (centered at (80, 80)); the real
-     *  screen position for the section is `xyoff + (buffer_dp - (80,80))`.
+     *  Drain the unified composite queue. The shape replay needs the unit's
+     *  house-aware converter — vanilla draws body/turret with EightBitDrawer
+     *  during composite and only applies house colors at blit time. Resolve
+     *  from `House->Scheme` so each SHP record lands with the correct unit
+     *  remap.
      */
-    GpuSurface* gpu_dest = dynamic_cast<GpuSurface*>(&surface);
-    if (gpu_dest == nullptr) {
-        // Non-GpuSurface destination — would need to fall back to vanilla
-        // CPU compositing, but that's out of scope (cameos etc.). Just
-        // drop the captures.
-        g_pending_voxels.clear();
-        return;
+    ConvertClass* unit_convert = nullptr;
+    if (House != nullptr) {
+        ColorScheme* scheme = ColorSchemes[House->Scheme];
+        if (scheme != nullptr) {
+            unit_convert = scheme->Converter;
+        }
     }
-
-    if (g_pending_voxels.empty()) {
-        return;
-    }
-
-    for (const PendingVoxelDraw& p : g_pending_voxels) {
-        if (p.voxeldata == nullptr) continue;
-
-        Point2D real_point(xyoff.X + (p.buffer_drawpoint.X - kCompositeOrigin.X),
-                           xyoff.Y + (p.buffer_drawpoint.Y - kCompositeOrigin.Y));
-
-        // Clip rect in the captured composite mode is the 160x160 scratch
-        // rect; the real clip is the unit's tactical cliprect — but at the
-        // capture site we don't have that. Pass the supplied `rect` here
-        // (the unit's true clip from Unit_Blit_Voxel's args).
-        ColorScheme* scheme = ColorSchemes[p.color_scheme];
-        if (scheme == nullptr || scheme->Converter == nullptr) continue;
-
-        Submit_Voxel_Object(*p.voxeldata, p.frame, p.matrix, real_point, rect,
-                           *scheme->Converter, p.brightness, p.alpha, p.z_adjust);
-    }
-    g_pending_voxels.clear();
+    Composite_Replay(surface, xyoff, rect, unit_convert);
 }
 
 
