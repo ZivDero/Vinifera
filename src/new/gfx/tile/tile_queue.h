@@ -43,14 +43,24 @@ namespace Vinifera::Gfx
         float        DstZBottom;
         RenderPass   Pass;
         /**
-         *  Per-cell lighting, sampled by the tile shader:
-         *    Tint[0] = cell.RedTint    / 1000.0   (0..2, 1.0 = neutral)
-         *    Tint[1] = cell.GreenTint  / 1000.0
-         *    Tint[2] = cell.BlueTint   / 1000.0
-         *    Tint[3] = cell.TileBrightness / 1000.0  (treated by shader as
-         *              cell_color * 1000 for the AlphaLightingRemap formula)
+         *  Per-cell lighting at the diamond's centre + four cardinal
+         *  corners, each RGBA:
+         *    [0] = RedTint   / 1000.0   (1.0 = neutral, 2.0 = max overbright)
+         *    [1] = GreenTint / 1000.0
+         *    [2] = BlueTint  / 1000.0
+         *    [3] = TileBrightness / 1000.0
+         *
+         *  When the [AudioVisual] SmoothLighting rule is on, the four
+         *  corner values are the average of own + the corresponding
+         *  cardinal neighbour cell. When off, all five are the cell's
+         *  own value and `TileQueue::Flush_Pass` emits a uniform quad.
+         *  For DrawExtra commands all five are always the own value.
          */
-        float        Tint[4];
+        float        TintC[4];
+        float        TintN[4];
+        float        TintE[4];
+        float        TintS[4];
+        float        TintW[4];
         bool         DrawExtra;       // false = base diamond; true = extra rect (cliff/wall body)
         GpuRenderTarget OutputTarget = GpuRenderTarget::Scene;
     };

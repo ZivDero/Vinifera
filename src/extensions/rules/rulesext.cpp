@@ -66,6 +66,7 @@ RulesClassExtension::RulesClassExtension(const RulesClass* this_ptr) :
     IsMPPrePlacedConYards(false),
     IsBuildOffAlly(true),
     IsShowSuperWeaponTimers(true),
+    IsSmoothLighting(true),
     IceStrength(0),
     WeedPipIndex(1),
     MaxFreeRefineryDistanceBias(16),
@@ -261,6 +262,7 @@ void RulesClassExtension::Object_CRC(CRCEngine &crc) const
     crc(IsMPPrePlacedConYards);
     crc(IsBuildOffAlly);
     crc(IsShowSuperWeaponTimers);
+    crc(IsSmoothLighting);
     crc(IceStrength);
     crc(MaxFreeRefineryDistanceBias);
     crc(IsRecheckPrerequisites);
@@ -753,6 +755,7 @@ bool RulesClassExtension::AudioVisual(CCINIClass &ini)
     }
 
     IsShowSuperWeaponTimers = ini.Get_Bool(AUDIOVISUAL, "ShowSuperWeaponTimers", IsShowSuperWeaponTimers);
+    IsSmoothLighting = ini.Get_Bool(AUDIOVISUAL, "SmoothLighting", IsSmoothLighting);
     WeedPipIndex = ini.Get_Int(AUDIOVISUAL, "WeedPipIndex", WeedPipIndex);
     MaxPips = ini.Get_IntList(AUDIOVISUAL, "MaxPips", MaxPips);
 

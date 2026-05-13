@@ -131,6 +131,30 @@ namespace Vinifera::Gfx
                   uint32_t layer, uint32_t flags);
 
         /**
+         *  Draw a 9-vertex / 8-triangle grid filling `dst` for terrain
+         *  tile cells. Vertices: rect corners, edge midpoints, centre.
+         *  Per-vertex tints land at:
+         *    centre              → tint_c (cell's own lighting)
+         *    top/right/bottom/left edge midpoints (= iso-diamond N/E/S/W
+         *                          corners)             → tint_n / e / s / w
+         *    rect corners        → tint_c (outside the iso-diamond shape;
+         *                          alpha-discarded by the tile shader on a
+         *                          standard tile)
+         *  Used by terrain-tile rendering to produce a smooth lighting
+         *  gradient that matches neighbouring cells at the diamond edges.
+         *  The full-rect coverage matches the alpha-discard path used by
+         *  the quad emitter, so boundary pixels are not lost to the
+         *  rasterizer's top-left fill rule.
+         */
+        void Draw_Tile_Cell(Texture2D* texture, const RectF& dst, const RectF* src,
+                            const float tint_c[4], const float tint_n[4],
+                            const float tint_e[4], const float tint_s[4],
+                            const float tint_w[4],
+                            float z_top, float z_bottom,
+                            const RectF* z_uv, const RectF* clip,
+                            uint32_t layer, uint32_t flags);
+
+        /**
          *  Convenience: draw at (x, y) with the texture's natural size.
          */
         void Draw(Texture2D* texture, float x, float y, uint32_t color = 0xFFFFFFFFu, float z = 0.0f);
@@ -145,10 +169,10 @@ namespace Vinifera::Gfx
 
         bool Create_Default_Effect(GraphicsDevice& device);
         void Flush_Group(GraphicsDevice& device, Texture2D* texture, const D3D11_RECT& scissor,
-                         int vertex_offset, int quad_count);
+                         int index_offset, int index_count);
 
         DynamicVertexBuffer<SpriteVertex> VertexBuffer;
-        ID3D11Buffer*                     IndexBuffer = nullptr;     // static, max_quads * 6 indices
+        DynamicIndexBuffer                IndexBuffer;
         Effect                            DefaultEffect;
         Effect*                           ActiveEffect = nullptr;
         EBlend                            ActiveBlend = EBlend::Premultiplied;
@@ -158,12 +182,20 @@ namespace Vinifera::Gfx
         int                               TargetHeight = 0;
         int                               MaxQuads = 0;
 
+        enum class PendingMode : uint8_t { Quad, TileCell };
+
         struct PendingSprite
         {
-            Texture2D* Tex;
-            SpriteVertex V[4];
-            RectF Clip;
-            bool UseClip;
+            Texture2D*   Tex;
+            /**
+             *  Quad uses V[0..3] (TL, TR, BR, BL).
+             *  TileCell uses V[0..8] in row-major order: TL, TM, TR / ML,
+             *  CC, MR / BL, BM, BR — a 3x3 grid filling the full rect.
+             */
+            SpriteVertex V[9];
+            RectF        Clip;
+            PendingMode  Mode;
+            bool         UseClip;
         };
         std::vector<PendingSprite> Pending;
         bool BatchOpen = false;

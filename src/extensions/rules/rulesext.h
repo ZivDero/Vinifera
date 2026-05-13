@@ -80,6 +80,13 @@ public:
     bool IsShowSuperWeaponTimers;
 
     /**
+     *  Should terrain lighting interpolate smoothly between cell
+     *  centres rather than stepping per-cell? Off = vanilla flat
+     *  per-cell shading.
+     */
+    bool IsSmoothLighting;
+
+    /**
      *  Defines the strength of ice. Higher values make ice less likely
      *  to break from a shot.
      */

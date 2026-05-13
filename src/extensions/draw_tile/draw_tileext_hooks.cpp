@@ -24,17 +24,20 @@
 
 #include "cell.h"
 #include "debughandler.h"
+#include "extension_globals.h"
 #include "graphics_device.h"
 #include "hooker.h"
 #include "mouse.h"
 #include "iso_tile_asset.h"
 #include "isotiletype.h"
 #include "render_pass.h"
+#include "rulesext.h"
 #include "shp_cache.h"
 #include "smudgetype.h"
 #include "surface.h"
 #include "syringe.h"
 #include "tibsun_globals.h"
+#include "tibsun_inline.h"
 #include "tile_queue.h"
 #include "vinifera_globals.h"
 
@@ -95,10 +98,83 @@ static IsometricTileTypeClass* Resolve_Tile_Variation(IsometricTileTypeClass* is
 
 
 /**
- *  Submit a tile cell's terrain icon to the GPU queue. Reads tint/brightness
- *  directly off `cell` (matching what vanilla's `Init_Drawer` writes back into
- *  CellClass), packs them into the 4-float vertex color attribute, and lets
- *  the tile shader unfold the AlphaLightingRemap math at pixel time.
+ *  Pack a cell's lighting tuple into RGBA: tint colours / 1000 (so 1.0 is
+ *  neutral) plus `TileBrightness` / 1000 in the alpha lane.
+ */
+static void Pack_Cell_Tint(const CellClass* cell, float out[4])
+{
+    out[0] = (float)cell->RedTint        / 1000.0f;
+    out[1] = (float)cell->GreenTint      / 1000.0f;
+    out[2] = (float)cell->BlueTint       / 1000.0f;
+    out[3] = (float)cell->TileBrightness / 1000.0f;
+}
+
+
+/**
+ *  Read a neighbour cell's tint in screen-N/E/S/W direction (the cells
+ *  whose diamonds share an edge with `cell`). Falls back to `own` if the
+ *  neighbour is off the playable map.
+ *
+ *  In TS iso, the cells visually adjacent to `cell` on screen are *not*
+ *  the cardinal TS-FACING neighbours — the iso projection rotates the
+ *  cell grid 45° relative to the screen. Mapping:
+ *    screen-NE = FACING_N, screen-SE = FACING_E,
+ *    screen-SW = FACING_S, screen-NW = FACING_W,
+ *    screen-N  = FACING_NW, screen-E  = FACING_NE,
+ *    screen-S  = FACING_SE, screen-W  = FACING_SW.
+ */
+static void Sample_Neighbour(const CellClass* cell, FacingType face,
+                             const float own[4], float out[4])
+{
+    const Cell neighbour_pos = Adjacent_Cell(cell->CellID, face);
+    if (Map.In_Radar(neighbour_pos)) {
+        Pack_Cell_Tint(&Map[neighbour_pos], out);
+    } else {
+        out[0] = own[0]; out[1] = own[1]; out[2] = own[2]; out[3] = own[3];
+    }
+}
+
+
+/**
+ *  Compute the tint at a diamond-corner vertex by averaging the four
+ *  cells that meet at that screen point: `cell`, the two cardinal
+ *  neighbours whose diamond edges end at the corner, and the diagonal
+ *  neighbour whose opposite-side diamond corner sits there.
+ *
+ *  Mapping per diamond corner:
+ *    iso-diamond N corner (rect top middle):    cell + FACING_N  + FACING_W  + FACING_NW
+ *    iso-diamond E corner (rect right middle):  cell + FACING_N  + FACING_E  + FACING_NE
+ *    iso-diamond S corner (rect bottom middle): cell + FACING_E  + FACING_S  + FACING_SE
+ *    iso-diamond W corner (rect left middle):   cell + FACING_S  + FACING_W  + FACING_SW
+ *
+ *  Because all four cells that share a diamond corner compute the same
+ *  four-cell average, the per-cell tints agree at the corner and
+ *  linearly interpolated values agree along the entire shared edge —
+ *  no visible cell-grid seam.
+ */
+static void Corner_Tint(const CellClass* cell,
+                        FacingType card_a, FacingType card_b, FacingType diag,
+                        const float own[4], float out[4])
+{
+    float a[4], b[4], d[4];
+    Sample_Neighbour(cell, card_a, own, a);
+    Sample_Neighbour(cell, card_b, own, b);
+    Sample_Neighbour(cell, diag,   own, d);
+    out[0] = (own[0] + a[0] + b[0] + d[0]) * 0.25f;
+    out[1] = (own[1] + a[1] + b[1] + d[1]) * 0.25f;
+    out[2] = (own[2] + a[2] + b[2] + d[2]) * 0.25f;
+    out[3] = (own[3] + a[3] + b[3] + d[3]) * 0.25f;
+}
+
+
+/**
+ *  Submit a tile cell's terrain icon to the GPU queue. Packs the cell's
+ *  lighting (RedTint / GreenTint / BlueTint / TileBrightness) into the
+ *  diamond-centre vertex and the four cardinal-neighbour-averaged values
+ *  into the diamond corners; the tile shader interpolates linearly across
+ *  the fan. When `[AudioVisual] SmoothLighting` is off all five are set
+ *  to the cell's own value and `TileQueue::Flush_Pass` falls back to a
+ *  uniform quad.
  */
 static void Submit_Tile_GPU(const CellClass* cell, IsometricTileTypeClass* ittype,
                             int subtile, int x_off, int y_off,
@@ -141,16 +217,10 @@ static void Submit_Tile_GPU(const CellClass* cell, IsometricTileTypeClass* ittyp
         return;
     }
 
-    /**
-     *  Per-cell lighting. RedTint / GreenTint / BlueTint / TileBrightness are
-     *  vanilla's 0..2000-range values (1000 = neutral); the shader divides
-     *  `cell_color = v.col.a * 1000` to recover TileBrightness for the
-     *  AlphaLightingRemap formula.
-     */
-    const float tint_r      = (float)cell->RedTint        / 1000.0f;
-    const float tint_g      = (float)cell->GreenTint      / 1000.0f;
-    const float tint_b      = (float)cell->BlueTint       / 1000.0f;
-    const float brightness  = (float)cell->TileBrightness / 1000.0f;
+    float own_tint[4];
+    Pack_Cell_Tint(cell, own_tint);
+
+    const bool smooth_lighting = (RuleExtension != nullptr) && RuleExtension->IsSmoothLighting;
 
     const float dz = Tile_Base_Depth_From_Visual_Y(y_off, cell_level, st->H);
 
@@ -168,10 +238,18 @@ static void Submit_Tile_GPU(const CellClass* cell, IsometricTileTypeClass* ittyp
     cmd.DstZTop      = dz;
     cmd.DstZBottom   = dz;
     cmd.Pass         = Current_Render_Pass();
-    cmd.Tint[0]      = tint_r;
-    cmd.Tint[1]      = tint_g;
-    cmd.Tint[2]      = tint_b;
-    cmd.Tint[3]      = brightness;
+    memcpy(cmd.TintC, own_tint, sizeof(own_tint));
+    if (smooth_lighting) {
+        Corner_Tint(cell, FACING_N, FACING_W, FACING_NW, own_tint, cmd.TintN);
+        Corner_Tint(cell, FACING_N, FACING_E, FACING_NE, own_tint, cmd.TintE);
+        Corner_Tint(cell, FACING_E, FACING_S, FACING_SE, own_tint, cmd.TintS);
+        Corner_Tint(cell, FACING_S, FACING_W, FACING_SW, own_tint, cmd.TintW);
+    } else {
+        memcpy(cmd.TintN, own_tint, sizeof(own_tint));
+        memcpy(cmd.TintE, own_tint, sizeof(own_tint));
+        memcpy(cmd.TintS, own_tint, sizeof(own_tint));
+        memcpy(cmd.TintW, own_tint, sizeof(own_tint));
+    }
     cmd.DrawExtra    = false;
 
     TileQueue::Get().Submit(cmd);

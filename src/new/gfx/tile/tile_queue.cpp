@@ -16,6 +16,8 @@
 #include "iso_tile_atlas.h"
 #include "palette_lut.h"
 #include "perf_monitor.h"
+#include "extension_globals.h"
+#include "rulesext.h"
 #include "shp_cache.h"
 #include "tibsun_globals.h"
 
@@ -173,6 +175,15 @@ namespace Vinifera::Gfx
              */
             TileEffectInstance.Bind_Tint_Mask(device);
 
+            /**
+             *  Per-pass sample of `[AudioVisual] SmoothLighting`. When on
+             *  and the command is a base-diamond draw, emit a 5-vertex
+             *  fan with per-corner tints so terrain lighting interpolates
+             *  smoothly between cell centres. Otherwise (DrawExtra or
+             *  rule off) fall back to the existing flat quad.
+             */
+            const bool smooth_lighting = (RuleExtension != nullptr) && RuleExtension->IsSmoothLighting;
+
             for (size_t k = bucket_start; k < bucket_end; ++k) {
                 const TileDrawCmd& c = pass_commands[k];
                 const IsoTileSubTileInfo* st = c.Asset->Get_Sub_Tile(c.SubTileIndex);
@@ -188,8 +199,16 @@ namespace Vinifera::Gfx
                     src = { (float)st->AtlasX, (float)st->AtlasY,
                             (float)st->W,       (float)st->H };
                 }
-                Batch.Draw(&shared_atlas, c.Dst, &src, c.Tint, c.DstZTop, c.DstZBottom, nullptr,
-                           c.Clip.Is_Valid() ? &c.Clip : nullptr);
+
+                const RectF* clip = c.Clip.Is_Valid() ? &c.Clip : nullptr;
+                if (!c.DrawExtra && smooth_lighting) {
+                    Batch.Draw_Tile_Cell(&shared_atlas, c.Dst, &src,
+                                         c.TintC, c.TintN, c.TintE, c.TintS, c.TintW,
+                                         c.DstZTop, c.DstZBottom, nullptr, clip,
+                                         /*layer*/ 0, /*flags*/ 0);
+                } else {
+                    Batch.Draw(&shared_atlas, c.Dst, &src, c.TintC, c.DstZTop, c.DstZBottom, nullptr, clip);
+                }
             }
 
             Batch.End(device);
