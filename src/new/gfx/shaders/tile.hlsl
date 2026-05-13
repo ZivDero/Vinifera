@@ -31,20 +31,23 @@ Texture2D<float>  TintMaskT : register(t4);
 struct PSOut { float4 color : SV_Target; float depth : SV_Depth; };
 
 /**
- *  Vanilla lighting model — replicated in float per pixel.
- *
- *  Per pixel, vanilla does:
- *    row = AlphaLightingRemap[cell_color_q][alpha_byte] >> 8
- *    out = drawer.Translator[row * 256 + idx]
- *
- *  Where drawer.Translator row N is built by `Apply_Tint`:
- *    if TintMask[idx]: rgb = palette[idx].rgb * tint_rgb * (2N/62)
- *    else:             rgb = palette[idx].rgb * clamp(N/max_level, 0, 1)
- *  with max_level ≈ 8 (= 30*63/200 - 1).
+ *  Smooth float lighting. Vanilla's CPU rasterizer bucketed the result
+ *  into a discrete row of `AlphaLightingRemap` (8 levels untinted, 62
+ *  tinted) which produced visible banding on lit alphas and per-cell
+ *  brightness gradients. We do the same math in continuous float instead.
  *
  *  Inputs from the vertex stream:
- *    v.col.rgb = cell.RedTint/GreenTint/BlueTint   (already / 1000)
- *    v.col.a   = cell.TileBrightness               (already / 1000)
+ *    v.col.rgb = cell.RedTint / GreenTint / BlueTint (already / 1000)
+ *    v.col.a   = cell.TileBrightness                 (already / 1000;
+ *                1.0 = neutral, 2.0 = max overbright)
+ *
+ *  AlphaTex is R8_UNORM seeded to 127/255 each frame; AlphaShape writes
+ *  lighter / darker bytes around lights and shroud. 127 = neutral pass.
+ *
+ *  Tint mask: `TintMaskT` mirrors vanilla `_default_mask` — palette
+ *  indices flagged false skip the colored tint multiply (used to keep
+ *  e.g. unit-shadow indices monochromatic). Stock TS marks everything
+ *  true, so on a vanilla build this collapses to `base * tint * scale`.
  */
 PSOut PSMain(VSOut v)
 {
@@ -52,24 +55,15 @@ PSOut PSMain(VSOut v)
     uint idx = Atlas.Load(int3(px, 0));
     if (idx == 0) discard;
 
-    float3 base    = Palette.Load(int3((int)idx, 0, 0)).rgb;
-    float  is_tint = TintMaskT.Load(int3((int)idx, 0, 0));
+    float3 base       = Palette.Load(int3((int)idx, 0, 0)).rgb;
+    float  is_tint    = TintMaskT.Load(int3((int)idx, 0, 0));
     float3 tint_rgb   = v.col.rgb;
-    float  cell_color = v.col.a * 1000.0;
+    float  brightness = v.col.a;
+    float  alpha_scl  = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0 / 127.0;
 
-    /* AlphaLightingRemap quantisation. */
-    float cc_q = clamp(floor((261.0 * cell_color) / 2048.0), 0.0, 254.0);
-    float alpha_b = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0;
-    const float kLevels = 62.0;
-    float row = clamp(floor((alpha_b * cc_q * kLevels) / 32258.0), 0.0, kLevels);
+    float3 light = lerp(brightness.xxx, tint_rgb * brightness, is_tint) * alpha_scl;
+    float3 lit   = base * light;
 
-    /* Tinted path: linear 0..2.0 across the 62 levels. */
-    float tint_intensity = row / 31.0;
-    /* Untinted path: ramp 0..1 across the first ~8 levels, then plateau. */
-    const float kMaxLevel = 8.0;
-    float intensity = saturate(row / kMaxLevel);
-
-    float3 lit = base * lerp(intensity.xxx, tint_rgb * tint_intensity, is_tint);
     PSOut o;
     o.color = float4(saturate(lit), 1.0);
     uint z = ZAtlas.Load(int3(px, 0));
