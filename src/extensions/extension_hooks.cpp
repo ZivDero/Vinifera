@@ -66,6 +66,7 @@
 #include "objecttypeext_hooks.h"
 #include "optionsext_hooks.h"
 #include "overlayext_hooks.h"
+#include "ownerdrawext_hooks.h"
 #include "overlaytypeext_hooks.h"
 #include "particleext_hooks.h"
 #include "particlesysext_hooks.h"
@@ -300,6 +301,7 @@ void Extension_Hooks()
     PrerequisiteGroup_Hooks();
     Beacon_Hooks();
     Radar_Hooks();
+    OwnerDraw_Hooks();
 
     Audio_Hooks();
 }

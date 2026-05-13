@@ -64,7 +64,7 @@ namespace Vinifera::Gfx
         int  Get_Logical_Height() const { return LogicalHeight; }
 
         bool Set_Surface_Format(int width, int height);
-        bool Upload_Surface(const void* pixels, int pitch_bytes);
+        bool Upload_Surface(const void* pixels, int pitch_bytes, int width, int height);
         bool Ensure_Sidebar_Target_Size(int width, int height);
 
         /**
@@ -86,6 +86,14 @@ namespace Vinifera::Gfx
          */
         bool Upload_Sidebar_Movie_Surface(const void* pixels, int pitch_bytes, int width, int height);
         void Draw_Sidebar_Movie(const Rect& dst_rect);
+
+        /**
+         *  OwnerDraw overlay (window-res dialog content). Uploaded into
+         *  a dedicated texture and drawn 1:1 onto the backbuffer after
+         *  the upscaled VisibleSurface so dialogs stay sharp.
+         */
+        bool Upload_OwnerDraw_Surface(const void* pixels, int pitch_bytes, int width, int height);
+        void Draw_OwnerDraw_Overlay(const Rect& dst_rect);
 
         void Begin_Frame();
         void Draw_Texture(ID3D11ShaderResourceView* srv, const Rect& dst_rect, SDL_ScaleMode scale_mode, EBlend blend = EBlend::Opaque);
@@ -152,6 +160,7 @@ namespace Vinifera::Gfx
         void Release_Surface_Texture();
         void Release_Radar_Texture();
         void Release_Movie_Texture();
+        void Release_OwnerDraw_Texture();
 
         HWND                     WindowHandle = nullptr;
 
@@ -203,6 +212,11 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView*MovieSRV = nullptr;
         int                      MovieTexWidth = 0;
         int                      MovieTexHeight = 0;
+
+        ID3D11Texture2D*         OwnerDrawTex = nullptr;
+        ID3D11ShaderResourceView*OwnerDrawSRV = nullptr;
+        int                      OwnerDrawTexWidth = 0;
+        int                      OwnerDrawTexHeight = 0;
 
         StateCache               StateCacheInstance;
     };

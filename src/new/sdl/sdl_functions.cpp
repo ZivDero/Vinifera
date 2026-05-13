@@ -39,6 +39,7 @@
 #include "mouse.h"
 #include "movie.h"
 #include "optionsext.h"
+#include "ownerdrawext_hooks.h"
 #include "radar.h"
 #include "playmovie.h"
 #include "primitive_queue.h"
@@ -261,23 +262,15 @@ namespace
         VisibleRect = visible_rect;
 
         /**
-         *  `VideoWidth/Height` advertise the backbuffer (display) resolution
-         *  now that the CPU surfaces all live at backbuffer dims. Vanilla
-         *  drawing code that sizes against `VideoWidth/Height` (dialogs,
-         *  full-screen clears, mouse-cursor positioning) now matches the
-         *  surface it's drawing into. The GPU scene retains its own logical
-         *  resolution via `Set_Logical_Resolution` and is decoupled from
-         *  this.
+         *  `VideoWidth/Height` advertise the logical resolution — vanilla
+         *  CPU drawing code (movies, menus, score, loading) renders into
+         *  logical-res CPU surfaces (HiddenSurface / AlternateSurface) and
+         *  the GPU upscales them to the backbuffer at present time.
+         *  Window-pixel paths (OwnerDraw, WinAPI dialogs) read backbuffer
+         *  dims directly off the device.
          */
-        if (Vinifera::Gfx::Device != nullptr
-            && Vinifera::Gfx::Device->Get_Backbuffer_Width() > 0
-            && Vinifera::Gfx::Device->Get_Backbuffer_Height() > 0) {
-            VideoWidth  = Vinifera::Gfx::Device->Get_Backbuffer_Width();
-            VideoHeight = Vinifera::Gfx::Device->Get_Backbuffer_Height();
-        } else {
-            VideoWidth  = visible_rect.Width;
-            VideoHeight = visible_rect.Height;
-        }
+        VideoWidth  = visible_rect.Width;
+        VideoHeight = visible_rect.Height;
 
         VisibleSurface = SDLSurface::Create_Primary();
 
@@ -314,19 +307,23 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
     Vinifera::Gfx::SurfaceTargetRegistry::Get().Clear();
 
     /**
-     *  HiddenSurface / AlternateSurface are presented as fullscreen quads to
-     *  the backbuffer; they no longer back the tactical scene (the GPU
-     *  pipeline writes directly to SceneRT at logical res). Allocate them at
-     *  the backbuffer's display resolution so WinAPI dialogs, menus, movies,
-     *  and the score / escape overlays render at the display's true pixel
-     *  size with a 1:1 present (no nearest-upscale blockiness).
+     *  HiddenSurface / AlternateSurface live at *logical* res. Vanilla CPU
+     *  drawing (movies, menus, score, loading screens) renders into them
+     *  at that size; the GPU upscales the result to the backbuffer at
+     *  present time.
+     *
+     *  OwnerDrawAlternate is the parallel surface at window (backbuffer)
+     *  res, used as the OwnerDraw scratch for dialog widgets (vanilla's
+     *  AlternateSurface refs inside ownrdraw.cpp / dialog code are
+     *  Patch_Dword'd to point here — see ownerdrawext_hooks.cpp).
      */
-    Rect cpu_surface_rect = hidden_rect;
+    const Rect cpu_surface_rect = hidden_rect;
+    Rect window_surface_rect = cpu_surface_rect;
     if (Vinifera::Gfx::Device != nullptr) {
         const int bb_w = Vinifera::Gfx::Device->Get_Backbuffer_Width();
         const int bb_h = Vinifera::Gfx::Device->Get_Backbuffer_Height();
         if (bb_w > 0 && bb_h > 0) {
-            cpu_surface_rect = Rect(0, 0, bb_w, bb_h);
+            window_surface_rect = Rect(0, 0, bb_w, bb_h);
         }
     }
 
@@ -334,6 +331,18 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
         DEBUG_INFO("Deleting AlternateSurface\n");
         delete AlternateSurface;
         AlternateSurface = nullptr;
+    }
+
+    if (OwnerDrawAlternate != nullptr) {
+        DEBUG_INFO("Deleting OwnerDrawAlternate\n");
+        delete OwnerDrawAlternate;
+        OwnerDrawAlternate = nullptr;
+    }
+
+    if (OwnerDrawVisible != nullptr) {
+        DEBUG_INFO("Deleting OwnerDrawVisible\n");
+        delete OwnerDrawVisible;
+        OwnerDrawVisible = nullptr;
     }
 
     if (HiddenSurface != nullptr) {
@@ -421,6 +430,16 @@ bool SDL_Allocate_Surfaces(const Rect& hidden_rect, const Rect& composite_rect, 
         DEBUG_INFO("AlternateSurface (%dx%d)\n", cpu_surface_rect.Width, cpu_surface_rect.Height);
     }
 
+    if (window_surface_rect.Is_Valid()) {
+        OwnerDrawAlternate = new SDLSurface(window_surface_rect.Width, window_surface_rect.Height);
+        OwnerDrawAlternate->Fill(0);
+        DEBUG_INFO("OwnerDrawAlternate (%dx%d)\n", window_surface_rect.Width, window_surface_rect.Height);
+
+        OwnerDrawVisible = new SDLSurface(window_surface_rect.Width, window_surface_rect.Height);
+        OwnerDrawVisible->Fill(0);
+        DEBUG_INFO("OwnerDrawVisible (%dx%d)\n", window_surface_rect.Width, window_surface_rect.Height);
+    }
+
     SDL_Register_Surface_Targets();
 
     return true;
@@ -469,16 +488,6 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     }
 
     /**
-     *  Allocate the streaming texture used to upload the CPU surface each
-     *  frame (menus, dialogs, score, escape, VQA). Sized to the backbuffer,
-     *  matching the CPU `SDLSurface`s, so present is a 1:1 copy.
-     */
-    if (!Vinifera::Gfx::Device->Set_Surface_Format(SDLWindowWidth, SDLWindowHeight)) {
-        DEBUG_ERROR("GraphicsDevice surface texture creation failed.\n");
-        return false;
-    }
-
-    /**
      *  Size the scene-side render targets (SceneRT, depth buffer, alpha buffer)
      *  to vanilla's logical render resolution. The present quad upscales
      *  SceneRT → Backbuffer on a borderless 4K display, so the heavy
@@ -490,12 +499,22 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
     }
 
     /**
-     *  Save video mode information. `VideoWidth/Height` advertise the
-     *  backbuffer (display) resolution to match the CPU `SDLSurface`s.
+     *  Save video mode information. `VideoWidth/Height` advertise vanilla's
+     *  logical game resolution — CPU surfaces (HiddenSurface, AlternateSurface,
+     *  VisibleSurface) are sized to it and the GPU upscales them to the
+     *  backbuffer at present time.
      */
-    VideoWidth = SDLWindowWidth;
-    VideoHeight = SDLWindowHeight;
+    VideoWidth = width;
+    VideoHeight = height;
     VideoBitsPerPixel = bits_per_pixel;
+
+    /**
+     *  OwnerDraw position math (dialog centering, window placement) reads
+     *  these instead of `VideoWidth/Height` via Patch_Dword redirects, so
+     *  dialogs stay positioned relative to the actual window.
+     */
+    OwnerDrawWidth  = SDLWindowWidth;
+    OwnerDrawHeight = SDLWindowHeight;
 
     if (!ViniferaImGui::Initialize(MainWindow, Vinifera::Gfx::Device->Get_Device(), Vinifera::Gfx::Device->Get_Context())) {
         DEBUG_ERROR("Vinifera ImGui could not be initialized.\n");
@@ -1159,16 +1178,18 @@ bool SDL_Update_Screen(Surface* surface)
     } else {
         /**
          *  CPU presentation path: VQA, main menu, map selection, score
-         *  screen, escape menu, generic dialogs. Vanilla has already
-         *  composed the final RGB565 pixels into the passed surface (its
-         *  `Update_Visible_Surface` blits source → VisibleSurface before
-         *  the present hook fires). We just upload it and present as a
-         *  fullscreen quad over the backbuffer.
+         *  screen, escape menu, generic dialogs. The source can be either
+         *  logical-res (HiddenSurface) or window-res (VisibleSurface);
+         *  `Upload_Surface` lazily resizes the upload texture to whichever
+         *  dims the caller passes, and `Draw_Surface` always targets the
+         *  full backbuffer so logical-res inputs get GPU-upscaled.
          */
         SDLSurface* sdl_surface = static_cast<SDLSurface*>(surface);
         void* pixels = sdl_surface->Lock();
         if (pixels != nullptr) {
-            Vinifera::Gfx::Device->Upload_Surface(pixels, sdl_surface->Stride());
+            Vinifera::Gfx::Device->Upload_Surface(
+                pixels, sdl_surface->Stride(),
+                sdl_surface->Get_Width(), sdl_surface->Get_Height());
             sdl_surface->Unlock();
         }
         Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
@@ -1176,6 +1197,33 @@ bool SDL_Update_Screen(Surface* surface)
             Vinifera::Gfx::Device->Get_Backbuffer_Width(),
             Vinifera::Gfx::Device->Get_Backbuffer_Height());
         Vinifera::Gfx::Device->Draw_Surface(cpu_dst, scale_mode);
+    }
+
+    /**
+     *  OwnerDraw overlay — `OwnerDrawVisible` is a window-res CPU surface
+     *  containing the dialog widgets (filled by the patched OwnerDraw
+     *  WindowProc callbacks). Upload + draw 1:1 over the backbuffer so
+     *  dialog content stays sharp regardless of the logical-res upscale
+     *  underneath. Gated on vanilla's `_dialog_count` global so the
+     *  surface's stale / uninitialised pixels don't blank the screen
+     *  outside of dialogs.
+     */
+    {
+        const int dialog_count = *reinterpret_cast<const int*>(0x007E492C);
+        if (dialog_count > 0 && OwnerDrawVisible != nullptr) {
+            void* od_pixels = OwnerDrawVisible->Lock();
+            if (od_pixels != nullptr) {
+                Vinifera::Gfx::Device->Upload_OwnerDraw_Surface(
+                    od_pixels, OwnerDrawVisible->Stride(),
+                    OwnerDrawVisible->Get_Width(), OwnerDrawVisible->Get_Height());
+                OwnerDrawVisible->Unlock();
+                Vinifera::Gfx::Device->Bind_Backbuffer_Color_Only();
+                Rect od_dst(0, 0,
+                    Vinifera::Gfx::Device->Get_Backbuffer_Width(),
+                    Vinifera::Gfx::Device->Get_Backbuffer_Height());
+                Vinifera::Gfx::Device->Draw_OwnerDraw_Overlay(od_dst);
+            }
+        }
     }
 
     /**

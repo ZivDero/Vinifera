@@ -112,6 +112,7 @@ namespace Vinifera::Gfx
 
     void GraphicsDevice::Shutdown()
     {
+        Release_OwnerDraw_Texture();
         Release_Movie_Texture();
         Release_Radar_Texture();
         Release_Surface_Texture();
@@ -140,6 +141,8 @@ namespace Vinifera::Gfx
         RadarTexHeight = 0;
         MovieTexWidth = 0;
         MovieTexHeight = 0;
+        OwnerDrawTexWidth = 0;
+        OwnerDrawTexHeight = 0;
         WindowHandle = nullptr;
     }
 
@@ -443,6 +446,15 @@ namespace Vinifera::Gfx
     }
 
 
+    void GraphicsDevice::Release_OwnerDraw_Texture()
+    {
+        Safe_Release(OwnerDrawSRV);
+        Safe_Release(OwnerDrawTex);
+        OwnerDrawTexWidth = 0;
+        OwnerDrawTexHeight = 0;
+    }
+
+
     bool GraphicsDevice::Resize_Backbuffer(int width, int height)
     {
         if (SwapChain == nullptr || width <= 0 || height <= 0) {
@@ -561,11 +573,23 @@ namespace Vinifera::Gfx
     }
 
 
-    bool GraphicsDevice::Upload_Surface(const void* pixels, int pitch_bytes)
+    bool GraphicsDevice::Upload_Surface(const void* pixels, int pitch_bytes, int width, int height)
     {
-        if (SurfaceTex == nullptr || pixels == nullptr) {
+        if (Device == nullptr || pixels == nullptr || width <= 0 || height <= 0) {
             return false;
         }
+
+        /**
+         *  Source surface dims vary frame-to-frame: HiddenSurface is at
+         *  logical res, VisibleSurface is at window res. Lazily resize
+         *  `SurfaceTex` to match whichever the caller passes.
+         */
+        if (SurfaceTex == nullptr || SurfaceWidth != width || SurfaceHeight != height) {
+            if (!Set_Surface_Format(width, height)) {
+                return false;
+            }
+        }
+
         D3D11_MAPPED_SUBRESOURCE mapped = {};
         if (FAILED(Context->Map(SurfaceTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
             return false;
@@ -703,6 +727,63 @@ namespace Vinifera::Gfx
         // source is the movie's native frame; the GPU scales between
         // them and linear filtering avoids blocky resampling.
         Draw_Texture(MovieSRV, dst_rect, SDL_SCALEMODE_LINEAR, EBlend::Opaque);
+    }
+
+
+    bool GraphicsDevice::Upload_OwnerDraw_Surface(const void* pixels, int pitch_bytes, int width, int height)
+    {
+        if (Device == nullptr || pixels == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+
+        if (OwnerDrawTex == nullptr || OwnerDrawTexWidth != width || OwnerDrawTexHeight != height) {
+            Release_OwnerDraw_Texture();
+            D3D11_TEXTURE2D_DESC td = {};
+            td.Width = width;
+            td.Height = height;
+            td.MipLevels = 1;
+            td.ArraySize = 1;
+            td.Format = DXGI_FORMAT_B5G6R5_UNORM;
+            td.SampleDesc.Count = 1;
+            td.Usage = D3D11_USAGE_DYNAMIC;
+            td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            if (FAILED(Device->CreateTexture2D(&td, nullptr, &OwnerDrawTex))) {
+                return false;
+            }
+            if (FAILED(Device->CreateShaderResourceView(OwnerDrawTex, nullptr, &OwnerDrawSRV))) {
+                Release_OwnerDraw_Texture();
+                return false;
+            }
+            OwnerDrawTexWidth = width;
+            OwnerDrawTexHeight = height;
+        }
+
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        if (FAILED(Context->Map(OwnerDrawTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+            return false;
+        }
+        const int row_bytes = width * 2;
+        const unsigned char* src = static_cast<const unsigned char*>(pixels);
+        unsigned char* dst = static_cast<unsigned char*>(mapped.pData);
+        if (mapped.RowPitch == (UINT)pitch_bytes && pitch_bytes == row_bytes) {
+            memcpy(dst, src, (size_t)pitch_bytes * height);
+        } else {
+            for (int y = 0; y < height; ++y) {
+                memcpy(dst + y * mapped.RowPitch, src + y * pitch_bytes, row_bytes);
+            }
+        }
+        Context->Unmap(OwnerDrawTex, 0);
+        return true;
+    }
+
+
+    void GraphicsDevice::Draw_OwnerDraw_Overlay(const Rect& dst_rect)
+    {
+        if (OwnerDrawSRV == nullptr || dst_rect.Width <= 0 || dst_rect.Height <= 0) {
+            return;
+        }
+        Draw_Texture(OwnerDrawSRV, dst_rect, SDL_SCALEMODE_NEAREST, EBlend::Opaque);
     }
 
 

@@ -13,6 +13,7 @@
 #include "hooker.h"
 #include "hooker_macros.h"
 #include "movie.h"
+#include "ownerdrawext_hooks.h"
 #include "sdl_functions.h"
 #include "syringe.h"
 #include "tibsun_globals.h"
@@ -186,8 +187,8 @@ int _ODMoveDialog(HWND window, int x, int y)
     RECT rect1;
     rect1.left = 0;
     rect1.top = 0;
-    rect1.right = VideoWidth;
-    rect1.bottom = VideoHeight;
+    rect1.right = OwnerDrawWidth;
+    rect1.bottom = OwnerDrawHeight;
 
     ClientToScreen(MainWindow, (LPPOINT)&rect1);
     ClientToScreen(MainWindow, (LPPOINT)&rect1.right);
@@ -228,8 +229,8 @@ void _Center_Window_Within_Window(HWND window, HWND parent)
     GetClientRect(parent, &rcl);
 
     if (parent == MainWindow) {
-        rcl.right = VideoWidth;
-        rcl.bottom = VideoHeight;
+        rcl.right = OwnerDrawWidth;
+        rcl.bottom = OwnerDrawHeight;
     }
 
     ClientToScreen(parent, (LPPOINT)&rcl);
