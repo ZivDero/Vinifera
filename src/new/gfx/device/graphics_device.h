@@ -77,6 +77,16 @@ namespace Vinifera::Gfx
         bool Upload_Radar_Surface(const void* pixels, int pitch_bytes, int width, int height);
         void Draw_Radar_To_Sidebar(const Rect& dst_rect);
 
+        /**
+         *  CPU→GPU bridge for sidebar (ingame) movies. Same pattern as the
+         *  radar pair. The render loop binds `SidebarRT` and passes the
+         *  VQHandle's `StretchRect` (movie native size at the radar
+         *  drawing origin — matches what vanilla `Movie_Queue_Ingame`
+         *  would have placed) as the destination.
+         */
+        bool Upload_Sidebar_Movie_Surface(const void* pixels, int pitch_bytes, int width, int height);
+        void Draw_Sidebar_Movie(const Rect& dst_rect);
+
         void Begin_Frame();
         void Draw_Texture(ID3D11ShaderResourceView* srv, const Rect& dst_rect, SDL_ScaleMode scale_mode, EBlend blend = EBlend::Opaque);
         void Draw_Surface(const Rect& dst_rect, SDL_ScaleMode scale_mode);
@@ -141,6 +151,7 @@ namespace Vinifera::Gfx
 
         void Release_Surface_Texture();
         void Release_Radar_Texture();
+        void Release_Movie_Texture();
 
         HWND                     WindowHandle = nullptr;
 
@@ -187,6 +198,11 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView*RadarSRV = nullptr;
         int                      RadarTexWidth = 0;
         int                      RadarTexHeight = 0;
+
+        ID3D11Texture2D*         MovieTex = nullptr;
+        ID3D11ShaderResourceView*MovieSRV = nullptr;
+        int                      MovieTexWidth = 0;
+        int                      MovieTexHeight = 0;
 
         StateCache               StateCacheInstance;
     };

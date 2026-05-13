@@ -37,6 +37,7 @@
 #include "shp_atlas.h"
 #include "debughandler.h"
 #include "mouse.h"
+#include "movie.h"
 #include "optionsext.h"
 #include "radar.h"
 #include "playmovie.h"
@@ -1094,17 +1095,25 @@ bool SDL_Update_Screen(Surface* surface)
                 Composite_Process_Deferred(*Vinifera::Gfx::Device);
             }
             /**
-             *  Composite the radar minimap onto `SidebarRT` between the
-             *  cameo (sprite) and view-box / border (primitive) flushes
-             *  so the layer order is `RadarAnim` frame → radar pixels →
-             *  rectangles. `RadarTex` is kept up-to-date by the
-             *  `Render_Radar` hook in `radarext_hooks.cpp`.
+             *  Composite the radar minimap (or ingame movie) onto
+             *  `SidebarRT` between the cameo (sprite) and view-box /
+             *  border (primitive) flushes so the layer order is
+             *  `RadarAnim` frame → radar/movie pixels → rectangles.
+             *  Both textures are kept current by hooks in
+             *  `radarext_hooks.cpp`; `RadarMode` is mutually exclusive
+             *  between `RMODE_TACTICAL` and `RMODE_MOVIE`.
              */
-            if (render_pass == Vinifera::Gfx::RenderPass::UiOverlay
-                && Map.RadarMode == RadarClass::RMODE_TACTICAL
-                && Map.RadarState == RadarClass::RSTATE_ACTIVE) {
-                Vinifera::Gfx::Device->Bind_Sidebar_Target();
-                Vinifera::Gfx::Device->Draw_Radar_To_Sidebar(Map.RadarRect);
+            if (render_pass == Vinifera::Gfx::RenderPass::UiOverlay) {
+                if (Map.RadarMode == RadarClass::RMODE_TACTICAL
+                    && Map.RadarState == RadarClass::RSTATE_ACTIVE) {
+                    Vinifera::Gfx::Device->Bind_Sidebar_Target();
+                    Vinifera::Gfx::Device->Draw_Radar_To_Sidebar(Map.RadarRect);
+                } else if (Map.RadarMode == RadarClass::RMODE_MOVIE
+                           && IngameVQ.Count() > 0
+                           && IngameVQ[0] != nullptr) {
+                    Vinifera::Gfx::Device->Bind_Sidebar_Target();
+                    Vinifera::Gfx::Device->Draw_Sidebar_Movie(IngameVQ[0]->StretchRect);
+                }
             }
             Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             /**

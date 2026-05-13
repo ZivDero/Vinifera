@@ -112,6 +112,7 @@ namespace Vinifera::Gfx
 
     void GraphicsDevice::Shutdown()
     {
+        Release_Movie_Texture();
         Release_Radar_Texture();
         Release_Surface_Texture();
         Release_Present_Pipeline();
@@ -137,6 +138,8 @@ namespace Vinifera::Gfx
         SurfaceHeight = 0;
         RadarTexWidth = 0;
         RadarTexHeight = 0;
+        MovieTexWidth = 0;
+        MovieTexHeight = 0;
         WindowHandle = nullptr;
     }
 
@@ -431,6 +434,15 @@ namespace Vinifera::Gfx
     }
 
 
+    void GraphicsDevice::Release_Movie_Texture()
+    {
+        Safe_Release(MovieSRV);
+        Safe_Release(MovieTex);
+        MovieTexWidth = 0;
+        MovieTexHeight = 0;
+    }
+
+
     bool GraphicsDevice::Resize_Backbuffer(int width, int height)
     {
         if (SwapChain == nullptr || width <= 0 || height <= 0) {
@@ -631,6 +643,66 @@ namespace Vinifera::Gfx
             return;
         }
         Draw_Texture(RadarSRV, dst_rect, SDL_SCALEMODE_NEAREST, EBlend::Opaque);
+    }
+
+
+    bool GraphicsDevice::Upload_Sidebar_Movie_Surface(const void* pixels, int pitch_bytes, int width, int height)
+    {
+        if (Device == nullptr || pixels == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+
+        if (MovieTex == nullptr || MovieTexWidth != width || MovieTexHeight != height) {
+            Release_Movie_Texture();
+            D3D11_TEXTURE2D_DESC td = {};
+            td.Width = width;
+            td.Height = height;
+            td.MipLevels = 1;
+            td.ArraySize = 1;
+            td.Format = DXGI_FORMAT_B5G6R5_UNORM;
+            td.SampleDesc.Count = 1;
+            td.Usage = D3D11_USAGE_DYNAMIC;
+            td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            if (FAILED(Device->CreateTexture2D(&td, nullptr, &MovieTex))) {
+                return false;
+            }
+            if (FAILED(Device->CreateShaderResourceView(MovieTex, nullptr, &MovieSRV))) {
+                Release_Movie_Texture();
+                return false;
+            }
+            MovieTexWidth = width;
+            MovieTexHeight = height;
+        }
+
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        if (FAILED(Context->Map(MovieTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+            return false;
+        }
+        const int row_bytes = width * 2;
+        const unsigned char* src = static_cast<const unsigned char*>(pixels);
+        unsigned char* dst = static_cast<unsigned char*>(mapped.pData);
+        if (mapped.RowPitch == (UINT)pitch_bytes && pitch_bytes == row_bytes) {
+            memcpy(dst, src, (size_t)pitch_bytes * height);
+        } else {
+            for (int y = 0; y < height; ++y) {
+                memcpy(dst + y * mapped.RowPitch, src + y * pitch_bytes, row_bytes);
+            }
+        }
+        Context->Unmap(MovieTex, 0);
+        return true;
+    }
+
+
+    void GraphicsDevice::Draw_Sidebar_Movie(const Rect& dst_rect)
+    {
+        if (MovieSRV == nullptr || dst_rect.Width <= 0 || dst_rect.Height <= 0) {
+            return;
+        }
+        // LINEAR — destination is the fixed 140×110 radar movie box,
+        // source is the movie's native frame; the GPU scales between
+        // them and linear filtering avoids blocky resampling.
+        Draw_Texture(MovieSRV, dst_rect, SDL_SCALEMODE_LINEAR, EBlend::Opaque);
     }
 
 
