@@ -65,8 +65,17 @@ namespace Vinifera::Gfx
 
         bool Set_Surface_Format(int width, int height);
         bool Upload_Surface(const void* pixels, int pitch_bytes);
-        bool Set_Sidebar_Surface_Format(int width, int height);
-        bool Upload_Sidebar_Surface(const void* pixels, int pitch_bytes);
+        bool Ensure_Sidebar_Target_Size(int width, int height);
+
+        /**
+         *  CPU→GPU bridge for the radar minimap. `Upload_Radar_Surface`
+         *  maps `RadarSurface`'s 565 pixels into `RadarTex`;
+         *  `Draw_Radar_To_Sidebar` composites that texture onto whichever
+         *  RT is currently bound (the sidebar render loop binds `SidebarRT`
+         *  before calling it).
+         */
+        bool Upload_Radar_Surface(const void* pixels, int pitch_bytes, int width, int height);
+        void Draw_Radar_To_Sidebar(const Rect& dst_rect);
 
         void Begin_Frame();
         void Draw_Texture(ID3D11ShaderResourceView* srv, const Rect& dst_rect, SDL_ScaleMode scale_mode, EBlend blend = EBlend::Opaque);
@@ -93,7 +102,6 @@ namespace Vinifera::Gfx
         ID3D11ShaderResourceView*  Get_Alpha_SRV() const { return AlphaSRV; }
         ID3D11UnorderedAccessView* Get_Alpha_UAV() const { return AlphaUAV; }
         ID3D11ShaderResourceView*  Get_Scene_SRV() const;
-        ID3D11ShaderResourceView*  Get_Sidebar_Upload_SRV() const { return SidebarSurfaceSRV; }
         ID3D11ShaderResourceView*  Get_Sidebar_Target_SRV() const;
         int                     Get_Backbuffer_Width() const { return BackbufferWidth; }
         int                     Get_Backbuffer_Height() const { return BackbufferHeight; }
@@ -132,7 +140,7 @@ namespace Vinifera::Gfx
         void Release_Present_Pipeline();
 
         void Release_Surface_Texture();
-        void Release_Sidebar_Surface_Texture();
+        void Release_Radar_Texture();
 
         HWND                     WindowHandle = nullptr;
 
@@ -175,10 +183,10 @@ namespace Vinifera::Gfx
         int                      SurfaceWidth = 0;
         int                      SurfaceHeight = 0;
 
-        ID3D11Texture2D*         SidebarSurfaceTex = nullptr;
-        ID3D11ShaderResourceView*SidebarSurfaceSRV = nullptr;
-        int                      SidebarSurfaceWidth = 0;
-        int                      SidebarSurfaceHeight = 0;
+        ID3D11Texture2D*         RadarTex = nullptr;
+        ID3D11ShaderResourceView*RadarSRV = nullptr;
+        int                      RadarTexWidth = 0;
+        int                      RadarTexHeight = 0;
 
         StateCache               StateCacheInstance;
     };

@@ -19,6 +19,8 @@ Texture2D<float4>            Palette       : register(t0);
 Texture2D<uint>              LightRemapTex : register(t1);
 StructuredBuffer<float3>     Normals       : register(t2);
 Texture2D<float4>            SceneCopy     : register(t3);
+Texture2D<float>             AlphaTex      : register(t4);
+static const uint VEF_NO_ALPHA_BUFFER = 0x02;
 
 struct VSIn  {
     uint4 pos       : POSITION;
@@ -80,6 +82,14 @@ PSOut PSMain(VSOut v)
     sample_px.x = clamp(sample_px.x, 0, scene_w - 1);
     sample_px.y = clamp(sample_px.y, 0, scene_h - 1);
     float4 bg = SceneCopy.Load(int3(sample_px, 0));
+
+    // Modulate the unit color BEFORE the predator blend so `bg` keeps
+    // its already-shrouded look. AlphaTex factor matches voxel.hlsl.
+    uint flags = (uint)Misc.w;
+    if (!(flags & VEF_NO_ALPHA_BUFFER)) {
+        float alpha_byte = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0;
+        rgba.rgb *= alpha_byte / 127.0;
+    }
 
     // lerp(voxel, scene, blend) — same math as the SHP distortion
     // path. Tint.a (visual-character translucency) is ignored: the

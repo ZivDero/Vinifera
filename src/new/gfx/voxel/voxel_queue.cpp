@@ -155,7 +155,17 @@ namespace Vinifera::Gfx
         pcb.Mtx[15] = 1.0f;
         EffectInstance.Set_Constants(device, &pcb);
 
-        EffectInstance.Set_Params(device, cmd.Params);
+        /**
+         *  AlphaTex is sized to the tactical scene; sidebar voxels live in
+         *  sidebar-space, so opt them out of the alpha-buffer sample.
+         */
+        VoxelEffectParams params = cmd.Params;
+        if (is_sidebar) {
+            uint32_t flags = (uint32_t)params.Misc[3];
+            flags |= VEF_NO_ALPHA_BUFFER;
+            params.Misc[3] = (float)flags;
+        }
+        EffectInstance.Set_Params(device, params);
 
         D3D11_VIEWPORT vp = {};
         vp.Width    = (float)target_w;
@@ -203,6 +213,10 @@ namespace Vinifera::Gfx
             EffectInstance.Bind_Palette(device, *cmd.Palette);
         }
         EffectInstance.Bind_Light_Remap(device, LightRemapInstance.Get_Texture());
+        // Unbind AlphaSRV on the sidebar path so the SRV doesn't stay
+        // bound across the SidebarRT switch (would also be sampled out of
+        // range — see params copy above).
+        EffectInstance.Bind_Alpha(device, is_sidebar ? nullptr : device.Get_Alpha_SRV());
 
         UINT stride = 8;       // sizeof(VoxelVertex)
         UINT offset = 0;
@@ -285,6 +299,7 @@ namespace Vinifera::Gfx
         }
         DistortionEffectInstance.Bind_Light_Remap(device, LightRemapInstance.Get_Texture());
         DistortionEffectInstance.Bind_Scene_Copy(device, SceneCopy::Get().Get_SRV());
+        DistortionEffectInstance.Bind_Alpha(device, device.Get_Alpha_SRV());
 
         UINT stride = 8;
         UINT offset = 0;

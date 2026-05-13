@@ -73,8 +73,9 @@ namespace Vinifera::Gfx
 
     enum VoxelEffectFlag : uint32_t
     {
-        VEF_NONE      = 0,
-        VEF_SHADOW    = 1u << 0,    // pixel shader emits dark-gray for ground shadow
+        VEF_NONE             = 0,
+        VEF_SHADOW           = 1u << 0,    // pixel shader emits dark-gray for ground shadow
+        VEF_NO_ALPHA_BUFFER  = 1u << 1,    // skip AlphaTex sample (sidebar voxels)
     };
 
 
@@ -104,6 +105,12 @@ namespace Vinifera::Gfx
          *  again if the device is rebuilt.
          */
         void Bind_Normals(GraphicsDevice& device);
+
+        /**
+         *  Bind the shroud / alpha-buffer SRV at t3. Pass `nullptr` to
+         *  unbind (paired with `VEF_NO_ALPHA_BUFFER` for sidebar voxels).
+         */
+        void Bind_Alpha(GraphicsDevice& device, ID3D11ShaderResourceView* alpha_srv);
 
         /**
          *  Exposes the normals SRV so VoxelDistortionEffect can bind the same
@@ -144,6 +151,12 @@ namespace Vinifera::Gfx
         void Bind_Light_Remap(GraphicsDevice& device, Texture2D& light_remap_tex);
         void Bind_Scene_Copy(GraphicsDevice& device, ID3D11ShaderResourceView* scene_copy_srv);
         void Bind_Normals(GraphicsDevice& device, ID3D11ShaderResourceView* normals_srv);
+
+        /**
+         *  Bind the shroud / alpha-buffer SRV at t4 — t3 is reserved for
+         *  `SceneCopy` on the distortion shader.
+         */
+        void Bind_Alpha(GraphicsDevice& device, ID3D11ShaderResourceView* alpha_srv);
 
         void Set_Params(GraphicsDevice& device, const VoxelEffectParams& params);
 

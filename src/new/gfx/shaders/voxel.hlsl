@@ -13,12 +13,15 @@ cbuffer EffectCB : register(b1)
     float4 Misc;         // x = z_adjust (pixels, object) or 0 (shadow);
                          // y = depth scale (1/16000);
                          // z = per-section kObjectEps (object) or shadow alpha;
-                         // w = flags (VEF_SHADOW = 1)
+                         // w = flags (VEF_SHADOW = 1, VEF_NO_ALPHA_BUFFER = 2)
 };
+static const uint VEF_SHADOW          = 0x01;
+static const uint VEF_NO_ALPHA_BUFFER = 0x02;
 
 Texture2D<float4>            Palette       : register(t0);
 Texture2D<uint>              LightRemapTex : register(t1);
 StructuredBuffer<float3>     Normals       : register(t2);
+Texture2D<float>             AlphaTex      : register(t3);
 
 struct VSIn  {
     uint4 pos       : POSITION;    // x, y, z, color_idx
@@ -86,7 +89,7 @@ struct PSOut {
 PSOut PSMain(VSOut v)
 {
     uint flags = (uint)Misc.w;
-    if (flags & 1u) {
+    if (flags & VEF_SHADOW) {
         // Shadow path: emit dark gray. Caller uses DestMultiplyHalf
         // blend so the scene RT darkens to ~50% under the shadow.
         // Depth from pixel-center Y (SV_Position.y in PS) so all
@@ -126,6 +129,15 @@ PSOut PSMain(VSOut v)
     // we don't multiply rgba.rgb by Tint here — Tint.a still
     // carries visual-character translucency (VISUAL_DARKEN etc.).
     float4 rgba = Palette.Load(int3((int)shaded_idx, 0, 0));
+
+    // AlphaTex holds the per-pixel "lighting byte" — 127 = neutral, 0 =
+    // full shroud, ~254 = overbright cap. Same factor sprites and tiles
+    // apply (see palette_sprite.hlsl).
+    if (!(flags & VEF_NO_ALPHA_BUFFER)) {
+        float alpha_byte = AlphaTex.Load(int3(int2(v.pos.xy), 0)) * 255.0;
+        rgba.rgb *= alpha_byte / 127.0;
+    }
+
     // Pre-multiply RGB by the final alpha. The queue binds an
     // EBlend::Premultiplied blend state which expects a pre-
     // multiplied source — without this the math collapses to

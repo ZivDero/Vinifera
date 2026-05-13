@@ -188,6 +188,14 @@ namespace Vinifera::Gfx
     }
 
 
+    void VoxelEffect::Bind_Alpha(GraphicsDevice& device, ID3D11ShaderResourceView* alpha_srv)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr) return;
+        ctx->PSSetShaderResources(3, 1, &alpha_srv);
+    }
+
+
     void VoxelEffect::Set_Params(GraphicsDevice& device, const VoxelEffectParams& params)
     {
         if (ParamsCB == nullptr) return;
@@ -271,6 +279,14 @@ namespace Vinifera::Gfx
         ID3D11DeviceContext* ctx = device.Get_Context();
         if (ctx == nullptr) return;
         ctx->PSSetShaderResources(3, 1, &scene_copy_srv);
+    }
+
+
+    void VoxelDistortionEffect::Bind_Alpha(GraphicsDevice& device, ID3D11ShaderResourceView* alpha_srv)
+    {
+        ID3D11DeviceContext* ctx = device.Get_Context();
+        if (ctx == nullptr) return;
+        ctx->PSSetShaderResources(4, 1, &alpha_srv);
     }
 
 

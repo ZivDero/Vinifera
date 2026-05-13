@@ -112,7 +112,7 @@ namespace Vinifera::Gfx
 
     void GraphicsDevice::Shutdown()
     {
-        Release_Sidebar_Surface_Texture();
+        Release_Radar_Texture();
         Release_Surface_Texture();
         Release_Present_Pipeline();
         StateCacheInstance.Shutdown();
@@ -135,8 +135,8 @@ namespace Vinifera::Gfx
         LogicalHeight = 0;
         SurfaceWidth = 0;
         SurfaceHeight = 0;
-        SidebarSurfaceWidth = 0;
-        SidebarSurfaceHeight = 0;
+        RadarTexWidth = 0;
+        RadarTexHeight = 0;
         WindowHandle = nullptr;
     }
 
@@ -422,12 +422,12 @@ namespace Vinifera::Gfx
     }
 
 
-    void GraphicsDevice::Release_Sidebar_Surface_Texture()
+    void GraphicsDevice::Release_Radar_Texture()
     {
-        Safe_Release(SidebarSurfaceSRV);
-        Safe_Release(SidebarSurfaceTex);
-        SidebarSurfaceWidth = 0;
-        SidebarSurfaceHeight = 0;
+        Safe_Release(RadarSRV);
+        Safe_Release(RadarTex);
+        RadarTexWidth = 0;
+        RadarTexHeight = 0;
     }
 
 
@@ -535,48 +535,17 @@ namespace Vinifera::Gfx
     }
 
 
-    bool GraphicsDevice::Set_Sidebar_Surface_Format(int width, int height)
+    bool GraphicsDevice::Ensure_Sidebar_Target_Size(int width, int height)
     {
         if (Device == nullptr || width <= 0 || height <= 0) {
             return false;
         }
-        if (SidebarSurfaceTex != nullptr
-            && SidebarSurfaceWidth == width
-            && SidebarSurfaceHeight == height
-            && SidebarTarget != nullptr
+        if (SidebarTarget != nullptr
             && SidebarTarget->Width() == width
             && SidebarTarget->Height() == height) {
             return true;
         }
-
-        Release_Sidebar_Surface_Texture();
-        if (!Create_Sidebar_Target(width, height)) {
-            return false;
-        }
-
-        D3D11_TEXTURE2D_DESC td = {};
-        td.Width = width;
-        td.Height = height;
-        td.MipLevels = 1;
-        td.ArraySize = 1;
-        td.Format = DXGI_FORMAT_B5G6R5_UNORM;
-        td.SampleDesc.Count = 1;
-        td.Usage = D3D11_USAGE_DYNAMIC;
-        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-        if (FAILED(Device->CreateTexture2D(&td, nullptr, &SidebarSurfaceTex))) {
-            Release_Sidebar_Target();
-            return false;
-        }
-        if (FAILED(Device->CreateShaderResourceView(SidebarSurfaceTex, nullptr, &SidebarSurfaceSRV))) {
-            Release_Sidebar_Surface_Texture();
-            Release_Sidebar_Target();
-            return false;
-        }
-        SidebarSurfaceWidth = width;
-        SidebarSurfaceHeight = height;
-        return true;
+        return Create_Sidebar_Target(width, height);
     }
 
 
@@ -604,27 +573,64 @@ namespace Vinifera::Gfx
     }
 
 
-    bool GraphicsDevice::Upload_Sidebar_Surface(const void* pixels, int pitch_bytes)
+    bool GraphicsDevice::Upload_Radar_Surface(const void* pixels, int pitch_bytes, int width, int height)
     {
-        if (SidebarSurfaceTex == nullptr || pixels == nullptr) {
+        if (Device == nullptr || pixels == nullptr || width <= 0 || height <= 0) {
             return false;
         }
+
+        /**
+         *  Radar size shifts on small/large toggle and on map switches —
+         *  reallocate whenever the source dimensions change.
+         */
+        if (RadarTex == nullptr || RadarTexWidth != width || RadarTexHeight != height) {
+            Release_Radar_Texture();
+            D3D11_TEXTURE2D_DESC td = {};
+            td.Width = width;
+            td.Height = height;
+            td.MipLevels = 1;
+            td.ArraySize = 1;
+            td.Format = DXGI_FORMAT_B5G6R5_UNORM;
+            td.SampleDesc.Count = 1;
+            td.Usage = D3D11_USAGE_DYNAMIC;
+            td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            if (FAILED(Device->CreateTexture2D(&td, nullptr, &RadarTex))) {
+                return false;
+            }
+            if (FAILED(Device->CreateShaderResourceView(RadarTex, nullptr, &RadarSRV))) {
+                Release_Radar_Texture();
+                return false;
+            }
+            RadarTexWidth = width;
+            RadarTexHeight = height;
+        }
+
         D3D11_MAPPED_SUBRESOURCE mapped = {};
-        if (FAILED(Context->Map(SidebarSurfaceTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
+        if (FAILED(Context->Map(RadarTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) {
             return false;
         }
-        const int row_bytes = SidebarSurfaceWidth * 2;
+        const int row_bytes = width * 2;
         const unsigned char* src = static_cast<const unsigned char*>(pixels);
         unsigned char* dst = static_cast<unsigned char*>(mapped.pData);
         if (mapped.RowPitch == (UINT)pitch_bytes && pitch_bytes == row_bytes) {
-            memcpy(dst, src, (size_t)pitch_bytes * SidebarSurfaceHeight);
+            memcpy(dst, src, (size_t)pitch_bytes * height);
         } else {
-            for (int y = 0; y < SidebarSurfaceHeight; ++y) {
+            for (int y = 0; y < height; ++y) {
                 memcpy(dst + y * mapped.RowPitch, src + y * pitch_bytes, row_bytes);
             }
         }
-        Context->Unmap(SidebarSurfaceTex, 0);
+        Context->Unmap(RadarTex, 0);
         return true;
+    }
+
+
+    void GraphicsDevice::Draw_Radar_To_Sidebar(const Rect& dst_rect)
+    {
+        if (RadarSRV == nullptr || dst_rect.Width <= 0 || dst_rect.Height <= 0) {
+            return;
+        }
+        Draw_Texture(RadarSRV, dst_rect, SDL_SCALEMODE_NEAREST, EBlend::Opaque);
     }
 
 

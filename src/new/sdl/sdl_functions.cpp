@@ -38,6 +38,7 @@
 #include "debughandler.h"
 #include "mouse.h"
 #include "optionsext.h"
+#include "radar.h"
 #include "playmovie.h"
 #include "primitive_queue.h"
 #include "rect.h"
@@ -205,7 +206,7 @@ namespace
             return;
         }
 
-        if (!Vinifera::Gfx::Device->Set_Sidebar_Surface_Format(sidebar_width, sidebar_height)) {
+        if (!Vinifera::Gfx::Device->Ensure_Sidebar_Target_Size(sidebar_width, sidebar_height)) {
             return;
         }
 
@@ -1091,6 +1092,19 @@ bool SDL_Update_Screen(Surface* surface)
              */
             if (render_pass == Vinifera::Gfx::RenderPass::ObjectLayer) {
                 Composite_Process_Deferred(*Vinifera::Gfx::Device);
+            }
+            /**
+             *  Composite the radar minimap onto `SidebarRT` between the
+             *  cameo (sprite) and view-box / border (primitive) flushes
+             *  so the layer order is `RadarAnim` frame → radar pixels →
+             *  rectangles. `RadarTex` is kept up-to-date by the
+             *  `Render_Radar` hook in `radarext_hooks.cpp`.
+             */
+            if (render_pass == Vinifera::Gfx::RenderPass::UiOverlay
+                && Map.RadarMode == RadarClass::RMODE_TACTICAL
+                && Map.RadarState == RadarClass::RSTATE_ACTIVE) {
+                Vinifera::Gfx::Device->Bind_Sidebar_Target();
+                Vinifera::Gfx::Device->Draw_Radar_To_Sidebar(Map.RadarRect);
             }
             Vinifera::Gfx::PrimitiveQueue::Get().Flush_Pass(*Vinifera::Gfx::Device, render_pass);
             /**

@@ -73,6 +73,7 @@
 #include "particletypeext_hooks.h"
 #include "playmovie_hooks.h"
 #include "prerequisitegroup_hooks.h"
+#include "radarext_hooks.h"
 #include "radioext_hooks.h"
 #include "rawfileext_hooks.h"
 #include "rulesext_hooks.h"
@@ -298,6 +299,7 @@ void Extension_Hooks()
     AircraftTracker_Hooks();
     PrerequisiteGroup_Hooks();
     Beacon_Hooks();
+    Radar_Hooks();
 
     Audio_Hooks();
 }
