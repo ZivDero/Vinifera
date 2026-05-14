@@ -14,6 +14,7 @@
 #include "debughandler.h"
 #include "graphics_device.h"
 
+#include <algorithm>
 #include <cstring>
 #include <vector>
 
@@ -72,7 +73,26 @@ namespace Vinifera::Gfx
             DEBUG_ERROR("FontAsset: FON blob too small (length=%u).\n", hdr.FontLength);
             return false;
         }
-        const size_t blob_size = hdr.FontLength;
+
+        /**
+         *  `FontLength` is `uint16_t` — capped at 64 KB. Modded high-res
+         *  fonts can exceed that and the field wraps, but the offset
+         *  blocks past wrap still point to valid data. Vanilla never
+         *  bounds-checks against `FontLength`, it just indexes the
+         *  per-char blocks directly. We do the same: if `FontLength` is
+         *  smaller than the minimum size the header blocks themselves
+         *  imply, treat it as wrapped/invalid and skip the bounds checks
+         *  below (trust the data exactly like vanilla).
+         */
+        const size_t min_required = std::max<size_t>({
+            (size_t)hdr.WidthBlockOffset  + 256,
+            (size_t)hdr.OffsetBlockOffset + 512,
+            (size_t)hdr.HeightOffset      + 512,
+            (size_t)hdr.InfoBlockOffset   + 6,
+        });
+        const size_t blob_size = ((size_t)hdr.FontLength >= min_required)
+            ? (size_t)hdr.FontLength
+            : SIZE_MAX;
 
         /**
          *  InfoBlock layout (from wwfont.cpp `Raw_Width` / `Raw_Height`):
