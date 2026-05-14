@@ -316,13 +316,19 @@ void CellClassExt::_Draw_It(Point2D const& xdrawpoint, Rect const& cliprect, boo
         subtile = SubTile;
         if (ittype != nullptr && ittype->TilesInSequence > 1) {
             /**
-             *  Vanilla checks `Is_Randomized(SubTile)` to choose between
-             *  bridge-damage-driven and `Clear_Icon`-driven variation. We
-             *  always use `Clear_Icon` here — `Is_Randomized` isn't exported
-             *  by TSpp and the bridge-damage path is a minor visual nuance
-             *  on a single set of tiles. TODO: wire it up.
+             *  Subtile records flagged `Is_Randomized` (bit 2 of
+             *  `IsoTileRecord::Flags`) drive their variation off the cell's
+             *  `IsBridgeEndDamaged` bit, not the spatial `Clear_Icon` hash.
+             *  This applies to bridge END pieces (`BridgeSet`/`TrainBridgeSet`)
+             *  AND bridge MIDDLE spans (`BridgeMiddle1/2`) — a bridge tile
+             *  set has exactly two entries (intact / damaged) and the same
+             *  `IsBridgeEndDamaged` bit flips the whole span in lockstep.
              */
-            icon = const_cast<CellClassExt*>(this)->Clear_Icon(ITType, ittype->TilesInSequence);
+            if (ittype->Is_Randomized(SubTile)) {
+                icon = IsBridgeEndDamaged ? 1 : 0;
+            } else {
+                icon = const_cast<CellClassExt*>(this)->Clear_Icon(ITType, ittype->TilesInSequence);
+            }
         }
     } else {
         ittype = IsoTileTypes[ISOTILE_CLEAR];
