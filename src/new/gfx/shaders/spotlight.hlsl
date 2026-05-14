@@ -14,15 +14,11 @@ struct VSOut { float4 pos : SV_Position; float2 scene_xy : TEXCOORD0; };
 VSOut VSMain(VSIn i)
 {
     VSOut o;
-    // Depth slightly less than terrain at the same screen-Y so
-    // the spotlight beats terrain. Spotlight isn't z-tested in
-    // vanilla (the CPU blitter writes unconditionally inside
-    // its 256x128 area), so this is just to keep ordering sane
-    // against other PostEffects content.
-    const float kPixelToDepth = 1.0 / 16000.0;
-    float z = clamp(1.0 - i.pos.y * kPixelToDepth - 1.0e-4, 1.0e-4, 0.9999);
+    // Spotlight isn't z-tested in vanilla (the CPU blitter writes
+    // unconditionally inside its 256x128 area) and the queue binds
+    // EDepthStencil::None for the same reason, so output z=0.
     float4 p = mul(ProjMtx, float4(i.pos.xy, 0.0, 1.0));
-    o.pos = float4(p.x, p.y, z, 1.0);
+    o.pos = float4(p.x, p.y, 0.0, 1.0);
     o.scene_xy = i.pos.xy;
     return o;
 }

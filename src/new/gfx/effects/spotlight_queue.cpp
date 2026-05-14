@@ -181,12 +181,14 @@ namespace Vinifera::Gfx
         ctx->RSSetState(device.States().Get(ERasterizer::CullNone));
 
         /**
-         *  Vanilla doesn't depth-test the spotlight — the CPU blitter
-         *  writes unconditionally within the 256x128 area. Using
-         *  `TestLessEqual_NoWrite` keeps the spotlight in front of
-         *  terrain at the same Y but it doesn't disturb the depth buffer.
+         *  Vanilla's CPU blitter writes spotlight pixels unconditionally
+         *  inside the 256x128 area — no depth test, no depth write. We must
+         *  match that: a depth test against terrain breaks on elevated
+         *  tiles whose `depth_y = y_off + tile_h + cell_level*LEVEL_PIXEL_H_1`
+         *  pushes them in front of a spotlight quad sampled at the same
+         *  screen-Y, culling the disc on any map with cliffs.
          */
-        ctx->OMSetDepthStencilState(device.States().Get(EDepthStencil::TestLessEqual_NoWrite), 0);
+        ctx->OMSetDepthStencilState(device.States().Get(EDepthStencil::None), 0);
 
         const float blend_factor[4] = { 0, 0, 0, 0 };
         ctx->OMSetBlendState(device.States().Get(EBlend::Opaque), blend_factor, 0xFFFFFFFFu);
