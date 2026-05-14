@@ -69,6 +69,14 @@ namespace Vinifera::Gfx
         PaletteLUT* Get_Or_Build(GraphicsDevice& device, const ConvertClass* convert);
 
         /**
+         *  Re-decode `convert`'s Translator into the existing cached
+         *  PaletteLUT in place, preserving the Texture2D and PaletteArray
+         *  layer. No-op if the converter isn't cached. Call after vanilla
+         *  `LightConvertClass::Apply_Tint` mutates Translator (ion storm).
+         */
+        void Refresh(const ConvertClass* convert);
+
+        /**
          *  Look up the palette LUT for a raw `PaletteClass*` (no converter).
          *  Used for the tile renderer's lookup of `IsoTilePalette`: the
          *  un-tinted 256-entry art palette, tint + intensity applied in the

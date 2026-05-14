@@ -82,6 +82,38 @@ namespace Vinifera::Gfx
     }
 
 
+    /**
+     *  Decode vanilla's 16-bit RGB565 Translator back into 8-bit RGB.
+     *  Translator is a public member; TS always runs in 16-bit so we
+     *  treat the LUT as `unsigned short[256]`. The 5/6/5 split is
+     *  upconverted to 8-bit via bit-replicate. If Translator is null
+     *  (uninitialized converter), fall back to a grayscale identity so
+     *  we still render *something* recognizable instead of crashing.
+     */
+    static void Decode_Translator(const ConvertClass* convert, uint8_t out_rgb[256 * 3])
+    {
+        const void* translator = const_cast<ConvertClass*>(convert)->Translator;
+        if (translator != nullptr) {
+            const uint16_t* lut16 = static_cast<const uint16_t*>(translator);
+            for (int i = 0; i < 256; ++i) {
+                const uint16_t v = lut16[i];
+                const uint8_t r5 = (uint8_t)((v >> 11) & 0x1F);
+                const uint8_t g6 = (uint8_t)((v >> 5) & 0x3F);
+                const uint8_t b5 = (uint8_t)(v & 0x1F);
+                out_rgb[i * 3 + 0] = (uint8_t)((r5 << 3) | (r5 >> 2));
+                out_rgb[i * 3 + 1] = (uint8_t)((g6 << 2) | (g6 >> 4));
+                out_rgb[i * 3 + 2] = (uint8_t)((b5 << 3) | (b5 >> 2));
+            }
+        } else {
+            for (int i = 0; i < 256; ++i) {
+                out_rgb[i * 3 + 0] = (uint8_t)i;
+                out_rgb[i * 3 + 1] = (uint8_t)i;
+                out_rgb[i * 3 + 2] = (uint8_t)i;
+            }
+        }
+    }
+
+
     PaletteLUT* PaletteCache::Get_Or_Build(GraphicsDevice& device, const ConvertClass* convert)
     {
         if (convert == nullptr) {
@@ -92,35 +124,8 @@ namespace Vinifera::Gfx
             return it->second.get();
         }
 
-        /**
-         *  Decode vanilla's 16-bit RGB565 Translator back into 8-bit RGB.
-         *  Translator is a public member; TS always runs in 16-bit so we
-         *  treat the LUT as `unsigned short[256]`. The 5/6/5 split is
-         *  upconverted to 8-bit via bit-replicate. If Translator is null
-         *  (uninitialized converter), fall back to a grayscale identity so
-         *  we still render *something* recognizable instead of crashing.
-         */
-        const void* translator = const_cast<ConvertClass*>(convert)->Translator;
-
         uint8_t rgb_triples[256 * 3] = {};
-        if (translator != nullptr) {
-            const uint16_t* lut16 = static_cast<const uint16_t*>(translator);
-            for (int i = 0; i < 256; ++i) {
-                const uint16_t v = lut16[i];
-                const uint8_t r5 = (uint8_t)((v >> 11) & 0x1F);
-                const uint8_t g6 = (uint8_t)((v >> 5) & 0x3F);
-                const uint8_t b5 = (uint8_t)(v & 0x1F);
-                rgb_triples[i * 3 + 0] = (uint8_t)((r5 << 3) | (r5 >> 2));
-                rgb_triples[i * 3 + 1] = (uint8_t)((g6 << 2) | (g6 >> 4));
-                rgb_triples[i * 3 + 2] = (uint8_t)((b5 << 3) | (b5 >> 2));
-            }
-        } else {
-            for (int i = 0; i < 256; ++i) {
-                rgb_triples[i * 3 + 0] = (uint8_t)i;
-                rgb_triples[i * 3 + 1] = (uint8_t)i;
-                rgb_triples[i * 3 + 2] = (uint8_t)i;
-            }
-        }
+        Decode_Translator(convert, rgb_triples);
 
         auto lut = std::make_unique<PaletteLUT>();
         if (!lut->Initialize(device)) {
@@ -129,13 +134,30 @@ namespace Vinifera::Gfx
         /**
          *  six_bit=false because the values we just decoded are already 8-bit.
          *  No additional tint — the Translator already had any LightConvert
-         *  tint applied at the time the converter was built.
+         *  tint applied at the time the converter was built. Subsequent
+         *  `LightConvertClass::Apply_Tint` mutations rebuild Translator in
+         *  place and are picked up via `Refresh` below.
          */
         lut->Update_Palette(rgb_triples, /*six_bit*/ false, 1000, 1000, 1000);
 
         PaletteLUT* raw = lut.get();
         ByConvert.emplace(convert, std::move(lut));
         return raw;
+    }
+
+
+    void PaletteCache::Refresh(const ConvertClass* convert)
+    {
+        if (convert == nullptr) {
+            return;
+        }
+        auto it = ByConvert.find(convert);
+        if (it == ByConvert.end() || it->second == nullptr) {
+            return;     // not cached: next Get_Or_Build picks up current state
+        }
+        uint8_t rgb_triples[256 * 3] = {};
+        Decode_Translator(convert, rgb_triples);
+        it->second->Update_Palette(rgb_triples, /*six_bit*/ false, 1000, 1000, 1000);
     }
 
 
