@@ -1188,15 +1188,40 @@ namespace
     }
 
         /**
-         *  Composite the scratch onto the scene RT at the unit's drawpoint
-         *  with the determined unit alpha. End_Unit_Composite restores the
-         *  saved RT/DSV/viewport and emits per-pixel SV_Depth so the unit's
-         *  silhouette occludes correctly against terrain at every Y.
+         *  Composite the scratch onto the scene RT at the unit's drawpoint.
+         *
+         *  Depth anchors at the unit's scene-space drawpoint Y to match
+         *  tile depth, which `Tile_Base_Depth_From_Visual_Y` anchors at
+         *  `tile_bottom_y` (one value per tile). `z_adjust` (negative for
+         *  cell-elevated objects) mirrors the `cell_level * LEVEL_PIXEL_H`
+         *  term tile depth already carries, so the unit stays in front of
+         *  its tile regardless of elevation. The 16 px bias clears the
+         *  half-tile gap between drawpoint and `tile_bottom_y` so the
+         *  unit's lower extent (chassis, treads) survives the LessEqual.
+         *
+         *  `z_adjust` is shared across all sections of a unit; pull it
+         *  from the first voxel record. Pure-SHP composites get 0 — the
+         *  cell-elevated all-SHP turreted unit is an exotic case.
          */
+        int unit_z_adjust = 0;
+        for (const PendingComposite& rec : deferred.records) {
+            if (rec.kind == CompositeKind::Voxel) {
+                unit_z_adjust = rec.voxel.z_adjust;
+                break;
+            }
+        }
+
         const Point2D scene_origin(xyoff.X - kUnitScratchOrigin.X,
                                    xyoff.Y - kUnitScratchOrigin.Y);
+        const float drawpoint_scene_y = static_cast<float>(xyoff.Y + TacticalRect.Y);
+        constexpr float kCompositeDepthBiasPixels = 16.0f;
+        const float unit_depth = std::clamp(
+            1.0f - drawpoint_scene_y * kPixelToDepth
+                 + static_cast<float>(unit_z_adjust) * kPixelToDepth
+                 - kCompositeDepthBiasPixels * kPixelToDepth,
+            1.0e-4f, 0.9999f);
         Vinifera::Gfx::UnitScratch::Get().End_Unit_Composite(
-            device, scene_origin, unit_alpha, /*scene_depth*/ 0.5f);
+            device, scene_origin, unit_alpha, unit_depth);
     }
 }  // anonymous namespace
 

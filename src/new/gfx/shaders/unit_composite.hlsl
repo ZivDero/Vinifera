@@ -41,22 +41,15 @@ struct PSOut {
 PSOut PSMain(VSOut v)
 {
     float4 c = Scratch.Sample(PointS, v.uv);
-    // Discard fully-transparent scratch pixels so we don't trip
-    // the depth test on empty unit area outside the unit's actual
-    // voxel footprint.
+    // Skip transparent scratch pixels so the depth test only sees the
+    // unit's actual footprint.
     if (c.a <= 0.0) discard;
     PSOut o;
-    // Scratch is already premultiplied. Scale by unit alpha so
-    // the final scene blend is `(scratch*unit_a) + (1 - scratch.a*unit_a)*scene`.
+    // Scratch is premultiplied; scale by unit alpha for the final
+    // `(scratch*unit_a) + (1 - scratch.a*unit_a)*scene` scene blend.
     o.color = c * Alpha;
-    // Per-pixel SV_Depth: emit a depth value that just barely beats
-    // terrain at THIS pixel's screen-Y. Terrain depth at pixel Y is
-    // `1 - Y * kPixelToDepth` (1/16000); subtract a small eps so
-    // composite consistently wins LessEqual against terrain across
-    // the whole 256x256 unit footprint. Without this, a single
-    // per-unit depth value misses on roughly half the unit (where
-    // terrain happens to be closer than our chosen baseline).
-    const float kPixelToDepth = 1.0 / 16000.0;
-    o.depth = clamp(1.0 - v.pos.y * kPixelToDepth - 1.0e-4, 1.0e-4, 0.9999);
+    // Per-unit constant depth from `Render_Deferred_Composite`, anchored
+    // at the unit's drawpoint Y to match `Tile_Base_Depth_From_Visual_Y`.
+    o.depth = v.pos.z;
     return o;
 }

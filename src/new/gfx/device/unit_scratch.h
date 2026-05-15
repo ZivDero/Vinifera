@@ -115,7 +115,8 @@ namespace Vinifera::Gfx
          *  (0, 0) corner lands in scene-RT pixels — for unit-local rendering
          *  centered at the unit's drawpoint, pass `drawpoint - scratch_origin`.
          *  `alpha` is the visual-character translucency [0..1]. `scene_depth`
-         *  is the depth value used for occlusion against scene depth.
+         *  is the depth emitted by every pixel of the quad (one value per
+         *  unit, anchored at the unit's drawpoint Y to match tile depth).
          */
         void End_Unit_Composite(GraphicsDevice& device,
                                 Point2D scene_origin,
