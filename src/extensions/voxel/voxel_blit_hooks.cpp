@@ -1301,35 +1301,16 @@ void TechnoClassExt::_Draw_Voxel(VoxelObject& voxeldata, unsigned int frame, int
     }
 
     /**
-     *  Bridge z-fudge for `IsTooBigToFitUnderBridge` units (Mammoth-class).
-     *  Mirrors vanilla unit.cpp:2431-2440: when such a unit is either
-     *  passing under a low bridge (`Is_Z_Fudge_Bridge && Get_Z_Fudge_Column == 0`)
-     *  or docking into a Weapons Factory door, vanilla swaps the voxel
-     *  render for a 32×32 placeholder sprite. We can't easily reproduce
-     *  that placeholder on the GPU sprite path, so we skip the voxel
-     *  render entirely — invisible-under-bridge is closer to correct
-     *  than full-voxel-poking-through.
+     *  `UnitTypeClass::IsTooBigToFitUnderBridge` is intentionally ignored
+     *  here. Vanilla's `unit.cpp:2431` swap to a 32x32 top-of-composite blit
+     *  is a workaround for its CPU rasterizer lacking per-pixel depth-test
+     *  occlusion against bridge / factory-door SHPs. Our pipeline writes
+     *  proper per-cell depth in `Tile_Base_Depth_From_Visual_Y` (Z-fudge
+     *  bridge tiles sit closer to the camera via the `cell_level` term) and
+     *  per-pixel SHP depth (Weapons Factory door), so the unit composite at
+     *  drawpoint depth is naturally occluded by the overhang and the
+     *  turret pokes out above its screen footprint.
      */
-    if (RTTI == RTTI_UNIT) {
-        FootClass* foot = reinterpret_cast<FootClass*>(const_cast<TechnoClassExt*>(this));
-        const UnitTypeClass* utype = reinterpret_cast<UnitClass const*>(this)->Class;
-        if (utype != nullptr && utype->IsTooBigToFitUnderBridge) {
-            bool fudge = false;
-            if (foot->Is_Z_Fudge_Bridge() && foot->Get_Z_Fudge_Column() == 0) {
-                fudge = true;
-            } else if (foot->NavCom != nullptr) {
-                TechnoClass* contact = foot->Contact_With_Whom();
-                if (contact != nullptr
-                    && contact->What_Am_I() == RTTI_BUILDING
-                    && static_cast<BuildingClass*>(contact)->Class->IsWeaponsFactory) {
-                    fudge = true;
-                }
-            }
-            if (fudge) {
-                return;
-            }
-        }
-    }
 
     /**
      *  Sinking offset for ice-cracker units. Vanilla sets `IsSinking = true`
