@@ -12,6 +12,7 @@
 #include "SDL3/SDL_surface.h"
 #include "extension.h"
 #include "options.h"
+#include "uicontrol.h"
 
 
 class CCINIClass;
@@ -40,7 +41,6 @@ public:
      *  implement them for completeness.
      */
     virtual int Get_Object_Size() const override;
-    virtual void Detach(AbstractClass* target, bool all = true) override;
     virtual void Object_CRC(CRCEngine& crc) const override;
 
     virtual const char* Name() const override { return "Options"; }
@@ -51,6 +51,12 @@ public:
     void Save_Settings();
 
     void Set();
+    SidebarViewType Get_Sidebar_View_Type() const;
+
+private:
+    void Apply_Volumes();
+
+public:
 
     static SubtitleModeType Parse_Subtitle_Mode(const char* name);
     static const char* Subtitle_Mode_Config_Name(SubtitleModeType mode);
@@ -65,6 +71,11 @@ public:
      *  Are harvesters and MCVs excluded from a band-box selection that includes combat units?
      */
     bool FilterBandBoxSelection;
+
+    /**
+     *  User override for the battle sidebar view type. SIDEBAR_COUNT means use UI.INI.
+     */
+    SidebarViewType SidebarViewTypeOverride;
 
     /**
      *  Customizable hotkeys for starting a chat.
@@ -98,4 +109,9 @@ public:
      *  Which VOX subtitles should be displayed.
      */
     SubtitleModeType SubtitleMode;
+
+    /**
+     *  Should building repairs be paused instead of stopped when the player has insufficient funds?
+     */
+    bool IsPauseRepairs;
 };

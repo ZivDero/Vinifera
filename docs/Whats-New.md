@@ -94,6 +94,16 @@ New:
 - Extended sidebar customizability (by ZivDero)
 - Replace the vanilla audio engine with a miniaudio-backed system for sound effects, music, EVA speech, subtitles, and VQA movie audio (by CCHyper/tomsons26, ZivDero)
 - Add new customizations options for themes, sounds and speeches (by CCHyper/tomsons26, ZivDero)
+- Add support for modern video formats (MP4, WMV, MPG, AVI) as replacements for VQA movies (by ZivDero, CCHyper)
+- Allow customizing Self Healing cap and rate globally and per-unit (by JoyfulShush)
+- Allow customizing whether AI can repair buildings created as base nodes (by JoyfulShush)
+- Add the ability to snap camera position instantly when using the Center Camera At Waypoint trigger action (by JoyfulShush)
+- Allow hospitals and armories to accept multiple infantry in one order to set a queue and to set rally points (by JoyfulShush)
+- Units and Reveal Around Waypoints trigger actions can now reveal any desired radius (by JoyfulShush)
+- Allow Reveal Around Waypoints trigger actions to specify their reveal radius and whether they take elevation into account (by JoyfulShush)
+- Removed incremental revealing logic when setting `RevealByHeight=no` (by JoyfulShush)
+- Allow building repairs to be paused rather than stopped when a house has insufficient funds (by JoyfulShush, Rampastring)
+- Allows aircraft to use Q-Move (by JoyfulShush)
 
 Vinifera fixes:
 - Fix unit placement in non-TS Client builds of Vinifera (by ZivDero)
@@ -164,6 +174,9 @@ Vanilla fixes:
 - Fix a bug that allowed players to issue movement and attack orders to units not owned by them through crafted network requests (by Rampastring)
 - Fix a bug where a trigger's "Elapsed Time" event timers were reset when the trigger was already enabled and the "Enable Trigger" TAction was used on it (by Rampastring)
 - Fix a bug where the sidebar could only contain up to 75 items on a strip (by ZivDero)
+- Fix a vanilla bug where harvesters would become permanently idle if they exhausted all resources to mine, even if new resources appeared (e.g. spawned by a Tiberium tree) (by JoyfulShush)
+- Fix a bug where if you started the game owning a Techno at its BuildLimit, it would not appear on your sidebar (by ZivDero)
+- Fix destroyed APCs sometimes not ejecting the infantry inside them when destroyed while moving (by JoyfulShush)
 
 :::
 
@@ -316,13 +329,6 @@ New:
 - Allow customizing which Tiberiums can grow on a tile (by ZivDero)
 - Allow customizing which Smudges can appear on a tile (by ZivDero)
 - Allow customizing if Veins can grow on a tile (by ZivDero)
-- Allow customizing Self Healing cap and rate globally and per-unit (by JoyfulShush)
-- Allow customizing whether AI can repair buildings created as base nodes (by JoyfulShush)
-- Add the ability to snap camera position instantly when using the Center Camera At Waypoint trigger action (by JoyfulShush)
-- Allow hospitals and armories to accept multiple infantry in one order to set a queue and to set rally points (by JoyfulShush)
-- Units and Reveal Around Waypoints trigger actions can now reveal any desired radius (by JoyfulShush)
-- Allow Reveal Around Waypoints trigger actions to specify their reveal radius and whether they take elevation into account (by JoyfulShush)
-- Removed incremental revealing logic when setting `RevealByHeight=no` (by JoyfulShush)
 
 Vanilla fixes:
 - Fix HouseType `Nod` having the `Prefix=B` and `Side=GDI` in vanilla `rules.ini` by setting them to `N` and `Nod`, respectively (by CCHyper/tomsons26)
@@ -406,5 +412,6 @@ Vanilla fixes:
 - Fix a bug where units that have DeathFrames (such as Reapers) could be killed multiple times, dropping small patches of tiberium with each death.
 - Fix a bug where units that have DeathFrames (such as Reapers) could be issued move orders by players while playing their death animations.
 - Fix a bug where capturing buildings with sensor capabilities (`SensorArray=yes`) would not update to the owners of the sensors (by JoyfulShush)
+- Allow helipads and service depots to accept additional units to add to the queue or re-assign to a different helipad when clicking on one that is currently in use (by JoyfulShush)
 
 :::

@@ -101,7 +101,8 @@ RulesClassExtension::RulesClassExtension(const RulesClass* this_ptr) :
     IronCurtainSound(VOC_NONE),
     ComesNearWaypointDistance(CELL_LEPTON_W * 5),
     IsAIDetectDisguise(true),
-    IsAIOneHarvesterInSingleplayer(true)
+    IsAIOneHarvesterInSingleplayer(true),
+    PausedRepairsFrame(6)
 {
     //if (this_ptr) EXT_DEBUG_TRACE("RulesClassExtension::RulesClassExtension - 0x%08X\n", (uintptr_t)(ThisPtr));
 
@@ -238,15 +239,6 @@ int RulesClassExtension::Get_Object_Size() const
 }
 
 
-/**
- *  Removes the specified target from any targeting and reference trackers.
- *  
- *  @author: CCHyper
- */
-void RulesClassExtension::Detach(AbstractClass * target, bool all)
-{
-    //EXT_DEBUG_TRACE("RulesClassExtension::Detach - 0x%08X\n", (uintptr_t)(This()));
-}
 
 
 /**
@@ -277,6 +269,7 @@ void RulesClassExtension::Object_CRC(CRCEngine &crc) const
     crc(IsAIDetectDisguise);
     crc(AIHarvestersPerRefinery.Count());
     crc(IsAIOneHarvesterInSingleplayer);
+    crc(PausedRepairsFrame);
 }
 
 
@@ -427,7 +420,7 @@ void RulesClassExtension::Process(CCINIClass &ini)
     Fixups(ini);
 
     /**
-     *  x
+     *  Read the theme data from the INI.
      */
     AudioTheme.Init_Themes(ini);
 }
@@ -714,6 +707,7 @@ bool RulesClassExtension::General(CCINIClass &ini)
     MaxBeacons = ini.Get_Int(GENERAL, "MaxBeacons", MaxBeacons);
     SelfHealingCap = ini.Get_Float(GENERAL, "SelfHealingCap", SelfHealingCap);    
     SelfHealingRate = ini.Get_Float(GENERAL, "SelfHealingRate", SelfHealingRate);
+    PausedRepairsFrame = ini.Get_Int(GENERAL, "PausedRepairsFrame", PausedRepairsFrame);
 
     /**
      *  Allow replacing any signle movement zone with a copy of RA2's water MZone.

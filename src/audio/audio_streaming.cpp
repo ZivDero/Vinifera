@@ -118,7 +118,7 @@ bool AudioStreamingClass::Initialize_PCM_Stream()
      *  and the game loop.
      */
     PCMBuffer = new ma_pcm_rb;
-    result = ma_pcm_rb_init(format, Channels, 4096 * 4, nullptr, nullptr, PCMBuffer);
+    result = ma_pcm_rb_init(format, Channels, PCM_RING_BUFFER_FRAMES, nullptr, nullptr, PCMBuffer);
     if (result != MA_SUCCESS) {
         delete PCMBuffer;
         PCMBuffer = nullptr;
@@ -260,7 +260,7 @@ bool AudioStreamingClass::Pause()
 
 
 /**
- *  Stops playback of the audio stream.
+ *  Stops playback of the audio stream and discards any buffered audio.
  *
  *  @author: CCHyper
  */
@@ -270,7 +270,15 @@ bool AudioStreamingClass::Stop()
     if (!Sound) {
         return false;
     }
-    return ma_sound_stop(Sound) == MA_SUCCESS;
+
+    ma_result result = ma_sound_stop(Sound);
+
+    if (PCMBuffer) {
+        ma_pcm_rb_reset(PCMBuffer);
+    }
+    FramesPushed.store(0, std::memory_order_relaxed);
+
+    return result == MA_SUCCESS;
 }
 
 

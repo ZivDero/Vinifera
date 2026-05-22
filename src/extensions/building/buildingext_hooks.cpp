@@ -17,6 +17,7 @@
 #include "anim.h"
 #include "animext.h"
 #include "asserthandler.h"
+#include "audio_vox.h"
 #include "bsurface.h"
 #include "building.h"
 #include "buildingext.h"
@@ -131,45 +132,39 @@ bool BuildingClassExt::_Can_Have_Rally_Point()
  */
 void BuildingClassExt::_Update_Buildables()
 {
-    if (House == PlayerPtr && !IsInLimbo && IsDiscoveredByPlayer && IsOn)
-    {
-        switch (Class->ToBuild)
-        {
+    if (House == PlayerPtr && !IsInLimbo && IsDiscoveredByPlayer && IsOn) {
+        switch (Class->ToBuild) {
         case RTTI_AIRCRAFTTYPE:
-            for (int i = 0; i < AircraftTypes.Count(); i++)
-            {
-                if (PlayerPtr->Can_Build(AircraftTypes[i], false, true) && AircraftTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)
-                {
+            for (int i = 0; i < AircraftTypes.Count(); i++) {
+                int can_build = PlayerPtr->Can_Build(AircraftTypes[i], false, true); // 0 = not allowed, 1 = allowed, -1 = build limit
+                if (can_build && (can_build == -1 || AircraftTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)) {
                     Map.Add(RTTI_AIRCRAFTTYPE, i);
                 }
             }
             break;
 
         case RTTI_BUILDINGTYPE:
-            for (int i = 0; i < BuildingTypes.Count(); i++)
-            {
-                if (PlayerPtr->Can_Build(BuildingTypes[i], false, true) && BuildingTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)
-                {
+            for (int i = 0; i < BuildingTypes.Count(); i++) {
+                int can_build = PlayerPtr->Can_Build(BuildingTypes[i], false, true);
+                if (can_build && (can_build == -1 || BuildingTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)) {
                     Map.Add(RTTI_BUILDINGTYPE, i);
                 }
             }
             break;
 
         case RTTI_INFANTRYTYPE:
-            for (int i = 0; i < InfantryTypes.Count(); i++)
-            {
-                if (PlayerPtr->Can_Build(InfantryTypes[i], false, true) && InfantryTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)
-                {
+            for (int i = 0; i < InfantryTypes.Count(); i++) {
+                int can_build = PlayerPtr->Can_Build(InfantryTypes[i], false, true);
+                if (can_build && (can_build == -1 || InfantryTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)) {
                     Map.Add(RTTI_INFANTRYTYPE, i);
                 }
             }
             break;
 
         case RTTI_UNITTYPE:
-            for (int i = 0; i < UnitTypes.Count(); i++)
-            {
-                if (PlayerPtr->Can_Build(UnitTypes[i], false, true) && UnitTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)
-                {
+            for (int i = 0; i < UnitTypes.Count(); i++) {
+                int can_build = PlayerPtr->Can_Build(UnitTypes[i], false, true);
+                if (can_build && (can_build == -1 || UnitTypes[i]->Who_Can_Build_Me(true, false, RuleExtension->IsRecheckPrerequisites, PlayerPtr) != nullptr)) {
                     Map.Add(RTTI_UNITTYPE, i);
                 }
             }
@@ -997,7 +992,7 @@ DEFINE_HOOK(0x0043266C, _BuildingClass_Mission_Repair_ReloadRate_Patch, 0)
 
     AircraftClass* radio = reinterpret_cast<AircraftClass*>(this_ptr->Contact_With_Whom());
     AircraftTypeClassExtension* radio_class_ext = Extension::Fetch(radio->Class);
-    int time = radio_class_ext->ReloadRate * TICKS_PER_MINUTE;
+    int time = radio_class_ext->Get_ReloadRate() * TICKS_PER_MINUTE;
     R->EAX(time);
 
     return 0x0043260F;
@@ -1818,7 +1813,7 @@ DEFINE_HOOK(0x00432937, _BuildingClass_Mission_Missile_LAUNCH_DOWN_Voice_Patch, 
 
     SuperWeaponTypeClassExtension* super_ext = Extension::Fetch(SuperWeaponTypes[this_ptr->field_298]);
     if (super_ext->VoxMissileLaunched != VOX_NONE) {
-        Speak(super_ext->VoxMissileLaunched);
+        AudioVoxClass::Speak(super_ext->VoxMissileLaunched);
     }
 
     return 0x00432943;
@@ -2031,8 +2026,9 @@ RadioMessageType BuildingClassExt::_Receive_Message(RadioClass* from, RadioMessa
     case RADIO_CAN_LOAD:
         TechnoClass::Receive_Message(from, message, param);
         if (!House->Is_Ally(from)) return RADIO_STATIC;
-        if (Mission == MISSION_CONSTRUCTION || Mission == MISSION_DECONSTRUCTION || BState == BSTATE_CONSTRUCTION || (!ScenarioInit && In_Radio_Contact() && Contact_With_Whom() != from)) return RADIO_NEGATIVE;
+        if (Mission == MISSION_CONSTRUCTION || Mission == MISSION_DECONSTRUCTION || BState == BSTATE_CONSTRUCTION) return RADIO_NEGATIVE;
         if (!IsOn) return RADIO_NEGATIVE;
+
         if (Class->IsCanUnitRepair) {
             if (from->RTTI == RTTI_UNIT || from->RTTI == RTTI_AIRCRAFT) {
                 if (Transmit_Message(RADIO_ON_DEPOT, from) != RADIO_ROGER) {
@@ -2040,7 +2036,8 @@ RadioMessageType BuildingClassExt::_Receive_Message(RadioClass* from, RadioMessa
                 }
             }
             return RADIO_NEGATIVE;
-        }
+        }        
+
         if ((Class->IsArmory || Class->IsHospital) && from->RTTI == RTTI_INFANTRY) {
             if (Ammo != 0 && Mission != MISSION_REPAIR) {
                 return RADIO_ROGER;
@@ -2057,6 +2054,15 @@ RadioMessageType BuildingClassExt::_Receive_Message(RadioClass* from, RadioMessa
             }
             return RADIO_NEGATIVE;
         }
+
+        /*
+        *  Prevents units from requesting to load into the building if it's already in a radio contact with a unit.
+        *  This is typically used in order to only allow one unit to set up loading into it.
+        *  Originally, it was at the very top of this function to prevent any building from interacting with units while during contact,
+        *  however it was moved here in order to allow Helipads, Armories, Hospitals and Service Depots to communicate with
+        *  all units without limitation. Only one unit can still be accepted into being loaded at a time.
+        */ 
+        if (!ScenarioInit && In_Radio_Contact() && Contact_With_Whom() != from) return RADIO_NEGATIVE;
 
         /**
          *  #issue-129
@@ -2447,6 +2453,11 @@ DEFINE_HOOK(0x0042A3D1, _BuildingClass_Unlimbo_AI_Repair_Base_Nodes, 5)
 {
     GET(BuildingClass*, this_ptr, ESI);
 
+    // Ignore pre-placed buildings
+    if (ScenarioInit) {
+        return 0;
+    }
+
     if (Session.Type == GAME_NORMAL && !this_ptr->House->Is_Human_Player() && RuleExtension->IsAIRepairBaseNodes) {
         this_ptr->IsToRepair = true;
     }
@@ -2492,6 +2503,62 @@ DEFINE_HOOK(0x0042FB9F, _BuildingClass_Captured_Enable_Sensors, 6)
     }
 
     return 0;
+}
+
+/*
+ *  Patches the part of BuildingClass::Repair_AI where a building can no longer be repaired due to a house having insufficient funds.
+ *  Typically, it would stop repairs altoghether. However, if the rule for pausing repairs is enabled, then it skips that.
+ *
+ *  @author: JoyfulShush, Rampastring
+ */
+DEFINE_HOOK(0x00435A38, _BuildingClass_Repair_AI_Pause_Repairs_Patch, 7)
+{
+    GET(BuildingClass*, this_ptr, ESI);
+
+    if (this_ptr->House->Is_Human_Player())
+    {
+        HouseClassExtension* houseext = Extension::Fetch(this_ptr->House);
+
+        if (houseext->IsPauseRepairs) {
+            return 0x00435A3F;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ *  Reimplements part of BuildingClass::Draw_Overlays where a building determines the wrench frame to use when drawing during repairs.
+ *  When the building's repairs are paused, the game draws a specific wrench frame to signal that the repairs are paused.
+ *
+ *  @author: JoyfulShush
+ */
+DEFINE_HOOK(0x004288E1, _BuildingClass_Draw_Overlays_Wrench_Shape_Patch, 0)
+{
+    GET(BuildingClass*, this_ptr, ESI);
+    GET(int, frame, ECX);
+    GET(Point2D*, point, EDI);
+    GET(Rect*, rect, EBP);
+
+    HouseClassExtension* houseext = Extension::Fetch(this_ptr->House);
+
+    int draw_frame;
+    if (this_ptr->House->Is_Human_Player() && houseext->IsPauseRepairs && this_ptr->House->Available_Money() < this_ptr->Class->Repair_Step()) {
+        draw_frame = RuleExtension->PausedRepairsFrame;
+    } else {
+        draw_frame = 6 * (Frame % frame) / (frame - 1);
+    }
+
+    Draw_Shape(*LogicalSurface,
+        *MouseDrawer,
+        (ShapeSet const*)BuildingClass::WrenchShape, 
+        draw_frame,
+        *point,
+        *rect,
+        ShapeFlags_Type(SHAPE_CENTER | SHAPE_WIN_REL | SHAPE_ALPHA)        
+    );
+
+    return 0x00428925;
 }
 
 /**

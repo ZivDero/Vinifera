@@ -18,6 +18,7 @@
 #include "debug_hooks.h"
 #include "extension_hooks.h"
 #include "audio_hooks.h"
+#include "movieplayback_hooks.h"
 #include "newswizzle_hooks.h"
 #include "sidebarext_hooks.h"
 #include "vinifera_hooks.h"
@@ -33,4 +34,6 @@ void Setup_Hooks()
 
     //CnCNet4_Hooks();
     //CnCNet5_Hooks();
+
+    MoviePlayback_Hooks();
 }

@@ -97,15 +97,6 @@ HRESULT ObjectClassExtension::Save(IStream *pStm, BOOL fClearDirty)
 }
 
 
-/**
- *  Removes the specified target from any targeting and reference trackers.
- *  
- *  @author: CCHyper
- */
-void ObjectClassExtension::Detach(AbstractClass * target, bool all)
-{
-    //EXT_DEBUG_TRACE("ObjectClassExtension::Detach - Name: %s (0x%08X)\n", Name(), (uintptr_t)(This()));
-}
 
 
 /**
@@ -157,19 +148,19 @@ void ObjectClassExtension::Ambient_AI()
 
     auto classext = Extension::Fetch(classof);
 
-    if (classext->AmbientSound != VOC_NONE && AmbientSound == nullptr) {
-        AmbientSound = new AudioVocHandle(classext->AmbientSound);
-        AmbientSound->Start(This()->PositionCoord);
-    }
-    if (AmbientSound != nullptr) {
+    if (classext->AmbientSound != VOC_NONE) {
+        if (AmbientSound == nullptr) {
+            AmbientSound = new AudioVocHandle(classext->AmbientSound);
+            AmbientSound->Start(This()->PositionCoord);
+        }
         AmbientSound->Update_Position(This()->PositionCoord);
     }
 
-    if (AttachedAmbientSoundType != VOC_NONE && AttachedAmbientSound == nullptr) {
-        AttachedAmbientSound = new AudioVocHandle(AttachedAmbientSoundType);
-        AttachedAmbientSound->Start(This()->PositionCoord);
-    }
-    if (AttachedAmbientSound != nullptr) {
+    if (AttachedAmbientSoundType != VOC_NONE) {
+        if (AttachedAmbientSound == nullptr) {
+            AttachedAmbientSound = new AudioVocHandle(AttachedAmbientSoundType);
+            AttachedAmbientSound->Start(This()->PositionCoord);
+        }
         AttachedAmbientSound->Update_Position(This()->PositionCoord);
     }
 }

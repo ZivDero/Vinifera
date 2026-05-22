@@ -46,6 +46,7 @@
 #include "rect.h"
 #include "render_pass.h"
 #include "scene_copy.h"
+#include "sdl_movie.h"
 #include "sdlmouse.h"
 #include "unit_composite.h"
 #include "spotlight_queue.h"
@@ -588,6 +589,8 @@ bool SDL_Set_Video_Mode(HWND, int width, int height, int bits_per_pixel)
  */
 void SDL_Reset_Video_Mode()
 {
+    ViniferaImGui::Shutdown();
+
     /**
      *  Asset caches and the sprite/tile queues hold textures bound to the
      *  GraphicsDevice — release them before the device tears down, since
@@ -704,7 +707,9 @@ LRESULT CALLBACK SDL_Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, L
         **  Refresh the window.
         */
     case WM_PAINT:
-        if (MouseCursor != nullptr && VisibleSurface != nullptr && HiddenSurface != nullptr && CompositeSurface != nullptr) {
+        if (Vinifera_ModernMoviePlaying) {
+            SDL_Movie_Repaint();
+        } else if (MouseCursor != nullptr && VisibleSurface != nullptr && HiddenSurface != nullptr && CompositeSurface != nullptr) {
             if (TacticalActive == true) {
                 Update_Visible_Surface(MouseCursor->Is_Captured(), CompositeSurface);
                 Map.Blit_Sidebar(true);

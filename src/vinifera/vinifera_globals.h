@@ -80,6 +80,7 @@ extern bool Vinifera_Developer_IsToReloadRules;
 extern SDL_Window* SDLWindow;
 extern int SDLWindowWidth;
 extern int SDLWindowHeight;
+extern bool Vinifera_ModernMoviePlaying;
 
 
 /**
@@ -107,6 +108,7 @@ extern int EnvironmentGlobals[/*std::size(ScenExtension->GlobalFlags)*/500];
 
 extern std::unordered_map<std::string, std::string> Vinifera_TutorialText;
 
+extern bool Vinifera_PlayerOptionsSent;
 
 /**
  *  Global vectors and heaps.
@@ -131,7 +133,6 @@ extern bool Vinifera_SkipToSkirmish;
 extern bool Vinifera_SkipToCampaign;
 extern bool Vinifera_SkipToInternet;
 extern bool Vinifera_ExitAfterSkip;
-
 
 /**
  *  Definition for the exception database struct. If you update this

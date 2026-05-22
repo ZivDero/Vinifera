@@ -1278,6 +1278,27 @@ DEFINE_HOOK(0x0065601D, _UnitClass_What_Action_ACTION_SELF_Prevent_Deploying_Hij
     return 0x0065602B;
 }
 
+/**
+ *  Patches UnitClass::Take_Damage right before iterating on the cargo.
+ *  Fixes an issue where units that have cargo (such as APCs) do not spawn their cargo if they are destroyed
+ *  while moving from one cell to another, resulting in the cargo getting erased instead.
+ * 
+ *  @author: JoyfulShush
+ */
+DEFINE_HOOK(0x0064FDB4, _Unit_Class_Take_Damage_Cargo_Hold_Patch, 6)
+{
+    GET(UnitClass*, this_ptr, ESI);
+
+    if (this_ptr->Cargo.Is_Something_Attached()) {
+        this_ptr->Stop_Driver();
+        if (this_ptr->Locomotion) {
+            this_ptr->Locomotion->Mark_All_Occupation_Bits(MARK_UP);
+        }
+    }
+    
+    return 0;
+}
+
 
 /**
  *  Main function for patching the hooks.
@@ -1294,4 +1315,10 @@ void UnitClassExtension_Hooks()
     Patch_Jump(0x006571E0, &UnitClassExt::_Approach_Target);
 
     Patch_Byte(0x00658961, 0xEB); // Allow pre-placed units to have missions in multiplayer, change JZ to JMP
+    /*
+    *  Patches the MISSION_HARVEST logic that handles harvesters becoming idle due to being unable to find tiberium in its area.
+    *  It does this by removing the MISSION_GUARD assignment inside the function and instead sets it to MISSION_GUARD_AREA,
+    *  which naturally seeks out tiberium to harvest.
+    */  
+    Patch_Byte(0x0065521C + 1, (unsigned char)MISSION_GUARD_AREA); 
 }

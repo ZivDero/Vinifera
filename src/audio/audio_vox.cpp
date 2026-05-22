@@ -192,16 +192,16 @@ constexpr std::array <std::string_view, 24> DialogPriority_LOW = {
     "EVA_OnHold",
     "EVA_Repairing",
     "EVA_StructureSold",
-    "EVA_BaseDefensesOffLine",
-    "EVA_BuildingOffLine",
-    "EVA_BuildingOnLine",
+    "EVA_BaseDefensesOffline",
+    "EVA_BuildingOffline",
+    "EVA_BuildingOnline",
     "EVA_UnitReady",
     "EVA_CannotDeployHere",
     "EVA_SelectTarget",
     "EVA_Training",
     "EVA_UnitRepaired",
     "EVA_UnitSold",
-    "EVA_UnitFirePowerUpgraded",
+    "EVA_UnitFirepowerUpgraded",
     "EVA_UnitArmorUpgraded",
     "EVA_UnitSpeedUpgraded",
 };
@@ -838,7 +838,7 @@ void AudioVoxClass::Stop_Speaking()
 
 
 /**
- *  Checks to see if the eva voice is still playing.
+ *  Checks to see if the EVA voice is still playing.
  *
  *  @author: CCHyper
  */

@@ -27,6 +27,7 @@
 #include "vinifera_globals.h"
 
 #include <algorithm>
+#include <cmath>
 
 
 /**
@@ -127,7 +128,16 @@ unsigned __stdcall AudioManagerClass::CleanupThreadFunction(void* context)
                             const AudioGroupType finished_group = handle->Get_Sample_Template().Get_Group();
                             const AudioInstanceHandle finished_id = handle->Get_ID();
 
-                            self->Remove_Active_Handle_NoLock(handle->Get_ID()); // handles deletion and removal from both maps
+                            /**
+                             *  Inlined removal instead of Remove_Active_Handle_NoLock so we
+                             *  can advance the iterator cleanly. A full `it = group_vec.begin()`
+                             *  restart would re-Update every earlier handle in the same tick,
+                             *  and Update is not idempotent (it decrements FadeTime and
+                             *  RemainingLoopRepeats), so fades and finite-loop counts would
+                             *  drift whenever a sound finishes mid-tick.
+                             */
+                            it = group_vec.erase(it);
+                            self->ActiveInstanceMap.erase(finished_id);
                             self->Clear_Request_State(finished_id);
 
                             // Promote the first deferred request for this sample now that a
@@ -155,8 +165,6 @@ unsigned __stdcall AudioManagerClass::CleanupThreadFunction(void* context)
                                 }
                                 self->DeferredPlayQueue = std::move(still_deferred);
                             }
-
-                            it = group_vec.begin();
                         } else {
                             ++it;
                         }
@@ -1284,9 +1292,9 @@ bool AudioManagerClass::Has_Been_Submitted(const std::string& filename, AudioGro
             }
         }
         return false;
-    } else {
-        return SamplesMap.contains(key);
     }
+
+    return SamplesMap.contains(key);
 }
 
 
@@ -1550,12 +1558,10 @@ bool AudioManagerClass::Remove_Active_Handle_NoLock(AudioInstanceHandle audio_id
  */
 bool AudioManagerClass::Clear_All_Active_Handles()
 {
-    {
-        std::scoped_lock lock(ThreadMutex);
+    std::scoped_lock lock(ThreadMutex);
 
-        ActiveInstanceMap.clear();
-        GroupedActiveInstanceMap.clear();
-    }
+    ActiveInstanceMap.clear();
+    GroupedActiveInstanceMap.clear();
 
     return true;
 }
@@ -1681,17 +1687,26 @@ AudioPriorityType AudioManagerClass::Priority_To_AudioPriority(int priority)
 /**
  *  Utility functions for converting integer audio volume (original DSAudio values) to and from float (miniaudio).
  *
+ *  The vanilla DirectSound engine used a logarithmic curve (Convert_HMI_To_Direct_Sound_Volume):
+ *    ds_vol = log10(vol/255) * 3333.3  [hundredths of dB]
+ *    amplitude = 10^(ds_vol/2000) = (vol/255)^(5/3)
+ *  These functions replicate that curve so volume behaviour matches the original engine.
+ *
  *  @author: CCHyper
  */
 unsigned int AudioManagerClass::fVolume_To_iVolume(float vol)
 {
     vol = std::clamp(vol, 0.0f, 1.0f);
-    return (vol * 255);
+    if (vol == 0.0f) return 0;
+    if (vol >= 1.0f) return 255;
+    return static_cast<unsigned int>(std::pow(vol, 3.0f / 5.0f) * 255.0f);
 }
 
 float AudioManagerClass::iVolume_To_fVolume(unsigned int vol)
 {
-    return float(vol) / 255.0f;
+    if (vol == 0) return 0.0f;
+    if (vol >= 255) return 1.0f;
+    return std::pow(static_cast<float>(vol) / 255.0f, 5.0f / 3.0f);
 }
 
 
