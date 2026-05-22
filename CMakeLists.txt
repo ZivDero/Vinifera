@@ -324,8 +324,8 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/imstb_rectpack.h
     ${IMGUI_DIR}/imstb_textedit.h
     ${IMGUI_DIR}/imstb_truetype.h
-    ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer3.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_sdlrenderer3.h
+    ${IMGUI_DIR}/backends/imgui_impl_dx11.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_dx11.h
     ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
     ${IMGUI_DIR}/backends/imgui_impl_win32.h
 )
@@ -333,7 +333,6 @@ target_include_directories(imgui PUBLIC
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
 )
-target_link_libraries(imgui PUBLIC SDL3::SDL3)
 # Match Vinifera's default __fastcall calling convention - otherwise the
 # function-name mangling differs and every imgui call comes out as an
 # unresolved external. Same fix as miniaudio above.
