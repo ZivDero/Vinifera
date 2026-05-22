@@ -58,7 +58,6 @@
 #include "mapseedext_hooks.h"
 #include "missionext_hooks.h"
 #include "mouseext_hooks.h"
-#include "msengineext_hooks.h"
 #include "msglistext_hooks.h"
 #include "multimissionext_hooks.h"
 #include "multiscoreext_hooks.h"
@@ -291,7 +290,6 @@ void Extension_Hooks()
     FilePCXExtension_Hooks();
     FetchRes_Hooks();
     XSurfaceExtension_Hooks();
-    MSEngineExtension_Hooks();
 
     /**
      *  New classes and interfaces.
