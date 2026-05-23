@@ -53,11 +53,6 @@ public:
     void Set();
     SidebarViewType Get_Sidebar_View_Type() const;
 
-private:
-    void Apply_Volumes();
-
-public:
-
     static SubtitleModeType Parse_Subtitle_Mode(const char* name);
     static const char* Subtitle_Mode_Config_Name(SubtitleModeType mode);
 
