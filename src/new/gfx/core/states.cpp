@@ -245,6 +245,34 @@ namespace Vinifera::Gfx
             dsd.DepthFunc = D3D11_COMPARISON_LESS;
             dsd.StencilEnable = FALSE;
             break;
+        case EDepthStencil::DarkenDedup: {
+            // Stencil-based dedup for sprite SHAPE_DARKEN draws so overlapping
+            // shadows (cliff + bridge, infantry shadow + cliff, etc.) darken
+            // each pixel at most once per frame. The D24S8 depth target is
+            // cleared (depth + stencil) per frame in graphics_device.cpp, so
+            // stencil starts each frame at 0. With ref=0 (sprite_batch.cpp
+            // hardcodes the OMSetDepthStencilState ref to 0), EQUAL passes on
+            // stencil==0 and INCR_SAT bumps to 1; subsequent darkens at the
+            // same pixel test 1 against ref=0 → fail → discarded.
+            //
+            // Depth-test stays LessEqual so shadows remain occluded by closer
+            // geometry drawn earlier; no depth write so shadows don't occlude
+            // anything later (units, etc).
+            dsd.DepthEnable    = TRUE;
+            dsd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+            dsd.DepthFunc      = D3D11_COMPARISON_LESS_EQUAL;
+            dsd.StencilEnable    = TRUE;
+            dsd.StencilReadMask  = 0xFF;
+            dsd.StencilWriteMask = 0xFF;
+            D3D11_DEPTH_STENCILOP_DESC op = {};
+            op.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
+            op.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+            op.StencilPassOp      = D3D11_STENCIL_OP_INCR_SAT;
+            op.StencilFunc        = D3D11_COMPARISON_EQUAL;
+            dsd.FrontFace = op;
+            dsd.BackFace  = op;
+            break;
+        }
         default: return nullptr;
         }
 

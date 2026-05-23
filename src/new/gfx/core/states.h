@@ -70,6 +70,13 @@ namespace Vinifera::Gfx
                                 // shadow rendering so multiple shadow voxels projecting to
                                 // the same pixel only land once — the first write sets the
                                 // depth, subsequent equal-depth writes are rejected.
+        DarkenDedup,            // depth-test LessEqual + no depth write + stencil dedup
+                                // (StencilFunc EQUAL with ref=0, StencilPassOp INCR_SAT).
+                                // First darken at a pixel passes (stencil 0 == ref 0), op
+                                // increments stencil to 1; subsequent darkens at the same
+                                // pixel fail (1 != 0) and are discarded. Used by sprite
+                                // SHAPE_DARKEN draws so overlapping shadows (cliff +
+                                // bridge, infantry shadow + cliff, etc.) darken once.
 
         Count
     };

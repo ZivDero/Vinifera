@@ -248,20 +248,21 @@ namespace Vinifera::Gfx
          */
         const auto state_eq = [](const SpriteDrawCmd& a, const SpriteDrawCmd& b) {
             /**
-             *  Palette, ZAsset page, and EffectFlags (DARKEN) are all per-
-             *  vertex now: palette layer rides the vertex stream into the
-             *  shared PaletteArray; DARKEN is encoded as a per-vertex SEF_*
-             *  flag handled by the dual-source-blend shader; and the z-shape
+             *  Palette and ZAsset page are per-vertex now: palette layer rides
+             *  the vertex stream into the shared PaletteArray; the z-shape
              *  atlas is the same texture as the color atlas (so binding the
              *  same SRV at t3 is harmless when no z-shape is in use).
              *
-             *  What remains as real pipeline state: SHP atlas page (still
-             *  may span multiple pages on heavy content) and depth-stencil
-             *  state (WriteDepth / DisableDepth).
+             *  What remains as real pipeline state: SHP atlas page (still may
+             *  span multiple pages on heavy content), depth-stencil state
+             *  (WriteDepth / DisableDepth), and the SEF_DARKEN bit because
+             *  darken draws select the stencil-dedup depth state to prevent
+             *  overlapping shadows from compound-darkening into 0.25.
              */
             if (a.Asset->Atlas_Page() != b.Asset->Atlas_Page()) return false;
             if (a.WriteDepth != b.WriteDepth) return false;
             if (a.DisableDepth != b.DisableDepth) return false;
+            if (((a.EffectFlags ^ b.EffectFlags) & SEF_DARKEN) != 0) return false;
             return true;
         };
 
@@ -291,6 +292,27 @@ namespace Vinifera::Gfx
                 && pass_commands[bucket_end].OutputTarget == bucket_target) {
                 ++bucket_end;
             }
+
+            /**
+             *  Reorder the bucket so SHAPE_DARKEN commands group at the front,
+             *  preserving original relative order within each group. Without
+             *  this, every per-object `shadow → body` transition would produce
+             *  a batch break (state_eq fails on the SEF_DARKEN bit) — turning
+             *  a single ObjectLayer pass into hundreds of micro-batches. With
+             *  it, each bucket fires at most one SEF_DARKEN-driven break: one
+             *  batch with DarkenDedup state for all shadows, one batch with
+             *  the regular sprite state for the rest.
+             *
+             *  Per-pixel dedup still works because the stencil channel is
+             *  cleared once per frame and persists across passes — drawing all
+             *  shadows first within a pass writes stencil=1 at every shadowed
+             *  pixel, and the same-pixel second darken (in this pass or a
+             *  later pass) hits stencil=1 and is discarded.
+             */
+            std::stable_partition(
+                pass_commands.begin() + bucket_start,
+                pass_commands.begin() + bucket_end,
+                [](const SpriteDrawCmd& c) { return (c.EffectFlags & SEF_DARKEN) != 0; });
 
             /**
              *  Crossing a bucket boundary is itself a batch break (different
@@ -360,10 +382,19 @@ namespace Vinifera::Gfx
                  *  bucket so EDepthStencil::TestLessEqual against a null
                  *  DSV doesn't trip undefined behaviour. Submission order
                  *  preserves layer ordering, matching vanilla's CPU paint.
+                 *
+                 *  SHAPE_DARKEN (SEF_DARKEN) batches use the stencil-dedup
+                 *  state so overlapping shadow shapes (cliff + bridge, etc.)
+                 *  darken each pixel exactly once instead of compounding
+                 *  multiplicatively. The state object still tests depth
+                 *  (LessEqual, no write) for occlusion correctness; the
+                 *  stencil channel handles the per-pixel dedup.
                  */
                 EDepthStencil depth_state;
                 if (is_sidebar) {
                     depth_state = EDepthStencil::None;
+                } else if (head.EffectFlags & SEF_DARKEN) {
+                    depth_state = EDepthStencil::DarkenDedup;
                 } else {
                     depth_state = head.DisableDepth
                         ? EDepthStencil::None
@@ -452,13 +483,16 @@ namespace Vinifera::Gfx
          *  records and uses submission order for layering) set
          *  `cmd.DisableDepth = true`. Callers that want normal depth-tested
          *  sprite behaviour leave the flags alone — same logic the regular
-         *  Flush_Pass uses.
+         *  Flush_Pass uses. SEF_DARKEN routes to the stencil-dedup state so
+         *  overlapping darken shapes don't compound (mirrors Flush_Pass).
          */
-        const EDepthStencil depth_state = cmd.DisableDepth
-            ? EDepthStencil::None
-            : (cmd.WriteDepth
-                ? EDepthStencil::WriteLessEqual
-                : EDepthStencil::TestLessEqual_NoWrite);
+        const EDepthStencil depth_state = (cmd.EffectFlags & SEF_DARKEN)
+            ? EDepthStencil::DarkenDedup
+            : (cmd.DisableDepth
+                ? EDepthStencil::None
+                : (cmd.WriteDepth
+                    ? EDepthStencil::WriteLessEqual
+                    : EDepthStencil::TestLessEqual_NoWrite));
 
         Batch.Begin(device, EBlend::DualSourceBlend, ESampler::PointClamp, &PalEffect,
                     target_w, target_h, depth_state);

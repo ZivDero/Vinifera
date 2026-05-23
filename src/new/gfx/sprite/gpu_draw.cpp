@@ -298,11 +298,17 @@ namespace Vinifera::Gfx
          *  Depth: WAE-style screen-Y normalization. Larger screen Y means
          *  the object is closer to the camera (front of the iso view), so it
          *  gets a smaller depth value. Per-vertex Z gradient (DstZTop vs
-         *  DstZBottom) is gated on SHAPE_ZGRAD specifically:
-         *    - SHAPE_ZGRAD + ZGRAD_GROUND: full gradient.
-         *    - SHAPE_ZGRAD + ZGRAD_45DEG: half gradient (cliff/ramp face).
-         *    - SHAPE_ZGRAD + ZGRAD_90DEG: no gradient (vertical structure).
-         *    - SHAPE_ZGRAD off, or ZGRAD_NONE: no gradient.
+         *  DstZBottom) triggers on either the SHAPE_ZGRAD flag bit OR a
+         *  non-NONE zgrad parameter — vanilla's CPU rasterizer drove the
+         *  gradient purely off the parameter, so overlay call sites that
+         *  pass `ZGRAD_GROUND`/`ZGRAD_90DEG` with only `SHAPE_4000`
+         *  (`SHAPE_ZREADWRITE`) set get the gradient too. The zgrad value
+         *  then selects:
+         *    - ZGRAD_GROUND: full gradient.
+         *    - ZGRAD_45DEG:  half gradient (cliff/ramp face).
+         *    - ZGRAD_90DEG:  no gradient (vertical structure).
+         *    - ZGRAD_NONE:   no gradient (and no gate triggered unless
+         *                    SHAPE_ZGRAD is set, which keeps top == bottom).
          */
         {
             const float kSpriteEpsilon = 5e-5f;
@@ -310,7 +316,8 @@ namespace Vinifera::Gfx
             const float bottom_y = (float)(y + fi->H) + depth_bias_y;
             float top_y = bottom_y;
 
-            if (flags & SHAPE_ZGRAD) {
+            const bool apply_grad = (flags & SHAPE_ZGRAD) || (zgrad != ZGRAD_NONE);
+            if (apply_grad) {
                 if (zgrad == ZGRAD_GROUND) {
                     top_y = bottom_y - (float)fi->H;
                 } else if (zgrad == ZGRAD_45DEG) {
@@ -332,9 +339,20 @@ namespace Vinifera::Gfx
          *  tactical view; submission order handles inter-overlay layering.
          */
         cmd.DisableDepth = !z_active;
-        if (Is_Cell_Shadow_Pass(cmd.Pass)) {
-            cmd.DisableDepth = false;
+
+        /**
+         *  Shadow / darkening shapes never write depth. A SHAPE_DARKEN draw
+         *  is a multiplicative mask, not geometry — it must not leave z
+         *  marks for later passes to occlude against. This covers cliff
+         *  shadows (CellShadows pass), bridge shadows (Overlays pass), and
+         *  infantry / vehicle / anim / bullet drop shadows uniformly. Z-test
+         *  is still active when the source flags asked for it, so shadows
+         *  remain correctly occluded by foreground geometry drawn earlier.
+         */
+        if (flags & SHAPE_DARKEN) {
+            cmd.WriteDepth = false;
         }
+
         if (cmd.DisableDepth) {
             cmd.WriteDepth = false;
         }
