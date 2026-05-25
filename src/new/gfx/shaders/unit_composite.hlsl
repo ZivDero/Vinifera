@@ -5,8 +5,9 @@ cbuffer SpriteCB : register(b0)
 cbuffer EffectCB : register(b1)
 {
     float  Alpha;
-    int    Ssaa;       // active SSAA stride: 1 = pass-through (1-tap), 2 = 2x2 resolve
-    float2 _Pad;
+    int    Ssaa;       // SSAA factor used for the t1 RT (only sampled when PassCount > 1)
+    int    PassCount;  // 1 = NoSSAA only; 2 = blend NoSSAA + SSAA 50/50
+    float  _Pad;
 };
 
 struct VSIn {
@@ -31,8 +32,9 @@ VSOut VSMain(VSIn i)
     return o;
 }
 
-Texture2D<float4> Scratch : register(t0);
-SamplerState      PointS  : register(s0);
+Texture2D<float4> ScratchNoSSAA : register(t0);
+Texture2D<float4> ScratchSSAA   : register(t1);
+SamplerState      PointS        : register(s0);
 
 struct PSOut {
     float4 color : SV_Target;
@@ -40,45 +42,62 @@ struct PSOut {
 };
 
 /**
- *  4-tap SSAA resolve with crisp-silhouette + interior-AA logic. The
- *  scratch is allocated at logical × kUnitScratchMaxSSAA and the active
- *  region for the current unit is logical × Ssaa (where `Ssaa` is the
- *  runtime CB uniform, 1 or 2 depending on `[AudioVisual] SmoothVoxels=`).
- *  Each dst pixel maps to an Ssaa×Ssaa source-texel block; doing the
- *  resolve ourselves instead of letting a bilinear sampler box-average
- *  everything keeps the silhouette pixel-aligned while smoothing the
- *  unit's interior.
+ *  Dual-pass composite resolve. Both passes render the SAME unit into
+ *  two separate scratch RTs:
+ *    t0 — NoSSAA RT (256², POINTLIST voxels, 1 source texel per dst pixel)
+ *    t1 — SSAA   RT (512², splatted voxels, 2×2 source block per dst pixel)
+ *  When PassCount == 1 (SmoothVoxels=off) only t0 was rendered; the PS
+ *  pass-throughs it. When PassCount == 2 the PS samples both and emits
+ *  a 50/50 average — gives "half-strength AA" where the SSAA softens
+ *  the unit but the crisp POINTLIST version keeps the pixel-art look
+ *  visible underneath.
  *
- *  Per dst pixel (with Ssaa = 2):
- *    - count of opaque source samples in the 2×2 block decides coverage
- *    - <2 opaque → discard (transparent; sharpens the outer silhouette)
- *    - ≥2 opaque → output fully opaque, color = avg of opaque-only samples
- *  The boundary jumps from <2 to ≥2 within one dst pixel so the
- *  silhouette stays crisp instead of fading through ~25%-alpha halo.
- *  Inside the unit (all 4 opaque) the average smooths VPL-ramp banding
- *  and softens transitions between adjacent voxels of different colors.
- *  Composite-replay SHPs whose one source texel covers a 2×2 scratch
- *  block contribute 4 identical samples, so SHP interiors and edges
- *  also stay crisp.
- *
- *  With Ssaa = 1 (SmoothVoxels=off, vanilla look) the stride collapses
- *  to 0, all 4 taps land on the same source texel, opaque_count is 0 or
- *  4, and the path reduces to a 1-tap pass-through that emits whatever
- *  was rasterized — no AA, no SSAA cost, voxel POINTLIST pixels render
- *  one-for-one into the scene.
+ *  Pixel handling at the silhouette: each pass has its own coverage,
+ *  averaging the premultiplied alphas means a dst pixel covered by only
+ *  one pass renders at ~50% alpha. That's the intended "blended" look
+ *  the dual-pass approach asks for — if you want pixel-aligned crisp
+ *  silhouettes, use SmoothVoxels=off (PassCount=1).
  */
-PSOut PSMain(VSOut v)
-{
-    uint w, h;
-    Scratch.GetDimensions(w, h);
-    float2 src_px = v.uv * float2(w, h);
-    int2   base   = int2(floor(src_px - 0.5));
-    int    stride = Ssaa - 1;   // 0 → all taps collapse; 1 → 2×2 footprint
 
-    float4 s0 = Scratch.Load(int3(base + int2(0,      0     ), 0));
-    float4 s1 = Scratch.Load(int3(base + int2(stride, 0     ), 0));
-    float4 s2 = Scratch.Load(int3(base + int2(0,      stride), 0));
-    float4 s3 = Scratch.Load(int3(base + int2(stride, stride), 0));
+float4 Resolve_NoSSAA(float2 uv)
+{
+    /**
+     *  1-tap point sample at the dst pixel's source texel. Voxel POINTLIST
+     *  pixels in the 256² RT map 1:1 to dst pixels, so this is exactly
+     *  what the unit was rasterized to.
+     */
+    uint w, h;
+    ScratchNoSSAA.GetDimensions(w, h);
+    int2 px = int2(floor(uv * float2(w, h)));
+    float4 c = ScratchNoSSAA.Load(int3(px, 0));
+    /**
+     *  Binarize alpha — premultiplied transparent pixels carry (0,0,0,0)
+     *  and opaque ones (color, 1.0). Returning the pre-multiplied tuple
+     *  keeps the blend math downstream consistent.
+     */
+    return c;
+}
+
+float4 Resolve_SSAA(float2 uv)
+{
+    /**
+     *  4-tap SSAA resolve with majority-opaque rule. Same logic as the
+     *  pre-dual-pass shader, just isolated as a helper so the dual-pass
+     *  blend can call it cleanly. Samples 4 corners of an Ssaa×Ssaa
+     *  block from the SSAA RT — for Ssaa=2 the 4 taps cover a 2×2 source
+     *  block; the majority rule keeps silhouettes pixel-aligned while
+     *  smoothing interior color transitions.
+     */
+    uint w, h;
+    ScratchSSAA.GetDimensions(w, h);
+    float2 src_px = uv * float2(w, h);
+    int2   base   = int2(floor(src_px - 0.5));
+    int    stride = Ssaa - 1;
+
+    float4 s0 = ScratchSSAA.Load(int3(base + int2(0,      0     ), 0));
+    float4 s1 = ScratchSSAA.Load(int3(base + int2(stride, 0     ), 0));
+    float4 s2 = ScratchSSAA.Load(int3(base + int2(0,      stride), 0));
+    float4 s3 = ScratchSSAA.Load(int3(base + int2(stride, stride), 0));
 
     float a0 = s0.a > 0.5 ? 1.0 : 0.0;
     float a1 = s1.a > 0.5 ? 1.0 : 0.0;
@@ -86,28 +105,63 @@ PSOut PSMain(VSOut v)
     float a3 = s3.a > 0.5 ? 1.0 : 0.0;
     float opaque_count = a0 + a1 + a2 + a3;
 
-    // Coverage threshold: majority of taps for SSAA=2 (≥2 of 4);
-    // any-tap for SSAA=1 (≥1 of 4, since all 4 are the same sample
-    // so opaque_count is 0 or 4 — 0.5 catches the latter). Discarding
-    // (instead of writing alpha=0) also keeps the scene depth test
-    // from seeing pixels that aren't really the unit's footprint.
-    const float kCoverThreshold = (Ssaa > 1) ? 2.0 : 0.5;
-    if (opaque_count < kCoverThreshold) discard;
-
-    // Scratch is premultiplied; opaque samples have rgb == final color,
-    // transparent samples have rgb == 0. Masking by per-sample a and
-    // dividing by opaque_count gives the actual color average across
-    // contributing samples — no transparent-black pollution at the
-    // silhouette pixels.
+    // Majority threshold (≥2 of 4) for silhouette. Sub-threshold pixels
+    // return premultiplied transparent; the dual-pass blend caller
+    // decides what to do when only one pass has coverage at a given
+    // pixel. Single return point — FXC's flow analyzer flags helper
+    // functions with multiple returns as "potentially uninitialized" in
+    // some configurations, so collapse to one tuple.
+    float pass_ok = opaque_count >= 2.0 ? 1.0 : 0.0;
+    float safe_count = max(opaque_count, 1.0);   // avoid /0 when pass_ok==0
     float3 rgb_sum = s0.rgb * a0 + s1.rgb * a1 + s2.rgb * a2 + s3.rgb * a3;
-    float3 rgb     = rgb_sum / opaque_count;
+    float3 rgb     = (rgb_sum / safe_count) * pass_ok;
+    return float4(rgb, pass_ok);
+}
+
+PSOut PSMain(VSOut v)
+{
+    float4 crisp = Resolve_NoSSAA(v.uv);
+
+    float4 blended;
+    if (PassCount > 1) {
+        /**
+         *  Coverage-weighted blend. Each pass contributes proportional
+         *  to its own coverage, and the output alpha is the *union* of
+         *  both — so a pixel reached by only one pass renders fully
+         *  opaque (no half-alpha halo around the silhouette where one
+         *  pass extended past the other), and pixels reached by both
+         *  get a true 50/50 color average. Both inputs are premultiplied
+         *  (rgb already scaled by their own alpha), so summing the rgbs
+         *  and dividing by the total alpha gives the weighted-average
+         *  color directly without re-premultiplying.
+         */
+        float4 smooth = Resolve_SSAA(v.uv);
+        float  total_a = crisp.a + smooth.a;
+        if (total_a <= 0.0) discard;
+        float3 mixed_rgb = (crisp.rgb + smooth.rgb) / total_a;
+        // Output alpha = "either pass covers this pixel". Saturate to
+        // 1 so a same-coverage interior pixel doesn't double up.
+        float  union_a = saturate(total_a);
+        blended = float4(mixed_rgb * union_a, union_a);
+    } else {
+        blended = crisp;
+    }
+
+    // Discard fully-transparent pixels so the scene depth test only
+    // sees the unit's actual footprint.
+    if (blended.a <= 0.0) discard;
 
     PSOut o;
-    // Per-unit translucency. Re-premultiplies for the scene's
-    // EBlend::Premultiplied blend (`src + (1 - src.a)*dst`).
-    o.color = float4(rgb * Alpha, Alpha);
-    // Per-unit constant depth from `Render_Deferred_Composite`, anchored
-    // at the unit's drawpoint Y to match `Tile_Base_Depth_From_Visual_Y`.
+    /**
+     *  Per-unit translucency. The blend math kept premultiplication, so
+     *  scaling the whole tuple by `Alpha` re-premultiplies for the
+     *  scene's `EBlend::Premultiplied` blend (`src + (1 - src.a)*dst`).
+     */
+    o.color = blended * Alpha;
+    /**
+     *  Per-unit constant depth from the caller (drawpoint-Y anchored to
+     *  match `Tile_Base_Depth_From_Visual_Y`).
+     */
     o.depth = v.pos.z;
     return o;
 }

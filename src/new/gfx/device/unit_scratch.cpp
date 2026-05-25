@@ -125,9 +125,46 @@ namespace Vinifera::Gfx
     }
 
 
+    namespace
+    {
+        /**
+         *  Build one of the two scratch depth textures. Same format,
+         *  different size per pass. Factored out so Ensure_Targets stays
+         *  readable.
+         */
+        bool Create_Scratch_Depth(ID3D11Device* d3d, int w, int h,
+                                  ID3D11Texture2D*& out_tex,
+                                  ID3D11DepthStencilView*& out_dsv)
+        {
+            D3D11_TEXTURE2D_DESC td = {};
+            td.Width      = w;
+            td.Height     = h;
+            td.MipLevels  = 1;
+            td.ArraySize  = 1;
+            td.Format     = DXGI_FORMAT_D32_FLOAT;
+            td.SampleDesc.Count   = 1;
+            td.SampleDesc.Quality = 0;
+            td.Usage      = D3D11_USAGE_DEFAULT;
+            td.BindFlags  = D3D11_BIND_DEPTH_STENCIL;
+            if (FAILED(d3d->CreateTexture2D(&td, nullptr, &out_tex))) {
+                return false;
+            }
+
+            D3D11_DEPTH_STENCIL_VIEW_DESC dsvd = {};
+            dsvd.Format        = DXGI_FORMAT_D32_FLOAT;
+            dsvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+            if (FAILED(d3d->CreateDepthStencilView(out_tex, &dsvd, &out_dsv))) {
+                return false;
+            }
+            return true;
+        }
+    }
+
+
     bool UnitScratch::Ensure_Targets(GraphicsDevice& device)
     {
-        if (ScratchRT != nullptr && DepthDSV != nullptr) return true;
+        if (ScratchNoSSAA != nullptr && ScratchSSAA != nullptr
+            && DepthDSVNoSSAA != nullptr && DepthDSVSSAA != nullptr) return true;
         Release_Targets();
 
         ID3D11Device* d3d = device.Get_Device();
@@ -136,54 +173,46 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  SSAA color target — RTV + SRV via RenderTarget2D, single-sample
-         *  at backing resolution (logical × kUnitScratchMaxSSAA). Allocated
-         *  once at the worst-case (max SSAA) size so the rule
-         *  `[AudioVisual] SmoothVoxels=` can toggle the active SSAA factor
-         *  at runtime without reallocating; when active < max, the unit
-         *  renders into the top-left active region and the composite blit
-         *  reads only that region.
+         *  NoSSAA color + depth at 256² (logical). Rendered every unit
+         *  (single source for SmoothVoxels=off, crisp half of the blend
+         *  when on). RTV+SRV via RenderTarget2D so the composite PS
+         *  samples it directly.
          */
-        ScratchRT = new RenderTarget2D();
-        if (ScratchRT == nullptr) {
+        ScratchNoSSAA = new RenderTarget2D();
+        if (ScratchNoSSAA == nullptr
+            || !ScratchNoSSAA->Initialize(device,
+                                          kUnitScratchWidth,
+                                          kUnitScratchHeight,
+                                          DXGI_FORMAT_R8G8B8A8_UNORM)) {
+            DEBUG_ERROR("UnitScratch: NoSSAA scratch RT init failed.\n");
             Release_Targets();
             return false;
         }
-        if (!ScratchRT->Initialize(device,
-                                   kUnitScratchBackingWidth,
-                                   kUnitScratchBackingHeight,
-                                   DXGI_FORMAT_R8G8B8A8_UNORM)) {
-            DEBUG_ERROR("UnitScratch: scratch RT init failed.\n");
+        if (!Create_Scratch_Depth(d3d, kUnitScratchWidth, kUnitScratchHeight,
+                                  DepthTexNoSSAA, DepthDSVNoSSAA)) {
+            DEBUG_ERROR("UnitScratch: NoSSAA depth init failed.\n");
             Release_Targets();
             return false;
         }
 
         /**
-         *  Depth at backing resolution to match the color RT. Single-
-         *  sample D32_FLOAT, BIND_DEPTH_STENCIL only — depth is never
-         *  sampled or resolved.
+         *  SSAA color + depth at backing (logical × kUnitScratchMaxSSAA,
+         *  currently 512²). Rendered only on dual-pass units. Contributes
+         *  the smooth 4-tap half of the composite blend.
          */
-        D3D11_TEXTURE2D_DESC td = {};
-        td.Width      = kUnitScratchBackingWidth;
-        td.Height     = kUnitScratchBackingHeight;
-        td.MipLevels  = 1;
-        td.ArraySize  = 1;
-        td.Format     = DXGI_FORMAT_D32_FLOAT;
-        td.SampleDesc.Count   = 1;
-        td.SampleDesc.Quality = 0;
-        td.Usage      = D3D11_USAGE_DEFAULT;
-        td.BindFlags  = D3D11_BIND_DEPTH_STENCIL;
-        if (FAILED(d3d->CreateTexture2D(&td, nullptr, &DepthTex))) {
-            DEBUG_ERROR("UnitScratch: depth tex creation failed.\n");
+        ScratchSSAA = new RenderTarget2D();
+        if (ScratchSSAA == nullptr
+            || !ScratchSSAA->Initialize(device,
+                                        kUnitScratchSSAAWidth,
+                                        kUnitScratchSSAAHeight,
+                                        DXGI_FORMAT_R8G8B8A8_UNORM)) {
+            DEBUG_ERROR("UnitScratch: SSAA scratch RT init failed.\n");
             Release_Targets();
             return false;
         }
-
-        D3D11_DEPTH_STENCIL_VIEW_DESC dsvd = {};
-        dsvd.Format        = DXGI_FORMAT_D32_FLOAT;
-        dsvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-        if (FAILED(d3d->CreateDepthStencilView(DepthTex, &dsvd, &DepthDSV))) {
-            DEBUG_ERROR("UnitScratch: DSV creation failed.\n");
+        if (!Create_Scratch_Depth(d3d, kUnitScratchSSAAWidth, kUnitScratchSSAAHeight,
+                                  DepthTexSSAA, DepthDSVSSAA)) {
+            DEBUG_ERROR("UnitScratch: SSAA depth init failed.\n");
             Release_Targets();
             return false;
         }
@@ -193,74 +222,95 @@ namespace Vinifera::Gfx
 
     void UnitScratch::Release_Targets()
     {
-        Safe_Release(DepthDSV);
-        Safe_Release(DepthTex);
-        if (ScratchRT != nullptr) {
-            delete ScratchRT;
-            ScratchRT = nullptr;
+        Safe_Release(DepthDSVSSAA);
+        Safe_Release(DepthTexSSAA);
+        if (ScratchSSAA != nullptr) {
+            delete ScratchSSAA;
+            ScratchSSAA = nullptr;
+        }
+        Safe_Release(DepthDSVNoSSAA);
+        Safe_Release(DepthTexNoSSAA);
+        if (ScratchNoSSAA != nullptr) {
+            delete ScratchNoSSAA;
+            ScratchNoSSAA = nullptr;
         }
     }
 
 
-    ID3D11ShaderResourceView* UnitScratch::Get_SRV() const
+    int UnitScratch::Get_Pass_Count() const
     {
-        return ScratchRT != nullptr ? ScratchRT->Get_SRV() : nullptr;
+        return (RuleExtension != nullptr && RuleExtension->IsSmoothVoxels) ? 2 : 1;
     }
 
 
     void UnitScratch::Clear_Depth(GraphicsDevice& device)
     {
-        if (!Initialized || DepthDSV == nullptr) return;
+        if (!Initialized) return;
         ID3D11DeviceContext* ctx = device.Get_Context();
         if (ctx == nullptr) return;
-        ctx->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+
+        /**
+         *  Pick the DSV for the currently-active pass. Records-in-replay
+         *  call this between captured records; in dual-pass mode each
+         *  pass walks the same record list independently, so the right
+         *  DSV depends on which pass we're currently in.
+         */
+        ID3D11DepthStencilView* dsv = (ActivePassIndex == 1) ? DepthDSVSSAA : DepthDSVNoSSAA;
+        if (dsv == nullptr) return;
+        ctx->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
     }
 
 
-    bool UnitScratch::Begin_Unit(GraphicsDevice& device)
+    bool UnitScratch::Begin_Unit_Pass(GraphicsDevice& device, int pass)
     {
         if (!Initialized) return false;
         ID3D11DeviceContext* ctx = device.Get_Context();
         if (ctx == nullptr) return false;
 
-        /**
-         *  Save current RTV/DSV/viewport so End_Unit_Composite can restore
-         *  them after the composite blit. OMGetRenderTargets AddRefs both
-         *  views; we Release in End_Unit_Composite.
-         */
-        Safe_Release(SavedRTV);
-        Safe_Release(SavedDSV);
-        ctx->OMGetRenderTargets(1, &SavedRTV, &SavedDSV);
-        SavedVPCount = 1;
-        ctx->RSGetViewports(&SavedVPCount, &SavedVP);
+        if (pass == 0) {
+            /**
+             *  Save current RTV/DSV/viewport so End_Unit_Composite can
+             *  restore them after the composite blit. OMGetRenderTargets
+             *  AddRefs both views; we Release in End_Unit_Composite.
+             *  Capture only on the first pass — subsequent passes within
+             *  the same unit just swap the scratch binding.
+             */
+            Safe_Release(SavedRTV);
+            Safe_Release(SavedDSV);
+            ctx->OMGetRenderTargets(1, &SavedRTV, &SavedDSV);
+            SavedVPCount = 1;
+            ctx->RSGetViewports(&SavedVPCount, &SavedVP);
+
+            /**
+             *  Latch the per-unit pass count from the rule so a live edit
+             *  between passes can't desync End_Unit_Composite's blend.
+             */
+            ActivePassCount = Get_Pass_Count();
+        }
 
         /**
-         *  Sample `[AudioVisual] SmoothVoxels=` to set the active SSAA
-         *  factor for this unit. SmoothVoxels=on → 2× SSAA + splat (full
-         *  AA path). SmoothVoxels=off → 1× SSAA + POINTLIST voxels
-         *  (vanilla look; splatting gated separately via VEF_SPLAT in
-         *  Build_Section_Params). Refreshing per-unit lets the rule
-         *  toggle live without reallocating the backing texture.
+         *  Pass 0 → NoSSAA RT (256², CurrentSsaa=1, POINTLIST voxels via
+         *  the VEF_SPLAT mask in Issue_Cmd_To_Scratch).
+         *  Pass 1 → SSAA RT (logical × kUnitScratchMaxSSAA, CurrentSsaa
+         *  = max, splatted voxels). Only valid when ActivePassCount == 2.
          */
-        const bool smooth = (RuleExtension != nullptr && RuleExtension->IsSmoothVoxels);
-        CurrentSsaa = smooth ? kUnitScratchMaxSSAA : 1;
+        ActivePassIndex = pass;
+        ID3D11RenderTargetView* rtv = nullptr;
+        ID3D11DepthStencilView* dsv = nullptr;
+        if (pass == 0) {
+            CurrentSsaa = 1;
+            rtv = ScratchNoSSAA->Get_RTV();
+            dsv = DepthDSVNoSSAA;
+        } else {
+            CurrentSsaa = kUnitScratchMaxSSAA;
+            rtv = ScratchSSAA->Get_RTV();
+            dsv = DepthDSVSSAA;
+        }
 
-        /**
-         *  Bind the SSAA scratch RT/DSV at backing resolution. Clear only
-         *  the active top-left region (the rest is leftover from prior
-         *  frames and unread by End_Unit_Composite's src rect anyway, so
-         *  there's no observable difference) — use a full RTV clear for
-         *  simplicity; one extra ROP across 768 KB / frame isn't worth
-         *  a partial-clear shader. Voxel cmds use viewport-and-T-scaled
-         *  coordinates (see Issue_Cmd_To_Scratch) so the unit's logical
-         *  footprint fills the active region; the composite PS then
-         *  4-tap-downsamples it back to logical size in scene space.
-         */
-        ID3D11RenderTargetView* rtv = ScratchRT->Get_RTV();
-        ctx->OMSetRenderTargets(1, &rtv, DepthDSV);
+        ctx->OMSetRenderTargets(1, &rtv, dsv);
         const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         ctx->ClearRenderTargetView(rtv, clear_color);
-        ctx->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+        ctx->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
         D3D11_VIEWPORT vp = {};
         vp.Width    = (float)Get_Active_Width();
@@ -284,7 +334,8 @@ namespace Vinifera::Gfx
         /**
          *  Restore the caller's RT/DSV bindings + viewport before issuing
          *  the composite quad. The quad targets whatever RT was active
-         *  before `Begin_Unit` (typically Scene), at the original viewport.
+         *  before `Begin_Unit_Pass(0)` (typically Scene), at the original
+         *  viewport.
          */
         ctx->OMSetRenderTargets(1, &SavedRTV, SavedDSV);
         if (SavedVPCount > 0) {
@@ -294,19 +345,22 @@ namespace Vinifera::Gfx
         Safe_Release(SavedDSV);
         SavedVPCount = 0;
 
-        if (alpha <= 0.0f) {
+        const int pass_count = ActivePassCount;
+        ActivePassIndex = -1;
+        ActivePassCount = 0;
+        CurrentSsaa     = kUnitScratchMaxSSAA;
+
+        if (alpha <= 0.0f || pass_count == 0) {
             return;
         }
 
         /**
-         *  Composite blit: full SSAA scratch quad → scene RT at scene_origin
-         *  at logical size. The composite PS does its own 4-tap downsample
-         *  (see unit_composite.hlsl) — explicit Load() of the 2×2 scratch
-         *  block per dst pixel + a majority-opaque rule that averages
-         *  interior colors but keeps the silhouette pixel-aligned. The
-         *  sampler is unused (Load bypasses it) but we bind PointClamp
-         *  to keep the sampler state predictable and to match the shader's
-         *  point-sample intent.
+         *  Composite blit: full scratch → scene quad at logical size. The
+         *  composite PS reads NoSSAA at t0 (1-tap point) and, if
+         *  pass_count == 2, SSAA at t1 (4-tap majority-opaque resolve)
+         *  and averages the two. SmoothVoxels=off short-circuits to just
+         *  the t0 pass-through. PointClamp sampler is bound but unused
+         *  (PS uses Load()).
          */
         const int scene_w = device.Get_Logical_Width();
         const int scene_h = device.Get_Logical_Height();
@@ -315,9 +369,21 @@ namespace Vinifera::Gfx
                              scene_w, scene_h, EDepthStencil::TestLessEqual_NoWrite);
 
         UnitCompositeEffect::Params p = {};
-        p.Alpha = alpha;
-        p.Ssaa  = CurrentSsaa;
+        p.Alpha     = alpha;
+        p.Ssaa      = kUnitScratchMaxSSAA;
+        p.PassCount = pass_count;
         CompositeFx.Set_Params(device, p);
+
+        /**
+         *  Bind the SSAA RT at t1 manually (SpriteBatch::Draw only binds
+         *  the texture at t0). When pass_count == 1 the shader ignores
+         *  t1 entirely, so a stale binding is fine — but binding the
+         *  current frame's SSAA RT regardless keeps state consistent and
+         *  avoids leftover bindings from prior passes.
+         */
+        ID3D11ShaderResourceView* ssaa_srv = (ScratchSSAA != nullptr)
+                                           ? ScratchSSAA->Get_SRV() : nullptr;
+        ctx->PSSetShaderResources(1, 1, &ssaa_srv);
 
         const RectF dst {
             (float)scene_origin.X,
@@ -325,14 +391,20 @@ namespace Vinifera::Gfx
             (float)kUnitScratchWidth,
             (float)kUnitScratchHeight
         };
+        /**
+         *  Src is in pixels of the t0 texture (NoSSAA, 256²) → full quad.
+         *  The shader computes the matching tap positions for t1 (SSAA)
+         *  by multiplying the same UV by t1's size via GetDimensions, so
+         *  no second src rect is needed.
+         */
         const RectF src {
             0.0f, 0.0f,
-            (float)Get_Active_Width(),
-            (float)Get_Active_Height()
+            (float)kUnitScratchWidth,
+            (float)kUnitScratchHeight
         };
         const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-        CompositeBatch.Draw(static_cast<Texture2D*>(ScratchRT), dst, &src, tint,
+        CompositeBatch.Draw(static_cast<Texture2D*>(ScratchNoSSAA), dst, &src, tint,
                             scene_depth, scene_depth,
                             /*z_uv*/ nullptr,
                             /*clip*/ nullptr,
@@ -340,10 +412,10 @@ namespace Vinifera::Gfx
         CompositeBatch.End(device);
 
         /**
-         *  Unbind the scratch SRV at slot 0 so subsequent passes that bind
-         *  the same slot don't see a stale view.
+         *  Unbind both scratch SRVs (t0 + t1) so subsequent passes that
+         *  bind the same slots don't see a stale view.
          */
-        ID3D11ShaderResourceView* null_srv = nullptr;
-        ctx->PSSetShaderResources(0, 1, &null_srv);
+        ID3D11ShaderResourceView* null_srvs[2] = { nullptr, nullptr };
+        ctx->PSSetShaderResources(0, 2, null_srvs);
     }
 }

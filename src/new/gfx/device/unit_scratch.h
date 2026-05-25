@@ -57,36 +57,33 @@ namespace Vinifera::Gfx
     inline const Point2D kUnitScratchOrigin(kUnitScratchOriginX, kUnitScratchOriginY);
 
     /**
-     *  Backing-storage SSAA factor — the color + depth textures are
-     *  allocated once at `(kUnitScratchWidth × kUnitScratchHeight)`
-     *  multiplied by this. The *active* SSAA per Begin_Unit may be lower
-     *  (currently gated by `[AudioVisual] SmoothVoxels=` — 2 when on,
-     *  1 when off). When the active factor is less than the max, the
-     *  unit renders into the top-left `(W*active × H*active)` region
-     *  of the backing texture and the composite blit reads only that
-     *  region. Keeping max=2 even when active=1 lets us toggle the
-     *  rule live without reallocating the scratch.
+     *  Backing-storage SSAA factor — the SSAA color + depth textures are
+     *  allocated at `(kUnitScratchWidth × kUnitScratchHeight)` multiplied
+     *  by this. There is a SECOND, no-SSAA RT pair at exactly logical
+     *  size for the dual-pass composite blend (see UnitScratch).
      *
      *  2 is the right default — 4× would quadruple PS cost across the
      *  whole unit footprint for a barely-perceptible improvement at
      *  256² logical.
      */
-    constexpr int kUnitScratchMaxSSAA      = 2;
-    constexpr int kUnitScratchBackingWidth  = kUnitScratchWidth  * kUnitScratchMaxSSAA;
-    constexpr int kUnitScratchBackingHeight = kUnitScratchHeight * kUnitScratchMaxSSAA;
+    constexpr int kUnitScratchMaxSSAA       = 2;
+    constexpr int kUnitScratchSSAAWidth     = kUnitScratchWidth  * kUnitScratchMaxSSAA;
+    constexpr int kUnitScratchSSAAHeight    = kUnitScratchHeight * kUnitScratchMaxSSAA;
 
 
     /**
-     *  Effect that samples the scratch RT and resolves it to scene size.
-     *  The PS does an explicit 4-tap SSAA resolve with a majority-opaque
-     *  rule (see unit_composite.hlsl) — keeps silhouettes pixel-aligned
-     *  while smoothing interior color transitions.
+     *  Composite resolve effect. Dual-pass blend: averages a 4-tap SSAA
+     *  resolve (from t1) and a 1-tap point sample (from t0); when only
+     *  the NoSSAA pass was rendered (PassCount == 1, SmoothVoxels=off)
+     *  the PS skips t1 entirely and emits the t0 sample as-is. See
+     *  unit_composite.hlsl.
      *
      *  Bind layout:
-     *    t0 — scratch RT SRV (backing-size, top-left active region)
+     *    t0 — NoSSAA scratch SRV (256², one source texel per dst pixel)
+     *    t1 — SSAA   scratch SRV (512², 2×2 source block per dst pixel)
      *    s0 — point-clamp sampler (unused; PS uses Load())
      *    b0 — SpriteCB (ProjMtx from SpriteBatch)
-     *    b1 — UnitCompositeCB (alpha + active SSAA factor)
+     *    b1 — UnitCompositeCB (alpha + SSAA factor + pass count)
      */
     class UnitCompositeEffect : public Effect
     {
@@ -94,8 +91,9 @@ namespace Vinifera::Gfx
         struct Params
         {
             float Alpha;
-            int   Ssaa;     // active SSAA stride for the 4-tap PS (1 → 1-tap pass-through; 2 → 2×2 block resolve)
-            float _Pad[2];
+            int   Ssaa;        // SSAA factor used for the t1 RT (currently always kUnitScratchMaxSSAA when sampled)
+            int   PassCount;   // 1 = NoSSAA only; 2 = blend NoSSAA + SSAA
+            float _Pad;
         };
 
         bool Initialize(GraphicsDevice& device);
@@ -119,53 +117,65 @@ namespace Vinifera::Gfx
         bool Is_Initialized() const { return Initialized; }
 
         /**
-         *  Active SSAA factor for the current Begin_Unit/End_Unit_Composite
-         *  scope. Set by Begin_Unit from `[AudioVisual] SmoothVoxels=`
-         *  (1 when off, 2 when on). Read by `VoxelQueue::Issue_Cmd_To_Scratch`
-         *  and `SpriteQueue::Render_Sprite_To_Scratch_Immediate` to size
-         *  their screen-space scaling, and by `End_Unit_Composite` to size
-         *  the composite blit's source rect + Ssaa CB field.
+         *  Active SSAA factor for the currently-bound pass — read by
+         *  `VoxelQueue::Issue_Cmd_To_Scratch` and
+         *  `SpriteQueue::Render_Sprite_To_Scratch_Immediate` to scale
+         *  their screen-space rects and pick render target dims. Set by
+         *  `Begin_Unit_Pass` (1 for the NoSSAA pass, kUnitScratchMaxSSAA
+         *  for the SSAA pass) and reset by `End_Unit_Composite`.
          */
         int Get_Active_SSAA()   const { return CurrentSsaa; }
         int Get_Active_Width()  const { return kUnitScratchWidth  * CurrentSsaa; }
         int Get_Active_Height() const { return kUnitScratchHeight * CurrentSsaa; }
 
         /**
-         *  Bind the scratch RTV+DSV with the active SSAA viewport
-         *  (Get_Active_Width × Get_Active_Height), clear color to
-         *  transparent and depth to 1.0. Saves the active RT/DSV
-         *  bindings so `End_Unit_Composite` can restore them. The
-         *  active SSAA factor is sampled from RulesExtension here, so
-         *  toggling `[AudioVisual] SmoothVoxels=` takes effect on the
-         *  next unit without recreating the scratch.
+         *  How many passes to render this unit through — sampled from
+         *  `RuleExtension->IsSmoothVoxels`. SmoothVoxels=off → 1 (NoSSAA
+         *  pass only, vanilla look). SmoothVoxels=on → 2 (NoSSAA + SSAA
+         *  passes, averaged at composite for a softened blend). Callers
+         *  loop `for (int p = 0; p < count; ++p) Begin_Unit_Pass(...,p)`
+         *  and re-render every section per pass.
          */
-        bool Begin_Unit(GraphicsDevice& device);
+        int Get_Pass_Count() const;
 
         /**
-         *  Clear the scratch depth buffer to 1.0 without disturbing the
-         *  scratch color RT. Used between captured records inside a single
-         *  unit's composite so each record's voxel/SHP draws start from a
-         *  fresh depth — gives strict painter's-order layering between
-         *  records (body, voxel barrel, turret) while preserving per-voxel
-         *  depth resolution within a single record's section.
+         *  Begin pass `pass` of this unit (0 ≤ pass < Get_Pass_Count()).
+         *  Pass 0 is always the NoSSAA pass (256² RT, CurrentSsaa = 1,
+         *  POINTLIST voxels via VEF_SPLAT mask in the queue helper).
+         *  Pass 1 is the SSAA pass (512² RT, CurrentSsaa =
+         *  kUnitScratchMaxSSAA, splatted voxels). Pass 0 also saves the
+         *  caller's scene RT/DSV/viewport so End_Unit_Composite can
+         *  restore them; later passes just rebind the scratch state.
+         */
+        bool Begin_Unit_Pass(GraphicsDevice& device, int pass);
+
+        /**
+         *  Clear the active pass's scratch depth buffer to 1.0 without
+         *  disturbing the scratch color RT. Used between captured
+         *  records so each record's voxel/SHP draws start from a fresh
+         *  depth — gives strict painter's-order layering between
+         *  records (body, voxel barrel, turret) while preserving per-
+         *  voxel depth resolution within a single record's section.
+         *  Operates on the currently-bound pass's DSV.
          */
         void Clear_Depth(GraphicsDevice& device);
 
         /**
-         *  Restore the scene RTV/DSV/viewport, then composite the scratch
-         *  contents as a single quad. `scene_origin` is where the scratch's
-         *  (0, 0) corner lands in scene-RT pixels — for unit-local rendering
-         *  centered at the unit's drawpoint, pass `drawpoint - scratch_origin`.
-         *  `alpha` is the visual-character translucency [0..1]. `scene_depth`
-         *  is the depth emitted by every pixel of the quad (one value per
-         *  unit, anchored at the unit's drawpoint Y to match tile depth).
+         *  Restore the scene RTV/DSV/viewport, then composite the
+         *  scratch contents as a single quad. When 2 passes were
+         *  rendered the composite PS averages the NoSSAA (crisp) and
+         *  SSAA (smooth) results; when only 1 pass was rendered (NoSSAA
+         *  only) the PS pass-throughs it. `scene_origin` is where the
+         *  scratch's (0, 0) corner lands in scene-RT pixels — for unit-
+         *  local rendering centered at the unit's drawpoint, pass
+         *  `drawpoint - scratch_origin`. `alpha` is the visual-character
+         *  translucency [0..1]. `scene_depth` is the depth emitted by
+         *  every pixel of the quad.
          */
         void End_Unit_Composite(GraphicsDevice& device,
                                 Point2D scene_origin,
                                 float alpha,
                                 float scene_depth);
-
-        ID3D11ShaderResourceView* Get_SRV() const;
 
     private:
         UnitScratch() = default;
@@ -174,24 +184,30 @@ namespace Vinifera::Gfx
         void Release_Targets();
 
         /**
-         *  SSAA color target — voxels render here at
-         *  `kUnitScratchBackingWidth × kUnitScratchBackingHeight`. Single-
-         *  sample so it can be bound as a regular SRV at composite time
-         *  without a resolve step. When the active SSAA is less than the
-         *  max (rule-toggled SmoothVoxels=off case), only the top-left
-         *  `Get_Active_Width × Get_Active_Height` region is rendered and
-         *  read; the remainder of the backing texture is leftover from
-         *  prior frames and gets ignored by the composite blit's src rect.
+         *  Two scratch color targets, one per dual-pass component:
+         *    ScratchNoSSAA: 256² — POINTLIST voxels at 1× scale, crisp
+         *                   single-tap source for the composite blend.
+         *                   Always rendered (used for both single-pass
+         *                   SmoothVoxels=off and dual-pass on).
+         *    ScratchSSAA:   512² — splatted voxels at 2× scale, smooth
+         *                   4-tap source. Rendered only in dual-pass
+         *                   (Get_Pass_Count() == 2).
+         *  Both RTV+SRV via RenderTarget2D, single-sample so the
+         *  composite PS can sample them directly without a resolve.
          */
-        RenderTarget2D*           ScratchRT  = nullptr;
+        RenderTarget2D*           ScratchNoSSAA  = nullptr;
+        RenderTarget2D*           ScratchSSAA    = nullptr;
 
         /**
-         *  SSAA depth — same backing resolution as the color RT (required
-         *  by D3D11 to bind both at OM). Single-sample D32_FLOAT. Consumed
-         *  only inside the scratch render; never resolved or sampled.
+         *  Per-pass depth targets, sized to match the respective color
+         *  RT. Single-sample D32_FLOAT, BIND_DEPTH_STENCIL only — never
+         *  sampled or resolved; consumed only during the per-pass
+         *  scratch render.
          */
-        ID3D11Texture2D*          DepthTex   = nullptr;
-        ID3D11DepthStencilView*   DepthDSV   = nullptr;
+        ID3D11Texture2D*          DepthTexNoSSAA = nullptr;
+        ID3D11DepthStencilView*   DepthDSVNoSSAA = nullptr;
+        ID3D11Texture2D*          DepthTexSSAA   = nullptr;
+        ID3D11DepthStencilView*   DepthDSVSSAA   = nullptr;
 
         SpriteBatch               CompositeBatch;
         UnitCompositeEffect       CompositeFx;
@@ -199,12 +215,27 @@ namespace Vinifera::Gfx
         bool                      Initialized = false;
 
         /**
-         *  Active SSAA factor for the current Begin_Unit scope. Refreshed
-         *  from `RuleExtension->IsSmoothVoxels` on each Begin_Unit. Default
-         *  matches the max so the first frame before a unit is rendered
-         *  still has a sane value.
+         *  Active SSAA factor for the currently-bound pass. Set by
+         *  `Begin_Unit_Pass` (1 for the NoSSAA pass, kUnitScratchMaxSSAA
+         *  for the SSAA pass). Reset to the max default by
+         *  `End_Unit_Composite` so a stray query between units returns
+         *  something sane.
          */
         int                       CurrentSsaa = kUnitScratchMaxSSAA;
+
+        /**
+         *  Pass-state tracking for the current unit:
+         *    ActivePassCount  — sampled from Get_Pass_Count() at the
+         *                       Begin_Unit_Pass(0) call and held until
+         *                       End_Unit_Composite, so a live rule edit
+         *                       between passes can't desync the loop.
+         *    ActivePassIndex  — index passed to the most recent
+         *                       Begin_Unit_Pass; consumed by Clear_Depth
+         *                       to pick which DSV to clear. -1 between
+         *                       units.
+         */
+        int                       ActivePassCount = 0;
+        int                       ActivePassIndex = -1;
 
         /**
          *  Saved bindings restored by `End_Unit_Composite`. Captured at

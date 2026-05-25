@@ -1123,15 +1123,6 @@ namespace
             }
         }
 
-        /**
-         *  Begin the scratch session. After this, the scratch RT+DSV are
-         *  bound with a 256x256 viewport; subsequent immediate-render
-         *  calls paint into the scratch.
-         */
-        if (!Vinifera::Gfx::UnitScratch::Get().Begin_Unit(device)) {
-            return;
-        }
-
         const Rect& rect = deferred.rect;
         const Point2D& xyoff = deferred.xyoff;
         ConvertClass* shape_convert_override = deferred.shape_convert_override;
@@ -1141,6 +1132,22 @@ namespace
         // CompositeSurface as our dummy "destination" — `Draw_Shape` takes
         // a Surface& and only inspects rect bounds.
         Surface& dst_surface_dummy = *CompositeSurface;
+
+        /**
+         *  Dual-pass scratch render. SmoothVoxels=off → 1 pass (NoSSAA
+         *  only, vanilla look). SmoothVoxels=on → 2 passes (NoSSAA then
+         *  SSAA), averaged by the composite PS in End_Unit_Composite.
+         *  Each pass re-walks the captured records and rebuilds each
+         *  cmd; the queue helpers (Issue_Cmd_To_Scratch,
+         *  Render_Sprite_To_Scratch_Immediate) read the active SSAA
+         *  factor and target the right RT.
+         */
+        Vinifera::Gfx::UnitScratch& scratch = Vinifera::Gfx::UnitScratch::Get();
+        const int pass_count = scratch.Get_Pass_Count();
+        for (int pass = 0; pass < pass_count; ++pass) {
+            if (!scratch.Begin_Unit_Pass(device, pass)) {
+                return;
+            }
 
         bool first_record = true;
         for (const PendingComposite& rec : deferred.records) {
@@ -1246,6 +1253,7 @@ namespace
         }
         }
     }
+        }   // end of pass loop
 
         /**
          *  Composite the scratch onto the scene RT at the unit's drawpoint.

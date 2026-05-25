@@ -154,7 +154,8 @@ namespace Vinifera::Gfx
          *  identical pixel layout to the pre-SSAA path.
          */
         UnitScratch& scratch = UnitScratch::Get();
-        const float kSSAAScale = (float)scratch.Get_Active_SSAA();
+        const int   ssaa       = scratch.Get_Active_SSAA();
+        const float kSSAAScale = (float)ssaa;
         VoxelDrawCmd scratch_cmd = cmd;
         scratch_cmd.Params.T0[0] *= kSSAAScale;
         scratch_cmd.Params.T0[1] *= kSSAAScale;
@@ -164,6 +165,21 @@ namespace Vinifera::Gfx
         scratch_cmd.Params.T2[1] *= kSSAAScale;
         scratch_cmd.Params.T3[0] *= kSSAAScale;
         scratch_cmd.Params.T3[1] *= kSSAAScale;
+        /**
+         *  Dual-pass NoSSAA pass: force POINTLIST regardless of the
+         *  cmd's VEF_SPLAT flag (set per the SmoothVoxels rule at
+         *  submit time). The NoSSAA pass contributes the crisp half of
+         *  the composite blend — it has to be 1-pixel-per-voxel to be
+         *  meaningfully distinct from the SSAA half. The cmd's original
+         *  flag is preserved (we only mask the local copy) so the same
+         *  cmd issued into the SSAA pass on the next iteration keeps
+         *  its splat behaviour.
+         */
+        if (ssaa == 1) {
+            uint32_t flags = (uint32_t)scratch_cmd.Params.Misc[3];
+            flags &= ~VEF_SPLAT;
+            scratch_cmd.Params.Misc[3] = (float)flags;
+        }
         Issue_Cmd(device, scratch_cmd,
                   scratch.Get_Active_Width(), scratch.Get_Active_Height(),
                   /*is_sidebar*/ false);
@@ -390,21 +406,25 @@ namespace Vinifera::Gfx
         if (count == 0 || !UnitScratch::Get().Is_Initialized()) {
             return;
         }
-        if (!UnitScratch::Get().Begin_Unit(device)) {
-            return;
-        }
 
         /**
-         *  Render each section into the scratch via the shared SSAA-aware
-         *  helper. Same path as `Render_Cmd_To_Scratch_Immediate` so the
-         *  deferred composite groups and the immediate composite-replay
-         *  scratch caller end up with bit-identical viewport + transform
-         *  setup. Output is premultiplied opaque (Tint.a forced to 1.0 at
-         *  submit time for composite cmds) so the LinearClamp downsample
-         *  in End_Unit_Composite averages premultiplied texels correctly.
+         *  Dual-pass render. SmoothVoxels=off → 1 pass (NoSSAA only,
+         *  vanilla look). SmoothVoxels=on → 2 passes (NoSSAA + SSAA),
+         *  averaged by the composite PS to give a softened blend. Each
+         *  pass re-renders every cmd into its respective scratch RT;
+         *  the queue helper (Issue_Cmd_To_Scratch) scales T0/T1/T2/T3
+         *  and masks VEF_SPLAT based on the active SSAA factor set by
+         *  Begin_Unit_Pass.
          */
-        for (size_t k = 0; k < count; ++k) {
-            Issue_Cmd_To_Scratch(device, *cmds[k]);
+        UnitScratch& scratch  = UnitScratch::Get();
+        const int pass_count  = scratch.Get_Pass_Count();
+        for (int pass = 0; pass < pass_count; ++pass) {
+            if (!scratch.Begin_Unit_Pass(device, pass)) {
+                return;
+            }
+            for (size_t k = 0; k < count; ++k) {
+                Issue_Cmd_To_Scratch(device, *cmds[k]);
+            }
         }
 
         const Point2D scene_origin {
