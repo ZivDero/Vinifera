@@ -102,6 +102,18 @@ namespace Vinifera::Gfx
         void Render_Sprite_Immediate(GraphicsDevice& device, const SpriteDrawCmd& cmd,
                                      int target_w, int target_h);
 
+        /**
+         *  Render one sprite cmd synchronously into the per-unit scratch RT
+         *  (must already be bound by `UnitScratch::Begin_Unit`). Scales the
+         *  cmd's screen-space Dst/Clip rects by kUnitScratchSSAA and
+         *  dispatches against the physical scratch dims so the SHP fills
+         *  the same SSAA-physical region as the voxel sections of the
+         *  same composite unit. Counterpart to
+         *  `VoxelQueue::Render_Cmd_To_Scratch_Immediate`.
+         */
+        void Render_Sprite_To_Scratch_Immediate(GraphicsDevice& device,
+                                                const SpriteDrawCmd& cmd);
+
         void Clear();
 
     private:

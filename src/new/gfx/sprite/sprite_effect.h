@@ -58,6 +58,17 @@ namespace Vinifera::Gfx
          *  view through.
          */
         SEF_NO_ALPHA_BUFFER  = 1u << 6,
+        /**
+         *  Per-vertex: PS treats `v.pos.z` as the encoded y-bias for the
+         *  `1.5 - SV_y/16000 - v.pos.z - eps` per-pixel formula. Set for
+         *  sprites that need a screen-Y gradient across their footprint
+         *  (ZGRAD_GROUND overlays, ZGRAD_45DEG ramps). When clear, PS
+         *  treats `v.pos.z` as the final depth value (CPU baked it from
+         *  `bottom_y`); use this for flat sprites (buildings, walls,
+         *  ZGRAD_NONE/90DEG) so they sort against tiles like vanilla
+         *  instead of pushing their upper pixels behind tile-bottom z.
+         */
+        SEF_PIXEL_DEPTH      = 1u << 7,
     };
 
 

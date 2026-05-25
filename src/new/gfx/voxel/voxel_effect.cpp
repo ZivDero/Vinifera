@@ -37,9 +37,13 @@ namespace Vinifera::Gfx
 
         const D3D11_INPUT_ELEMENT_DESC VoxelIL[] = {
             /* (X, Y, Z, ColorIdx) packed as 4×uint8 in the first 4 bytes,
-               (NormalIdx, _Pad, _Pad, _Pad) in the next 4 bytes. */
-            { "POSITION",   0, DXGI_FORMAT_R8G8B8A8_UINT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "NORMALIDX",  0, DXGI_FORMAT_R8G8B8A8_UINT, 0, 4, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+               (NormalIdx, _Pad, _Pad, _Pad) in the next 4 bytes.
+               Per-instance: one voxel per instance. The VS uses SV_VertexID
+               to fan each voxel into a 4-vertex screen-space quad (splat),
+               sized to match the section's projection step so adjacent
+               voxels overlap and no pixel gaps appear between them. */
+            { "POSITION",   0, DXGI_FORMAT_R8G8B8A8_UINT, 0, 0, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+            { "NORMALIDX",  0, DXGI_FORMAT_R8G8B8A8_UINT, 0, 4, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
         };
 
 

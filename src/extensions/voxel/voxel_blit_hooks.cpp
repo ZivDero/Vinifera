@@ -37,6 +37,7 @@
 #include "convert.h"
 #include "debughandler.h"
 #include "drawshape.h"
+#include "extension_globals.h"
 #include "foot.h"
 #include "gpu_draw.h"
 #include "gpu_surface.h"
@@ -50,6 +51,7 @@
 #include "mouse.h"
 #include "objecttype.h"
 #include "render_pass.h"
+#include "rulesext.h"
 #include "shp_cache.h"
 #include "sprite_batch.h"
 #include "sprite_queue.h"
@@ -496,7 +498,20 @@ namespace
         out.Misc[0] = is_shadow ? 0.0f : static_cast<float>(z_adjust);
         out.Misc[1] = kPixelToDepth;
         out.Misc[2] = is_shadow ? 0.5f : kObjectEps_section;
-        out.Misc[3] = is_shadow ? static_cast<float>(VEF_SHADOW) : 0.0f;
+
+        /**
+         *  Splat toggle from [AudioVisual] SmoothVoxels=. When on, the VS
+         *  expands each voxel into a screen-aligned quad and the queue
+         *  switches to TRIANGLESTRIP + DrawInstanced. When off, the VS
+         *  skips the splat offset and the queue stays on POINTLIST. Both
+         *  paths use the same instanced input layout — see voxel_queue
+         *  for the topology + draw-count branch on this bit.
+         */
+        uint32_t base_flags = is_shadow ? VEF_SHADOW : 0u;
+        if ((RuleExtension != nullptr) && RuleExtension->IsSmoothVoxels) {
+            base_flags |= Vinifera::Gfx::VEF_SPLAT;
+        }
+        out.Misc[3] = static_cast<float>(base_flags);
     }
 
 
@@ -578,39 +593,29 @@ namespace
         int unit_group_id = -1;
         if (is_composite) {
             /**
-             *  Composite blit depth at the unit's scene-space drawpoint Y.
-             *  `point.Y` is TacticalRect-relative; the scene RT covers the
-             *  full LogicalSurface (incl. tabs + sidebar), so we shift by
-             *  TacticalRect.Y to land in the same coordinate system tile
-             *  depth (Tile_Base_Depth_From_Visual_Y) uses. Without the
-             *  shift the blit sits ~16 px too deep and the TestLessEqual
-             *  in End_Unit_Composite rejects every pixel against terrain.
-             *
-             *  `z_adjust` mirrors vanilla's Get_Z_Adjustment() — negative
-             *  for cell-elevated objects (flying units, bullets above
-             *  ground) so they sort at the ground cell beneath rather
-             *  than where their raised drawpoint Y happens to land.
-             *
-             *  The 16 px bias clears the half-tile gap between the unit's
-             *  drawpoint and `tile_bottom_y` so the unit's lower extent
-             *  survives the LessEqual against terrain. Matches the
-             *  Composite_Process_Deferred path used by EightBitSurface
-             *  composites (turreted units).
+             *  Allocate the unit group with a placeholder depth — the real
+             *  value is computed below after the section loop has measured
+             *  the unit's vertical extent (so the composite blit's bias
+             *  scales to whatever the unit actually needs, rather than a
+             *  fixed 16 px that clips bottoms off oversized voxels).
              */
-            const float drawpoint_scene_y = static_cast<float>(point.Y) + (float)TacticalRect.Y;
-            constexpr float kCompositeDepthBiasPixels = 16.0f;
-            const float unit_depth = std::clamp(
-                1.0f - drawpoint_scene_y * kPixelToDepth
-                     + static_cast<float>(z_adjust) * kPixelToDepth
-                     - kCompositeDepthBiasPixels * kPixelToDepth,
-                1.0e-4f, 0.9999f);
             VoxelUnitGroup group;
             group.Drawpoint  = point;
             group.Alpha      = alpha;
-            group.SceneDepth = unit_depth;
+            group.SceneDepth = 0.5f;
             group.Clip       = clip;
             unit_group_id = VoxelQueue::Get().Allocate_Unit_Group(group);
         }
+
+        /**
+         *  Track the largest per-section kObjectEps across the unit. Each
+         *  section's eps is sized from its worst-case projected corner
+         *  (max screen-Y offset below drawpoint + back-Z contribution + a
+         *  margin), so taking the max gives the bias needed to clear the
+         *  whole unit's lowest pixel against terrain in the composite
+         *  blit. See `Build_Section_Params` ~line 485.
+         */
+        float max_section_eps = 0.0f;
 
         for (int layer = frame_lo; layer < frame_hi && layer < layer_count; ++layer) {
             const VoxelSectionMesh* mesh = asset->Get_Section(layer, 0);
@@ -654,6 +659,14 @@ namespace
             Build_Section_Params(*mesh, section_world, point, brightness, section_alpha,
                                  /*is_shadow*/ false, z_adjust, cmd.Params);
 
+            /**
+             *  `Misc[2]` holds the section's kObjectEps when !is_shadow
+             *  (see Build_Section_Params). Accumulate the max so the
+             *  composite blit below can size its bias to fit the tallest
+             *  section.
+             */
+            max_section_eps = std::max(max_section_eps, cmd.Params.Misc[2]);
+
             if (is_composite) {
                 /**
                  *  Re-target the section's screen origin to scratch-local
@@ -686,6 +699,40 @@ namespace
             }
 
             VoxelQueue::Get().Submit(cmd);
+        }
+
+        /**
+         *  Finalize the composite blit depth now that we've measured the
+         *  unit's vertical extent. The bias is sized so the blit clears
+         *  the unit's bottommost voxel against terrain — for a small
+         *  bullet `max_section_eps` is tiny and we floor at 16 px (the
+         *  half-tile gap from drawpoint to tile-bottom anchor); for a
+         *  huge mech `max_section_eps` already encodes the bottom-most
+         *  corner's screen-Y offset + back-Z contribution + a small
+         *  margin, so the blit's depth sits in front of the south-cell
+         *  terrain those bottom voxels overlap. A small extra margin on
+         *  top guards against rounding at the boundary.
+         *
+         *  Side effect: huge units' composite blits now sit further ahead
+         *  of drawpoint depth than small ones. A building south of a huge
+         *  unit within the unit's bottom extent will be occluded by the
+         *  unit. That matches what a huge unit's footprint should occlude
+         *  visually (the unit physically extends further south than its
+         *  drawpoint cell).
+         */
+        if (is_composite && unit_group_id >= 0) {
+            const float drawpoint_scene_y = static_cast<float>(point.Y) + (float)TacticalRect.Y;
+            constexpr float kMinCompositeBiasPixels = 16.0f;
+            constexpr float kCompositeBiasMarginPixels = 5.0f;
+            const float min_bias    = kMinCompositeBiasPixels * kPixelToDepth;
+            const float margin      = kCompositeBiasMarginPixels * kPixelToDepth;
+            const float bias        = std::max(min_bias, max_section_eps + margin);
+            const float unit_depth  = std::clamp(
+                1.0f - drawpoint_scene_y * kPixelToDepth
+                     + static_cast<float>(z_adjust) * kPixelToDepth
+                     - bias,
+                1.0e-4f, 0.9999f);
+            VoxelQueue::Get().Set_Unit_Group_Depth(unit_group_id, unit_depth);
         }
     }
 
@@ -769,10 +816,7 @@ namespace
             Build_Section_Params(*mesh, section_world, point, brightness,
                                  /*alpha*/ 1.0f, /*is_shadow*/ false, z_adjust, cmd.Params);
 
-            VoxelQueue::Get().Render_Cmd_Immediate(*Vinifera::Gfx::Device, cmd,
-                                                    Vinifera::Gfx::kUnitScratchWidth,
-                                                    Vinifera::Gfx::kUnitScratchHeight,
-                                                    /*is_sidebar*/ false);
+            VoxelQueue::Get().Render_Cmd_To_Scratch_Immediate(*Vinifera::Gfx::Device, cmd);
         }
     }
 
@@ -1196,10 +1240,8 @@ namespace
             built_cmd.DisableDepth = true;
             built_cmd.WriteDepth   = false;
 
-            Vinifera::Gfx::SpriteQueue::Get().Render_Sprite_Immediate(
-                device, built_cmd,
-                Vinifera::Gfx::kUnitScratchWidth,
-                Vinifera::Gfx::kUnitScratchHeight);
+            Vinifera::Gfx::SpriteQueue::Get().Render_Sprite_To_Scratch_Immediate(
+                device, built_cmd);
             break;
         }
         }

@@ -21,10 +21,12 @@ StructuredBuffer<float3>     Normals       : register(t2);
 Texture2D<float4>            SceneCopy     : register(t3);
 Texture2D<float>             AlphaTex      : register(t4);
 static const uint VEF_NO_ALPHA_BUFFER = 0x02;
+static const uint VEF_SPLAT           = 0x04;
 
 struct VSIn  {
-    uint4 pos       : POSITION;
-    uint4 normal_w  : NORMALIDX;
+    uint4 pos        : POSITION;
+    uint4 normal_w   : NORMALIDX;
+    uint  vertex_id  : SV_VertexID;   // 0..3 -> quad corner of the splat
 };
 struct VSOut {
     float4 pos        : SV_Position;
@@ -42,6 +44,20 @@ VSOut VSMain(VSIn i)
     float screen_x = T0.x + vx * T1.x + vy * T2.x + vz * T3.x;
     float screen_y = T0.y + vx * T1.y + vy * T2.y + vz * T3.y;
     float voxel_z  = T0.z + vx * T1.z + vy * T2.z + vz * T3.z;
+
+    // Same splat fan as voxel.hlsl, gated on the same VEF_SPLAT flag.
+    // Shares VoxelIL input layout (per-instance voxel data + SV_VertexID
+    // for the 4-corner quad) so the distortion path picks up gap-filling
+    // automatically when SmoothVoxels= is on.
+    uint vs_flags = (uint)Misc.w;
+    float splat_active = (vs_flags & VEF_SPLAT) ? 1.0 : 0.0;
+    float2 corner = float2(float(i.vertex_id & 1) - 0.5,
+                           float((i.vertex_id >> 1) & 1) - 0.5);
+    float splat_x = max(max(abs(T1.x), abs(T2.x)), abs(T3.x)) + 0.5;
+    float splat_y = max(max(abs(T1.y), abs(T2.y)), abs(T3.y)) + 0.5;
+    screen_x += corner.x * splat_x * 2.0 * splat_active;
+    screen_y += corner.y * splat_y * 2.0 * splat_active;
+
     float4 clip = mul(ProjMtx, float4(screen_x, screen_y, 0.0, 1.0));
     VSOut o;
     o.pos        = float4(clip.x, clip.y, 0.5, 1.0);

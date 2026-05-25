@@ -113,11 +113,32 @@ namespace Vinifera::Gfx
         int Allocate_Unit_Group(const VoxelUnitGroup& group);
 
         /**
+         *  Patch a previously-allocated group's `SceneDepth` after section
+         *  iteration has measured the unit's vertical extent — the composite
+         *  blit depth needs to clear the unit's bottom voxels against
+         *  terrain, which only becomes known once each section's bounds are
+         *  projected.
+         */
+        void Set_Unit_Group_Depth(int group_id, float scene_depth);
+
+        /**
          *  Render one voxel cmd synchronously against the currently bound
          *  render target, bypassing the deferred queue.
          */
         void Render_Cmd_Immediate(GraphicsDevice& device, const VoxelDrawCmd& cmd,
                                   int target_w, int target_h, bool is_sidebar);
+
+        /**
+         *  Render one voxel cmd synchronously into the per-unit scratch RT
+         *  (must already be bound by `UnitScratch::Begin_Unit`). Applies
+         *  the SSAA-to-physical screen-space scaling so the cmd's logical
+         *  T0/T1/T2/T3 coordinates fill the physical scratch backing.
+         *  This is the immediate-path counterpart to the deferred
+         *  composite group flush — both end up issuing into the same
+         *  SSAA-scaled viewport, so they layer correctly within a unit.
+         */
+        void Render_Cmd_To_Scratch_Immediate(GraphicsDevice& device,
+                                             const VoxelDrawCmd& cmd);
 
         VoxelEffect&            Effect()    { return EffectInstance; }
         VoxelLightRemapTexture&  LightRemap() { return LightRemapInstance; }
@@ -129,6 +150,15 @@ namespace Vinifera::Gfx
                        int target_w, int target_h, bool is_sidebar);
         void Issue_Predator_Cmd(GraphicsDevice& device, const VoxelDrawCmd& cmd,
                                 int target_w, int target_h);
+
+        /**
+         *  Common scratch-render core: scales cmd.Params.T0/T1/T2/T3 xy
+         *  by kUnitScratchSSAA and dispatches `Issue_Cmd` against the
+         *  physical scratch dims. The scratch RT/DSV must already be
+         *  bound (UnitScratch::Begin_Unit) — this only does the cmd-
+         *  side translation, not the RT setup.
+         */
+        void Issue_Cmd_To_Scratch(GraphicsDevice& device, const VoxelDrawCmd& cmd);
 
         /**
          *  Render `count` cmds of one composite unit group into the shared

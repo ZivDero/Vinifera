@@ -128,25 +128,48 @@ namespace Vinifera::Gfx
         if (ScratchRT != nullptr && DepthDSV != nullptr) return true;
         Release_Targets();
 
+        ID3D11Device* d3d = device.Get_Device();
+        if (d3d == nullptr) {
+            return false;
+        }
+
+        /**
+         *  SSAA color target — RTV + SRV via RenderTarget2D, single-sample
+         *  at physical resolution (logical × kUnitScratchSSAA). Voxels
+         *  render here at the oversampled resolution; the composite blit
+         *  reads this SRV through a LinearClamp sampler so 2×2 scratch
+         *  texels downsample-average into one scene pixel.
+         */
         ScratchRT = new RenderTarget2D();
-        if (ScratchRT == nullptr) return false;
-        if (!ScratchRT->Initialize(device, kUnitScratchWidth, kUnitScratchHeight,
+        if (ScratchRT == nullptr) {
+            Release_Targets();
+            return false;
+        }
+        if (!ScratchRT->Initialize(device,
+                                   kUnitScratchPhysicalWidth,
+                                   kUnitScratchPhysicalHeight,
                                    DXGI_FORMAT_R8G8B8A8_UNORM)) {
-            DEBUG_ERROR("UnitScratch: color RT init failed.\n");
+            DEBUG_ERROR("UnitScratch: scratch RT init failed.\n");
             Release_Targets();
             return false;
         }
 
+        /**
+         *  Depth at physical resolution to match the color RT. Single-
+         *  sample D32_FLOAT, BIND_DEPTH_STENCIL only — depth is never
+         *  sampled or resolved.
+         */
         D3D11_TEXTURE2D_DESC td = {};
-        td.Width      = kUnitScratchWidth;
-        td.Height     = kUnitScratchHeight;
+        td.Width      = kUnitScratchPhysicalWidth;
+        td.Height     = kUnitScratchPhysicalHeight;
         td.MipLevels  = 1;
         td.ArraySize  = 1;
         td.Format     = DXGI_FORMAT_D32_FLOAT;
-        td.SampleDesc.Count = 1;
+        td.SampleDesc.Count   = 1;
+        td.SampleDesc.Quality = 0;
         td.Usage      = D3D11_USAGE_DEFAULT;
         td.BindFlags  = D3D11_BIND_DEPTH_STENCIL;
-        if (FAILED(device.Get_Device()->CreateTexture2D(&td, nullptr, &DepthTex))) {
+        if (FAILED(d3d->CreateTexture2D(&td, nullptr, &DepthTex))) {
             DEBUG_ERROR("UnitScratch: depth tex creation failed.\n");
             Release_Targets();
             return false;
@@ -155,7 +178,7 @@ namespace Vinifera::Gfx
         D3D11_DEPTH_STENCIL_VIEW_DESC dsvd = {};
         dsvd.Format        = DXGI_FORMAT_D32_FLOAT;
         dsvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-        if (FAILED(device.Get_Device()->CreateDepthStencilView(DepthTex, &dsvd, &DepthDSV))) {
+        if (FAILED(d3d->CreateDepthStencilView(DepthTex, &dsvd, &DepthDSV))) {
             DEBUG_ERROR("UnitScratch: DSV creation failed.\n");
             Release_Targets();
             return false;
@@ -208,9 +231,12 @@ namespace Vinifera::Gfx
         ctx->RSGetViewports(&SavedVPCount, &SavedVP);
 
         /**
-         *  Bind scratch RT/DSV. Clear color to fully transparent (0,0,0,0)
-         *  and depth to 1.0 (far). Subsequent draws into the scratch will
-         *  fill the unit's pixels with the correct premultiplied color.
+         *  Bind the SSAA scratch RT/DSV at physical resolution. Clear color
+         *  to fully transparent (0,0,0,0) and depth to 1.0 (far). Voxel
+         *  cmds rendered into this RT use viewport-and-T-scaled coordinates
+         *  (see VoxelQueue::Flush_Composite_Group) so the unit's logical
+         *  footprint fills the full physical viewport — the composite blit
+         *  then linear-downsamples it back to logical size in scene space.
          */
         ID3D11RenderTargetView* rtv = ScratchRT->Get_RTV();
         ctx->OMSetRenderTargets(1, &rtv, DepthDSV);
@@ -219,8 +245,8 @@ namespace Vinifera::Gfx
         ctx->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
         D3D11_VIEWPORT vp = {};
-        vp.Width    = (float)kUnitScratchWidth;
-        vp.Height   = (float)kUnitScratchHeight;
+        vp.Width    = (float)kUnitScratchPhysicalWidth;
+        vp.Height   = (float)kUnitScratchPhysicalHeight;
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
         ctx->RSSetViewports(1, &vp);
@@ -255,14 +281,18 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Composite blit: full scratch quad → scene RT at scene_origin.
-         *  SpriteBatch handles the projection-matrix CB at b0; our
-         *  effect CB at b1 carries the unit alpha.
+         *  Composite blit: full SSAA scratch quad → scene RT at scene_origin
+         *  at logical size. LinearClamp downsamples the physical scratch
+         *  (kUnitScratchPhysical*) to the logical dst (kUnitScratchWidth/
+         *  Height) — each scene pixel ends up averaged over `SSAA²` scratch
+         *  texels, which softens splat silhouettes and VPL-ramp banding.
+         *  Premultiplied alpha (what the voxel PS writes) bilinears
+         *  correctly under the linear filter — no color halos.
          */
         const int scene_w = device.Get_Logical_Width();
         const int scene_h = device.Get_Logical_Height();
 
-        CompositeBatch.Begin(device, EBlend::Premultiplied, ESampler::PointClamp, &CompositeFx,
+        CompositeBatch.Begin(device, EBlend::Premultiplied, ESampler::LinearClamp, &CompositeFx,
                              scene_w, scene_h, EDepthStencil::TestLessEqual_NoWrite);
 
         UnitCompositeEffect::Params p = {};
@@ -275,7 +305,11 @@ namespace Vinifera::Gfx
             (float)kUnitScratchWidth,
             (float)kUnitScratchHeight
         };
-        const RectF src { 0.0f, 0.0f, (float)kUnitScratchWidth, (float)kUnitScratchHeight };
+        const RectF src {
+            0.0f, 0.0f,
+            (float)kUnitScratchPhysicalWidth,
+            (float)kUnitScratchPhysicalHeight
+        };
         const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
         CompositeBatch.Draw(static_cast<Texture2D*>(ScratchRT), dst, &src, tint,

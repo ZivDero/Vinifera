@@ -17,6 +17,7 @@ cbuffer EffectCB : register(b1)
 };
 static const uint VEF_SHADOW          = 0x01;
 static const uint VEF_NO_ALPHA_BUFFER = 0x02;
+static const uint VEF_SPLAT           = 0x04;
 
 Texture2D<float4>            Palette       : register(t0);
 Texture2D<uint>              LightRemapTex : register(t1);
@@ -24,8 +25,9 @@ StructuredBuffer<float3>     Normals       : register(t2);
 Texture2D<float>             AlphaTex      : register(t3);
 
 struct VSIn  {
-    uint4 pos       : POSITION;    // x, y, z, color_idx
-    uint4 normal_w  : NORMALIDX;   // normal_idx, _, _, _
+    uint4 pos        : POSITION;    // x, y, z, color_idx (per-instance)
+    uint4 normal_w   : NORMALIDX;   // normal_idx, _, _, _ (per-instance)
+    uint  vertex_id  : SV_VertexID; // 0..3 -> quad corner of the splat
 };
 struct VSOut {
     float4 pos        : SV_Position;
@@ -45,6 +47,34 @@ VSOut VSMain(VSIn i)
     float screen_x = T0.x + vx * T1.x + vy * T2.x + vz * T3.x;
     float screen_y = T0.y + vx * T1.y + vy * T2.y + vz * T3.y;
     float voxel_z  = T0.z + vx * T1.z + vy * T2.z + vz * T3.z;
+
+    // Voxel splatting: fan each voxel (one instance) into a 4-vertex
+    // screen-space quad via SV_VertexID. TRIANGLESTRIP order
+    //   vid=0 -> (-0.5, -0.5)   vid=1 -> (+0.5, -0.5)
+    //   vid=2 -> (-0.5, +0.5)   vid=3 -> (+0.5, +0.5)
+    // gives a CCW front face; CullNone in the raster state makes
+    // winding irrelevant.
+    //
+    // Splat half-extents along screen X/Y are sized to the largest
+    // |T*| step across the three voxel axes plus a half-pixel of
+    // margin, so adjacent voxels' splats overlap by at least one
+    // pixel. The per-voxel SV_Depth in PS resolves overlap to the
+    // front-most voxel. At default zoom the step is ~1 px and the
+    // splat ends up about 3 px wide — the surface "fills in"
+    // instead of leaving 1-pixel pinholes between adjacent voxels.
+    //
+    // Gated by the VEF_SPLAT flag (set from [AudioVisual] SmoothVoxels=).
+    // When off, the queue switches to POINTLIST + DrawInstanced(1, N),
+    // vertex_id is always 0, and `splat_active = 0` zeroes the corner
+    // offset so the point lands at the voxel center as before.
+    uint vs_flags = (uint)Misc.w;
+    float splat_active = (vs_flags & VEF_SPLAT) ? 1.0 : 0.0;
+    float2 corner = float2(float(i.vertex_id & 1) - 0.5,
+                           float((i.vertex_id >> 1) & 1) - 0.5);
+    float splat_x = max(max(abs(T1.x), abs(T2.x)), abs(T3.x)) + 0.5;
+    float splat_y = max(max(abs(T1.y), abs(T2.y)), abs(T3.y)) + 0.5;
+    screen_x += corner.x * splat_x * 2.0 * splat_active;
+    screen_y += corner.y * splat_y * 2.0 * splat_active;
 
     // Object voxels: depth = base - kObjectEps - voxel_z*kVZS +
     // z_adjust/16000. The z_adjust term carries vanilla's

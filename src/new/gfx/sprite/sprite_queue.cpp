@@ -20,6 +20,7 @@
 #include "shp_cache.h"
 #include "tactical.h"
 #include "tibsun_globals.h"
+#include "unit_scratch.h"  // kUnitScratchSSAA + physical scratch dims for composite SHP path
 
 #include <algorithm>
 
@@ -531,5 +532,33 @@ namespace Vinifera::Gfx
                    cmd.Clip.Is_Valid() ? &cmd.Clip : nullptr,
                    layer, flags);
         Batch.End(device);
+    }
+
+
+    void SpriteQueue::Render_Sprite_To_Scratch_Immediate(GraphicsDevice& device,
+                                                         const SpriteDrawCmd& cmd)
+    {
+        /**
+         *  Scale the screen-space rects (Dst + Clip) by the scratch SSAA
+         *  factor and dispatch against the physical scratch dims. Same
+         *  rationale as VoxelQueue::Issue_Cmd_To_Scratch — the scratch
+         *  backing is allocated at logical × SSAA, so the composite-replay
+         *  SHP needs its 256-logical Dst stretched to fill the physical
+         *  256×SSAA region. DstZ* are normalized depth and don't scale.
+         */
+        constexpr float kSSAAScale = (float)kUnitScratchSSAA;
+        SpriteDrawCmd scratch_cmd = cmd;
+        scratch_cmd.Dst.X *= kSSAAScale;
+        scratch_cmd.Dst.Y *= kSSAAScale;
+        scratch_cmd.Dst.W *= kSSAAScale;
+        scratch_cmd.Dst.H *= kSSAAScale;
+        if (scratch_cmd.Clip.Is_Valid()) {
+            scratch_cmd.Clip.X *= kSSAAScale;
+            scratch_cmd.Clip.Y *= kSSAAScale;
+            scratch_cmd.Clip.W *= kSSAAScale;
+            scratch_cmd.Clip.H *= kSSAAScale;
+        }
+        Render_Sprite_Immediate(device, scratch_cmd,
+                                kUnitScratchPhysicalWidth, kUnitScratchPhysicalHeight);
     }
 }

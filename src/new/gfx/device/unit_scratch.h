@@ -36,9 +36,12 @@ namespace Vinifera::Gfx
 
 
     /**
-     *  Fixed scratch size — large enough for any TS unit (Mammoth Mk II is
+     *  Logical scratch size — large enough for any TS unit (Mammoth Mk II is
      *  ~80x80 visible; predator/walker units fit comfortably). Doubled from
-     *  vanilla's 160x160 EightBitSurface to give effects headroom.
+     *  vanilla's 160x160 EightBitSurface to give effects headroom. Voxel
+     *  submit-time transforms (T0/T1/T2/T3) are expressed in these logical
+     *  units; the SSAA factor (below) is applied inside the queue, not at
+     *  submit time.
      */
     constexpr int kUnitScratchWidth  = 256;
     constexpr int kUnitScratchHeight = 256;
@@ -53,13 +56,33 @@ namespace Vinifera::Gfx
     constexpr int kUnitScratchOriginY = kUnitScratchHeight / 2;
     inline const Point2D kUnitScratchOrigin(kUnitScratchOriginX, kUnitScratchOriginY);
 
+    /**
+     *  SSAA factor for the scratch. The backing color + depth textures are
+     *  allocated at `(kUnitScratchWidth*kUnitScratchSSAA)` ×
+     *  `(kUnitScratchHeight*kUnitScratchSSAA)` and the voxel queue scales
+     *  the per-section screen-space transforms by this factor when issuing
+     *  to the scratch. The composite blit then linear-downsamples the
+     *  oversampled scratch into a logical-size quad in scene space — each
+     *  scene pixel ends up averaged over `SSAA²` scratch samples, which
+     *  AAs splat silhouettes AND smooths VPL-ramp banding between
+     *  adjacent voxels for free.
+     *
+     *  2× is the right default — 4× quadruples PS cost across the whole
+     *  unit footprint for a barely-perceptible improvement at 256² logical.
+     */
+    constexpr int kUnitScratchSSAA = 2;
+    constexpr int kUnitScratchPhysicalWidth  = kUnitScratchWidth  * kUnitScratchSSAA;
+    constexpr int kUnitScratchPhysicalHeight = kUnitScratchHeight * kUnitScratchSSAA;
+
 
     /**
      *  Effect that samples the scratch RT as a plain RGBA texture and pre-
      *  multiplies by a unit-level alpha for the final composite blend.
      *  Bind layout:
      *    t0 — scratch RT SRV
-     *    s0 — point-clamp sampler
+     *    s0 — linear-clamp sampler (the composite downsamples the SSAA
+     *         scratch to logical-size; bilinear box-filters 2×2 scratch
+     *         samples into one scene pixel)
      *    b0 — SpriteCB (ProjMtx from SpriteBatch)
      *    b1 — UnitCompositeCB (alpha + unused)
      */
@@ -93,9 +116,10 @@ namespace Vinifera::Gfx
         bool Is_Initialized() const { return Initialized; }
 
         /**
-         *  Bind the scratch RTV+DSV with a 256x256 viewport, clear color to
-         *  transparent and depth to 1.0. Saves the active RT/DSV bindings so
-         *  `End_Unit_Composite` can restore them.
+         *  Bind the scratch RTV+DSV with the SSAA-physical viewport
+         *  (kUnitScratchPhysicalWidth × kUnitScratchPhysicalHeight), clear
+         *  color to transparent and depth to 1.0. Saves the active RT/DSV
+         *  bindings so `End_Unit_Composite` can restore them.
          */
         bool Begin_Unit(GraphicsDevice& device);
 
@@ -131,7 +155,20 @@ namespace Vinifera::Gfx
         bool Ensure_Targets(GraphicsDevice& device);
         void Release_Targets();
 
+        /**
+         *  SSAA color target — voxels render here at
+         *  `kUnitScratchPhysicalWidth × kUnitScratchPhysicalHeight`. Single-
+         *  sample so it can be bound as a regular SRV at composite time
+         *  without a resolve step. The composite blit downsamples to
+         *  logical size via the LinearClamp sampler.
+         */
         RenderTarget2D*           ScratchRT  = nullptr;
+
+        /**
+         *  SSAA depth — same physical resolution as the color RT (required
+         *  by D3D11 to bind both at OM). Single-sample D32_FLOAT. Consumed
+         *  only inside the scratch render; never resolved or sampled.
+         */
         ID3D11Texture2D*          DepthTex   = nullptr;
         ID3D11DepthStencilView*   DepthDSV   = nullptr;
 

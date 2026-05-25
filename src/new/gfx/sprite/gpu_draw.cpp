@@ -295,43 +295,45 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Depth: encode the per-sprite y-bias into `Pos.z` (constant for all
-         *  4 vertices). The pixel shader (palette_sprite.hlsl) then computes
-         *  the actual depth deterministically from `SV_Position.y` plus the
-         *  decoded bias — `1 - (pixel_y + bias)/16000 - kSpriteEpsilon`.
+         *  Depth: two modes, selected by the sprite's `zgrad` type.
          *
-         *  This bypasses HW barycentric interpolation of vertex z, which
-         *  drifted by ~1 LSB between adjacent quads at the same screen pixel
-         *  because each sprite interpolates over a different vertex pair.
-         *  With strict-LESS depth tests that ~1 LSB noise caused flicker at
-         *  seams between adjacent overlay cells (low bridges). All 4 vertices
-         *  share the same encoded bias, so HW interpolation gives a constant
-         *  value at every pixel and PS computes a byte-identical depth for
-         *  any sprite at the same screen Y with the same bias.
+         *  Gradient sprites (ZGRAD_GROUND overlays, ZGRAD_45DEG ramps):
+         *      Encode the y-bias into `Pos.z` (constant on all 4 vertices)
+         *      and tag the cmd with SEF_PIXEL_DEPTH; PS then computes
+         *      depth per-pixel from `SV_Position.y` so adjacent quads at
+         *      the same screen pixel get byte-identical depth — what
+         *      kills the bridge-seam flicker. `Pos.z = depth_bias_y/16000
+         *      + 0.5`; the +0.5 keeps it inside (0,1) so the rasterizer
+         *      depth-clip doesn't cull the fragment.
          *
-         *  As a side effect, sprites that previously had flat z (ZGRAD_90DEG,
-         *  ZGRAD_NONE: top_y == bottom_y baked into vertex z) now use the
-         *  same `1 - pixel_y/16000` gradient as everything else — depth
-         *  varies across the sprite by screen Y. That matches the bus drawn
-         *  by vanilla's CPU rasterizer for ZGRAD_GROUND already; for the
-         *  other ZGRAD modes it changes behavior, but the impact is
-         *  bounded (the bias term still positions sprites correctly
-         *  relative to terrain via height_offset).
-         *
-         *  Encoding: `Pos.z = depth_bias_y/16000 + 0.5`. The +0.5 offset
-         *  keeps `Pos.z` safely inside `(0,1)` so the rasterizer's depth-
-         *  clip doesn't cull fragments. PS decodes via
-         *  `bias = (v.pos.z - 0.5) * 16000`. depth_bias_y range observed:
-         *  roughly [-300, 50] for cliff shadows / bridge bodies, giving an
-         *  encoded range of ~[0.481, 0.503].
+         *  Flat sprites (ZGRAD_NONE / ZGRAD_90DEG — buildings, walls,
+         *  everything that wants a single base z plus z-shape modulation):
+         *      Bake the actual depth value `1 - (bottom_y + bias)/16000
+         *      - eps` directly into `Pos.z` (still constant on all 4
+         *      verts). PS uses it as the final depth. Anchored at
+         *      `bottom_y` like pre-19c7b2268 and like vanilla — without
+         *      this, per-pixel SV_y pushes the building's upper pixels
+         *      ~30 px ahead of the tile-bottom-anchored terrain depth
+         *      and the building's upper corners fail strict-LESS against
+         *      terrain (cut corners along the building silhouette where
+         *      the z-shape value is small).
          */
         {
             const float depth_bias_y = (float)-height_offset;
-            float encoded_bias = depth_bias_y / 16000.0f + 0.5f;
-            if (encoded_bias < 0.001f) encoded_bias = 0.001f;
-            if (encoded_bias > 0.999f) encoded_bias = 0.999f;
-            cmd.DstZTop = encoded_bias;
-            cmd.DstZBottom = encoded_bias;
+            const bool gradient_mode = (zgrad == ZGRAD_GROUND) || (zgrad == ZGRAD_45DEG);
+            float encoded_z;
+            if (gradient_mode) {
+                encoded_z = depth_bias_y / 16000.0f + 0.5f;
+                cmd.EffectFlags |= SEF_PIXEL_DEPTH;
+            } else {
+                const float kSpriteEpsilon = 5e-5f;
+                const float bottom_y = (float)(y + fi->H) + depth_bias_y;
+                encoded_z = 1.0f - bottom_y / 16000.0f - kSpriteEpsilon;
+            }
+            if (encoded_z < 0.001f) encoded_z = 0.001f;
+            if (encoded_z > 0.999f) encoded_z = 0.999f;
+            cmd.DstZTop = encoded_z;
+            cmd.DstZBottom = encoded_z;
         }
 
         cmd.WriteDepth = z_write;

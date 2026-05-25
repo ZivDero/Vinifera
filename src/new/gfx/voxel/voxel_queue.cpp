@@ -109,6 +109,13 @@ namespace Vinifera::Gfx
     }
 
 
+    void VoxelQueue::Set_Unit_Group_Depth(int group_id, float scene_depth)
+    {
+        if (group_id < 0 || (size_t)group_id >= UnitGroups.size()) return;
+        UnitGroups[group_id].SceneDepth = scene_depth;
+    }
+
+
     void VoxelQueue::Render_Cmd_Immediate(GraphicsDevice& device, const VoxelDrawCmd& cmd,
                                           int target_w, int target_h, bool is_sidebar)
     {
@@ -121,6 +128,41 @@ namespace Vinifera::Gfx
          */
         LightRemapInstance.Ensure_Uploaded();
         Issue_Cmd(device, cmd, target_w, target_h, is_sidebar);
+    }
+
+
+    void VoxelQueue::Render_Cmd_To_Scratch_Immediate(GraphicsDevice& device,
+                                                     const VoxelDrawCmd& cmd)
+    {
+        if (!Initialized) return;
+        LightRemapInstance.Ensure_Uploaded();
+        Issue_Cmd_To_Scratch(device, cmd);
+    }
+
+
+    void VoxelQueue::Issue_Cmd_To_Scratch(GraphicsDevice& device, const VoxelDrawCmd& cmd)
+    {
+        /**
+         *  Scale the per-section screen-space transforms (xy only) by the
+         *  SSAA factor so the unit's logical kUnitScratchWidth×Height
+         *  footprint fills the SSAA-physical viewport. Depth (z) and
+         *  unit_y (T0.w) stay logical — neither depends on scratch pixel
+         *  size. Issue_Cmd then sets ProjMtx and viewport from the
+         *  physical scratch dims, matching the SSAA backing.
+         */
+        constexpr float kSSAAScale = (float)kUnitScratchSSAA;
+        VoxelDrawCmd scratch_cmd = cmd;
+        scratch_cmd.Params.T0[0] *= kSSAAScale;
+        scratch_cmd.Params.T0[1] *= kSSAAScale;
+        scratch_cmd.Params.T1[0] *= kSSAAScale;
+        scratch_cmd.Params.T1[1] *= kSSAAScale;
+        scratch_cmd.Params.T2[0] *= kSSAAScale;
+        scratch_cmd.Params.T2[1] *= kSSAAScale;
+        scratch_cmd.Params.T3[0] *= kSSAAScale;
+        scratch_cmd.Params.T3[1] *= kSSAAScale;
+        Issue_Cmd(device, scratch_cmd,
+                  kUnitScratchPhysicalWidth, kUnitScratchPhysicalHeight,
+                  /*is_sidebar*/ false);
     }
 
 
@@ -179,26 +221,32 @@ namespace Vinifera::Gfx
         // (well in front of terrain's ~0.97) gives within-unit painter's via
         // depth buffer while bypassing voxel-vs-terrain competition.
         //
-        // Shadow voxels: WriteLess at a fixed depth (0.51, shader-set). The
-        // strict LESS comparison rejects equal-depth writes, so when multiple
-        // shadow columns project to the same pixel (cardinal facings) only
-        // the first write lands — preventing DestMultiplyHalf from compound-
-        // darkening into pitch-black. Subsequent object voxels at depth
-        // ~0.5 still pass LessEqual against the shadow's 0.51 and overdraw.
+        // Shadow voxels: DarkenDedup — LessEqual depth test, NO depth write,
+        // per-pixel stencil dedup (StencilFunc EQUAL with ref=0, StencilPassOp
+        // INCR_SAT). Matches the SHP shadow path. Without depth write the
+        // shadow can't push scene depth ahead of the building / unit-body /
+        // anim depths drawn later in or after ObjectLayer — those used to
+        // depth-test against the shadow's depth (which sat ~32 px ahead of
+        // terrain to clear the tile-bottom anchor) and get rejected, taking
+        // bites out of unit chassis bottoms and building footprints anywhere
+        // a voxel shadow had projected. Stencil handles the per-pixel "darken
+        // each pixel at most once" job that WriteLess used to do, and as a
+        // bonus voxel shadows now dedup against SHP shadows too (shared
+        // stencil, cleared once per frame).
         //
         // Sidebar: no depth attachment regardless.
         EDepthStencil depth_state;
         if (is_sidebar) {
             depth_state = EDepthStencil::None;
         } else if (cmd.IsShadow) {
-            depth_state = EDepthStencil::WriteLess;
+            depth_state = EDepthStencil::DarkenDedup;
         } else {
             depth_state = EDepthStencil::WriteLessEqual;
         }
         ctx->OMSetDepthStencilState(device.States().Get(depth_state), 0);
 
         // Shadows: DestMultiplyHalf with blend_factor=(0.5, 0.5, 0.5, 1) so
-        // dest pixels get halved. The WriteLess depth state above ensures
+        // dest pixels get halved. The DarkenDedup stencil state above ensures
         // each pixel is only darkened once even if many shadow columns
         // project to it. Objects: Premultiplied (standard alpha blend).
         const float shadow_factor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
@@ -221,8 +269,20 @@ namespace Vinifera::Gfx
         UINT stride = 8;       // sizeof(VoxelVertex)
         UINT offset = 0;
         ctx->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
-        ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-        ctx->Draw(vert_count, 0);
+        // Splat vs point: gated on VEF_SPLAT (set from [AudioVisual]
+        // SmoothVoxels=). When on, each voxel (instance) fans into a
+        // 4-vertex screen-space quad via SV_VertexID + TRIANGLESTRIP.
+        // When off, falls back to 1-pixel POINTLIST per voxel — same
+        // primitive as vanilla. Both paths use DrawInstanced so the
+        // PER_INSTANCE_DATA layout advances one voxel per instance.
+        const bool splat = ((uint32_t)params.Misc[3] & VEF_SPLAT) != 0;
+        if (splat) {
+            ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+            ctx->DrawInstanced(/*verts*/ 4, /*instances*/ vert_count, 0, 0);
+        } else {
+            ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+            ctx->DrawInstanced(/*verts*/ 1, /*instances*/ vert_count, 0, 0);
+        }
         PerfMonitor::Get().Note_Voxel_Composite_Draw_Call();
     }
 
@@ -304,8 +364,16 @@ namespace Vinifera::Gfx
         UINT stride = 8;
         UINT offset = 0;
         ctx->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
-        ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-        ctx->Draw(vert_count, 0);
+        // Splat same as Issue_Cmd — voxel_distortion.hlsl shares the
+        // same per-instance VoxelIL + SV_VertexID quad fan. Same toggle.
+        const bool splat = ((uint32_t)params.Misc[3] & VEF_SPLAT) != 0;
+        if (splat) {
+            ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+            ctx->DrawInstanced(/*verts*/ 4, /*instances*/ vert_count, 0, 0);
+        } else {
+            ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+            ctx->DrawInstanced(/*verts*/ 1, /*instances*/ vert_count, 0, 0);
+        }
         PerfMonitor::Get().Note_Voxel_Composite_Draw_Call();
     }
 
@@ -323,17 +391,16 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Render each section into the scratch using the standard voxel
-         *  path. `Issue_Cmd` already does the right thing — same shader,
-         *  same depth math — and the scratch's viewport (set by Begin_Unit)
-         *  drives the projection matrix to 256x256 local coords because we
-         *  pass target_w/h = scratch size. Voxels with WriteLessEqual depth
-         *  test against the scratch's depth buffer so within-unit front-
-         *  most wins. Output to scratch is premultiplied opaque (Tint.a
-         *  forced to 1.0 at submit time for composite cmds).
+         *  Render each section into the scratch via the shared SSAA-aware
+         *  helper. Same path as `Render_Cmd_To_Scratch_Immediate` so the
+         *  deferred composite groups and the immediate composite-replay
+         *  scratch caller end up with bit-identical viewport + transform
+         *  setup. Output is premultiplied opaque (Tint.a forced to 1.0 at
+         *  submit time for composite cmds) so the LinearClamp downsample
+         *  in End_Unit_Composite averages premultiplied texels correctly.
          */
         for (size_t k = 0; k < count; ++k) {
-            Issue_Cmd(device, *cmds[k], kUnitScratchWidth, kUnitScratchHeight, /*is_sidebar*/ false);
+            Issue_Cmd_To_Scratch(device, *cmds[k]);
         }
 
         const Point2D scene_origin {

@@ -86,6 +86,17 @@ public:
     bool IsSmoothLighting;
 
     /**
+     *  Should voxels render with screen-aligned splats (sized to the
+     *  per-section projection step) so adjacent voxels overlap and
+     *  no pixel gaps appear between them, and so MSAA can soften the
+     *  silhouette + intra-unit voxel boundaries? Off = vanilla 1-pixel
+     *  point per voxel; the scratch MSAA target is still allocated but
+     *  becomes a no-op (points cover one sample only, resolve is a
+     *  passthrough).
+     */
+    bool IsSmoothVoxels;
+
+    /**
      *  Defines the strength of ice. Higher values make ice less likely
      *  to break from a shot.
      */

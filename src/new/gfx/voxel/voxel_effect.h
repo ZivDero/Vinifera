@@ -76,6 +76,10 @@ namespace Vinifera::Gfx
         VEF_NONE             = 0,
         VEF_SHADOW           = 1u << 0,    // pixel shader emits dark-gray for ground shadow
         VEF_NO_ALPHA_BUFFER  = 1u << 1,    // skip AlphaTex sample (sidebar voxels)
+        VEF_SPLAT            = 1u << 2,    // expand each voxel into a screen-aligned quad sized
+                                           // to the per-section projection step (no inter-voxel
+                                           // gaps). Off = 1-pixel POINTLIST per voxel (vanilla).
+                                           // Toggled by [AudioVisual] SmoothVoxels=.
     };
 
 
