@@ -96,7 +96,24 @@ PSOut PSMain(VSOut v)
         // shadow voxels landing in this pixel — regardless of
         // which vertex/section produced them — share one depth
         // value; WriteLess+dedup then prevents compound darken.
-        const float kShadowEps = 5e-5;
+        //
+        // Terrain tile depth is anchored at the tile's *bottom* Y
+        // (Tile_Base_Depth_From_Visual_Y, constant across the entire
+        // diamond), so a shadow pixel can be up to a full tile height
+        // (~30 px) ABOVE the tile_bottom_y that the cell wrote into
+        // the depth buffer. With the old 5e-5 epsilon the shadow's
+        // per-pixel-Y depth landed BEHIND the tile at every pixel
+        // above the tile's bottom row — strict-LESS rejected it and
+        // voxel shadows were completely invisible. Use ~32 px worth
+        // of depth (32/16000 = 2e-3) so shadow.depth is always
+        // strictly less than tile.depth at the same pixel regardless
+        // of where in the diamond the fragment lands. Body voxel
+        // sorting still wins because the per-section kObjectEps is
+        // sized from the section's worst-case screen-Y + back-Z
+        // contribution (typically > 2e-3 for any reasonable voxel
+        // model) and body uses LessEqual against shadow's written
+        // depth.
+        const float kShadowEps = 2.0e-3;
         PSOut so;
         so.color = float4(0.5, 0.5, 0.5, Misc.z);
         so.depth = 1.0 - v.pos.y * Misc.y - kShadowEps;
