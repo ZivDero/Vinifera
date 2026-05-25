@@ -38,16 +38,61 @@ struct PSOut {
     float  depth : SV_Depth;
 };
 
+/**
+ *  4-tap SSAA resolve with crisp-silhouette + interior-AA logic. The
+ *  scratch is allocated at logical * kUnitScratchSSAA (currently 2×, so
+ *  each dst pixel maps to a 2×2 source-texel block). Doing the resolve
+ *  ourselves instead of letting a bilinear sampler box-average everything
+ *  lets the silhouette stay pixel-aligned while still smoothing the
+ *  unit's interior.
+ *
+ *  Per dst pixel:
+ *    - count of opaque source samples in the 2×2 block decides coverage
+ *    - <2 opaque → discard (transparent; sharpens the outer silhouette)
+ *    - ≥2 opaque → output fully opaque, color = avg of opaque-only samples
+ *  The boundary jumps from <2 to ≥2 within one dst pixel so the
+ *  silhouette stays crisp instead of fading through ~25%-alpha halo.
+ *  Inside the unit (all 4 opaque) the average smooths VPL-ramp banding
+ *  and softens transitions between adjacent voxels of different colors.
+ *  Composite-replay SHPs whose one source texel covers a 2×2 scratch
+ *  block contribute 4 identical samples, so SHP interiors and edges
+ *  also stay crisp — no SHP softening.
+ */
 PSOut PSMain(VSOut v)
 {
-    float4 c = Scratch.Sample(PointS, v.uv);
-    // Skip transparent scratch pixels so the depth test only sees the
-    // unit's actual footprint.
-    if (c.a <= 0.0) discard;
+    uint w, h;
+    Scratch.GetDimensions(w, h);
+    float2 src_px = v.uv * float2(w, h);
+    int2   base   = int2(floor(src_px - 0.5));
+
+    float4 s0 = Scratch.Load(int3(base + int2(0, 0), 0));
+    float4 s1 = Scratch.Load(int3(base + int2(1, 0), 0));
+    float4 s2 = Scratch.Load(int3(base + int2(0, 1), 0));
+    float4 s3 = Scratch.Load(int3(base + int2(1, 1), 0));
+
+    float a0 = s0.a > 0.5 ? 1.0 : 0.0;
+    float a1 = s1.a > 0.5 ? 1.0 : 0.0;
+    float a2 = s2.a > 0.5 ? 1.0 : 0.0;
+    float a3 = s3.a > 0.5 ? 1.0 : 0.0;
+    float opaque_count = a0 + a1 + a2 + a3;
+
+    // <2 opaque → outside the unit. Discarding (instead of writing
+    // alpha=0) also keeps the scene depth test from seeing pixels
+    // that aren't really the unit's footprint.
+    if (opaque_count < 2.0) discard;
+
+    // Scratch is premultiplied; opaque samples have rgb == final color,
+    // transparent samples have rgb == 0. Masking by per-sample a and
+    // dividing by opaque_count gives the actual color average across
+    // contributing samples — no transparent-black pollution at the
+    // silhouette pixels.
+    float3 rgb_sum = s0.rgb * a0 + s1.rgb * a1 + s2.rgb * a2 + s3.rgb * a3;
+    float3 rgb     = rgb_sum / opaque_count;
+
     PSOut o;
-    // Scratch is premultiplied; scale by unit alpha for the final
-    // `(scratch*unit_a) + (1 - scratch.a*unit_a)*scene` scene blend.
-    o.color = c * Alpha;
+    // Per-unit translucency. Re-premultiplies for the scene's
+    // EBlend::Premultiplied blend (`src + (1 - src.a)*dst`).
+    o.color = float4(rgb * Alpha, Alpha);
     // Per-unit constant depth from `Render_Deferred_Composite`, anchored
     // at the unit's drawpoint Y to match `Tile_Base_Depth_From_Visual_Y`.
     o.depth = v.pos.z;

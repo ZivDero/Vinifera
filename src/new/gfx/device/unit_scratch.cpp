@@ -282,17 +282,18 @@ namespace Vinifera::Gfx
 
         /**
          *  Composite blit: full SSAA scratch quad → scene RT at scene_origin
-         *  at logical size. LinearClamp downsamples the physical scratch
-         *  (kUnitScratchPhysical*) to the logical dst (kUnitScratchWidth/
-         *  Height) — each scene pixel ends up averaged over `SSAA²` scratch
-         *  texels, which softens splat silhouettes and VPL-ramp banding.
-         *  Premultiplied alpha (what the voxel PS writes) bilinears
-         *  correctly under the linear filter — no color halos.
+         *  at logical size. The composite PS does its own 4-tap downsample
+         *  (see unit_composite.hlsl) — explicit Load() of the 2×2 scratch
+         *  block per dst pixel + a majority-opaque rule that averages
+         *  interior colors but keeps the silhouette pixel-aligned. The
+         *  sampler is unused (Load bypasses it) but we bind PointClamp
+         *  to keep the sampler state predictable and to match the shader's
+         *  point-sample intent.
          */
         const int scene_w = device.Get_Logical_Width();
         const int scene_h = device.Get_Logical_Height();
 
-        CompositeBatch.Begin(device, EBlend::Premultiplied, ESampler::LinearClamp, &CompositeFx,
+        CompositeBatch.Begin(device, EBlend::Premultiplied, ESampler::PointClamp, &CompositeFx,
                              scene_w, scene_h, EDepthStencil::TestLessEqual_NoWrite);
 
         UnitCompositeEffect::Params p = {};
