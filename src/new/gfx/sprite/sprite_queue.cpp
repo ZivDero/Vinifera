@@ -396,10 +396,23 @@ namespace Vinifera::Gfx
                 } else if (head.EffectFlags & SEF_DARKEN) {
                     depth_state = EDepthStencil::DarkenDedup;
                 } else {
+                    /**
+                     *  Z-write uses strict LESS to match vanilla's blitter
+                     *  semantics (`BlitTransXlatZReadWrite` at 0x467140 does
+                     *  `if (src_z < dest_z)`). With our front-to-back overlay
+                     *  iteration (inherited from vanilla's Render_Overlays_At),
+                     *  adjacent cells with equal gradient z at overlap pixels
+                     *  fail the back-cell's test under strict LESS — so front
+                     *  drawn first wins, matching vanilla. Under LessEqual we
+                     *  used to let back overwrite front, which broke low
+                     *  bridges. Sprite-vs-tile still draws correctly because
+                     *  the kSpriteEpsilon (5e-5) bias keeps sprite z strictly
+                     *  less than tile z.
+                     */
                     depth_state = head.DisableDepth
                         ? EDepthStencil::None
                         : (head.WriteDepth
-                            ? EDepthStencil::WriteLessEqual
+                            ? EDepthStencil::WriteLess
                             : EDepthStencil::TestLessEqual_NoWrite);
                 }
 
@@ -491,7 +504,7 @@ namespace Vinifera::Gfx
             : (cmd.DisableDepth
                 ? EDepthStencil::None
                 : (cmd.WriteDepth
-                    ? EDepthStencil::WriteLessEqual
+                    ? EDepthStencil::WriteLess
                     : EDepthStencil::TestLessEqual_NoWrite));
 
         Batch.Begin(device, EBlend::DualSourceBlend, ESampler::PointClamp, &PalEffect,

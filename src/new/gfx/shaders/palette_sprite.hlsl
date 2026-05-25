@@ -56,7 +56,26 @@ struct PSOut {
 PSOut PSMain(VSOut v)
 {
     PSOut o;
-    o.depth = v.pos.z;
+    /**
+     *  `v.pos.z` carries the per-sprite y-bias encoded by gpu_draw.cpp as
+     *  `depth_bias_y / 16000 + 0.5` — constant on all 4 vertices, so HW
+     *  interpolation gives the same value at every pixel of the sprite
+     *  with no FP drift. We decode and compute the actual depth from the
+     *  rasterized pixel Y here:
+     *
+     *      depth_bias_y = (v.pos.z - 0.5) * 16000
+     *      depth = 1 - (v.pos.y + depth_bias_y) / 16000 - kSpriteEpsilon
+     *            = 1 - v.pos.y/16000 - (v.pos.z - 0.5) - eps
+     *            = 1.5 - v.pos.y/16000 - v.pos.z - eps
+     *
+     *  `ZShapeDepthScale = 1/16000` (set CPU-side). Two sprites at the
+     *  same screen pixel with the same bias produce byte-identical depth,
+     *  so strict-LESS depth tests resolve deterministically and front-to-
+     *  back overlay iteration wins consistently — no FP flicker. Sprites
+     *  with different biases still get distinct depths (cliff shadows,
+     *  units with height_offset, etc).
+     */
+    o.depth = saturate(1.5 - v.pos.y * ZShapeDepthScale - v.pos.z - 5e-5);
     int2 px = int2(v.uv * AtlasSize);
     uint idx = Atlas.Load(int3(px, 0));
     if (idx == 0) discard;

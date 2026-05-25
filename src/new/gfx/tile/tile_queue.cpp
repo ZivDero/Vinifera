@@ -150,9 +150,16 @@ namespace Vinifera::Gfx
             const bool is_sidebar = (bucket_target == GpuRenderTarget::Sidebar);
             const int target_w = is_sidebar ? device.Get_Sidebar_Target_Width()  : device.Get_Logical_Width();
             const int target_h = is_sidebar ? device.Get_Sidebar_Target_Height() : device.Get_Logical_Height();
+            /**
+             *  Strict LESS matches vanilla's blitter semantics (see
+             *  sprite_queue.cpp for the longer comment). Adjacent tile cells
+             *  with equal gradient z at overlap pixels fail the back-cell's
+             *  test, so front-drawn-first wins — consistent with vanilla's
+             *  front-to-back iteration of CellRedraw.
+             */
             const EDepthStencil depth_state = is_sidebar
                 ? EDepthStencil::None
-                : EDepthStencil::WriteLessEqual;
+                : EDepthStencil::WriteLess;
 
             Batch.Begin(device, EBlend::Opaque, ESampler::PointClamp,
                         &TileEffectInstance, target_w, target_h, depth_state);

@@ -295,39 +295,43 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Depth: WAE-style screen-Y normalization. Larger screen Y means
-         *  the object is closer to the camera (front of the iso view), so it
-         *  gets a smaller depth value. Per-vertex Z gradient (DstZTop vs
-         *  DstZBottom) triggers on either the SHAPE_ZGRAD flag bit OR a
-         *  non-NONE zgrad parameter — vanilla's CPU rasterizer drove the
-         *  gradient purely off the parameter, so overlay call sites that
-         *  pass `ZGRAD_GROUND`/`ZGRAD_90DEG` with only `SHAPE_4000`
-         *  (`SHAPE_ZREADWRITE`) set get the gradient too. The zgrad value
-         *  then selects:
-         *    - ZGRAD_GROUND: full gradient.
-         *    - ZGRAD_45DEG:  half gradient (cliff/ramp face).
-         *    - ZGRAD_90DEG:  no gradient (vertical structure).
-         *    - ZGRAD_NONE:   no gradient (and no gate triggered unless
-         *                    SHAPE_ZGRAD is set, which keeps top == bottom).
+         *  Depth: encode the per-sprite y-bias into `Pos.z` (constant for all
+         *  4 vertices). The pixel shader (palette_sprite.hlsl) then computes
+         *  the actual depth deterministically from `SV_Position.y` plus the
+         *  decoded bias — `1 - (pixel_y + bias)/16000 - kSpriteEpsilon`.
+         *
+         *  This bypasses HW barycentric interpolation of vertex z, which
+         *  drifted by ~1 LSB between adjacent quads at the same screen pixel
+         *  because each sprite interpolates over a different vertex pair.
+         *  With strict-LESS depth tests that ~1 LSB noise caused flicker at
+         *  seams between adjacent overlay cells (low bridges). All 4 vertices
+         *  share the same encoded bias, so HW interpolation gives a constant
+         *  value at every pixel and PS computes a byte-identical depth for
+         *  any sprite at the same screen Y with the same bias.
+         *
+         *  As a side effect, sprites that previously had flat z (ZGRAD_90DEG,
+         *  ZGRAD_NONE: top_y == bottom_y baked into vertex z) now use the
+         *  same `1 - pixel_y/16000` gradient as everything else — depth
+         *  varies across the sprite by screen Y. That matches the bus drawn
+         *  by vanilla's CPU rasterizer for ZGRAD_GROUND already; for the
+         *  other ZGRAD modes it changes behavior, but the impact is
+         *  bounded (the bias term still positions sprites correctly
+         *  relative to terrain via height_offset).
+         *
+         *  Encoding: `Pos.z = depth_bias_y/16000 + 0.5`. The +0.5 offset
+         *  keeps `Pos.z` safely inside `(0,1)` so the rasterizer's depth-
+         *  clip doesn't cull fragments. PS decodes via
+         *  `bias = (v.pos.z - 0.5) * 16000`. depth_bias_y range observed:
+         *  roughly [-300, 50] for cliff shadows / bridge bodies, giving an
+         *  encoded range of ~[0.481, 0.503].
          */
         {
-            const float kSpriteEpsilon = 5e-5f;
             const float depth_bias_y = (float)-height_offset;
-            const float bottom_y = (float)(y + fi->H) + depth_bias_y;
-            float top_y = bottom_y;
-
-            const bool apply_grad = (flags & SHAPE_ZGRAD) || (zgrad != ZGRAD_NONE);
-            if (apply_grad) {
-                if (zgrad == ZGRAD_GROUND) {
-                    top_y = bottom_y - (float)fi->H;
-                } else if (zgrad == ZGRAD_45DEG) {
-                    top_y = bottom_y - (float)fi->H * 0.5f;
-                }
-                /* ZGRAD_90DEG / ZGRAD_NONE: keep top_y = bottom_y. */
-            }
-
-            cmd.DstZTop = Depth_From_Screen_Y(top_y) - kSpriteEpsilon;
-            cmd.DstZBottom = Depth_From_Screen_Y(bottom_y) - kSpriteEpsilon;
+            float encoded_bias = depth_bias_y / 16000.0f + 0.5f;
+            if (encoded_bias < 0.001f) encoded_bias = 0.001f;
+            if (encoded_bias > 0.999f) encoded_bias = 0.999f;
+            cmd.DstZTop = encoded_bias;
+            cmd.DstZBottom = encoded_bias;
         }
 
         cmd.WriteDepth = z_write;
