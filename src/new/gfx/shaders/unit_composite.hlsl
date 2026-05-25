@@ -5,7 +5,8 @@ cbuffer SpriteCB : register(b0)
 cbuffer EffectCB : register(b1)
 {
     float  Alpha;
-    float3 _Pad;
+    int    Ssaa;       // active SSAA stride: 1 = pass-through (1-tap), 2 = 2x2 resolve
+    float2 _Pad;
 };
 
 struct VSIn {
@@ -40,13 +41,15 @@ struct PSOut {
 
 /**
  *  4-tap SSAA resolve with crisp-silhouette + interior-AA logic. The
- *  scratch is allocated at logical * kUnitScratchSSAA (currently 2×, so
- *  each dst pixel maps to a 2×2 source-texel block). Doing the resolve
- *  ourselves instead of letting a bilinear sampler box-average everything
- *  lets the silhouette stay pixel-aligned while still smoothing the
+ *  scratch is allocated at logical × kUnitScratchMaxSSAA and the active
+ *  region for the current unit is logical × Ssaa (where `Ssaa` is the
+ *  runtime CB uniform, 1 or 2 depending on `[AudioVisual] SmoothVoxels=`).
+ *  Each dst pixel maps to an Ssaa×Ssaa source-texel block; doing the
+ *  resolve ourselves instead of letting a bilinear sampler box-average
+ *  everything keeps the silhouette pixel-aligned while smoothing the
  *  unit's interior.
  *
- *  Per dst pixel:
+ *  Per dst pixel (with Ssaa = 2):
  *    - count of opaque source samples in the 2×2 block decides coverage
  *    - <2 opaque → discard (transparent; sharpens the outer silhouette)
  *    - ≥2 opaque → output fully opaque, color = avg of opaque-only samples
@@ -56,7 +59,13 @@ struct PSOut {
  *  and softens transitions between adjacent voxels of different colors.
  *  Composite-replay SHPs whose one source texel covers a 2×2 scratch
  *  block contribute 4 identical samples, so SHP interiors and edges
- *  also stay crisp — no SHP softening.
+ *  also stay crisp.
+ *
+ *  With Ssaa = 1 (SmoothVoxels=off, vanilla look) the stride collapses
+ *  to 0, all 4 taps land on the same source texel, opaque_count is 0 or
+ *  4, and the path reduces to a 1-tap pass-through that emits whatever
+ *  was rasterized — no AA, no SSAA cost, voxel POINTLIST pixels render
+ *  one-for-one into the scene.
  */
 PSOut PSMain(VSOut v)
 {
@@ -64,11 +73,12 @@ PSOut PSMain(VSOut v)
     Scratch.GetDimensions(w, h);
     float2 src_px = v.uv * float2(w, h);
     int2   base   = int2(floor(src_px - 0.5));
+    int    stride = Ssaa - 1;   // 0 → all taps collapse; 1 → 2×2 footprint
 
-    float4 s0 = Scratch.Load(int3(base + int2(0, 0), 0));
-    float4 s1 = Scratch.Load(int3(base + int2(1, 0), 0));
-    float4 s2 = Scratch.Load(int3(base + int2(0, 1), 0));
-    float4 s3 = Scratch.Load(int3(base + int2(1, 1), 0));
+    float4 s0 = Scratch.Load(int3(base + int2(0,      0     ), 0));
+    float4 s1 = Scratch.Load(int3(base + int2(stride, 0     ), 0));
+    float4 s2 = Scratch.Load(int3(base + int2(0,      stride), 0));
+    float4 s3 = Scratch.Load(int3(base + int2(stride, stride), 0));
 
     float a0 = s0.a > 0.5 ? 1.0 : 0.0;
     float a1 = s1.a > 0.5 ? 1.0 : 0.0;
@@ -76,10 +86,13 @@ PSOut PSMain(VSOut v)
     float a3 = s3.a > 0.5 ? 1.0 : 0.0;
     float opaque_count = a0 + a1 + a2 + a3;
 
-    // <2 opaque → outside the unit. Discarding (instead of writing
-    // alpha=0) also keeps the scene depth test from seeing pixels
-    // that aren't really the unit's footprint.
-    if (opaque_count < 2.0) discard;
+    // Coverage threshold: majority of taps for SSAA=2 (≥2 of 4);
+    // any-tap for SSAA=1 (≥1 of 4, since all 4 are the same sample
+    // so opaque_count is 0 or 4 — 0.5 catches the latter). Discarding
+    // (instead of writing alpha=0) also keeps the scene depth test
+    // from seeing pixels that aren't really the unit's footprint.
+    const float kCoverThreshold = (Ssaa > 1) ? 2.0 : 0.5;
+    if (opaque_count < kCoverThreshold) discard;
 
     // Scratch is premultiplied; opaque samples have rgb == final color,
     // transparent samples have rgb == 0. Masking by per-sample a and

@@ -539,14 +539,16 @@ namespace Vinifera::Gfx
                                                          const SpriteDrawCmd& cmd)
     {
         /**
-         *  Scale the screen-space rects (Dst + Clip) by the scratch SSAA
-         *  factor and dispatch against the physical scratch dims. Same
-         *  rationale as VoxelQueue::Issue_Cmd_To_Scratch — the scratch
-         *  backing is allocated at logical × SSAA, so the composite-replay
-         *  SHP needs its 256-logical Dst stretched to fill the physical
-         *  256×SSAA region. DstZ* are normalized depth and don't scale.
+         *  Scale the screen-space rects (Dst + Clip) by the scratch's
+         *  currently-active SSAA factor and dispatch against the active
+         *  scratch dims. Same rationale as VoxelQueue::Issue_Cmd_To_Scratch:
+         *  the scratch backing is fixed at logical × kUnitScratchMaxSSAA,
+         *  but the active region depends on `[AudioVisual] SmoothVoxels=`
+         *  (1 → SSAA off, logical only; 2 → full backing). DstZ* are
+         *  normalized depth and don't scale.
          */
-        constexpr float kSSAAScale = (float)kUnitScratchSSAA;
+        UnitScratch& scratch = UnitScratch::Get();
+        const float kSSAAScale = (float)scratch.Get_Active_SSAA();
         SpriteDrawCmd scratch_cmd = cmd;
         scratch_cmd.Dst.X *= kSSAAScale;
         scratch_cmd.Dst.Y *= kSSAAScale;
@@ -559,6 +561,7 @@ namespace Vinifera::Gfx
             scratch_cmd.Clip.H *= kSSAAScale;
         }
         Render_Sprite_Immediate(device, scratch_cmd,
-                                kUnitScratchPhysicalWidth, kUnitScratchPhysicalHeight);
+                                scratch.Get_Active_Width(),
+                                scratch.Get_Active_Height());
     }
 }

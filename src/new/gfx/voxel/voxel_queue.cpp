@@ -144,13 +144,17 @@ namespace Vinifera::Gfx
     {
         /**
          *  Scale the per-section screen-space transforms (xy only) by the
-         *  SSAA factor so the unit's logical kUnitScratchWidth×Height
-         *  footprint fills the SSAA-physical viewport. Depth (z) and
-         *  unit_y (T0.w) stay logical — neither depends on scratch pixel
-         *  size. Issue_Cmd then sets ProjMtx and viewport from the
-         *  physical scratch dims, matching the SSAA backing.
+         *  scratch's currently-active SSAA factor so the unit's logical
+         *  kUnitScratchWidth×Height footprint fills the active viewport.
+         *  Depth (z) and unit_y (T0.w) stay logical — neither depends on
+         *  scratch pixel size. Issue_Cmd then sets ProjMtx and viewport
+         *  from the active scratch dims, matching the viewport
+         *  UnitScratch::Begin_Unit set up. When SmoothVoxels=off the
+         *  active SSAA collapses to 1 → no scaling, viewport=logical,
+         *  identical pixel layout to the pre-SSAA path.
          */
-        constexpr float kSSAAScale = (float)kUnitScratchSSAA;
+        UnitScratch& scratch = UnitScratch::Get();
+        const float kSSAAScale = (float)scratch.Get_Active_SSAA();
         VoxelDrawCmd scratch_cmd = cmd;
         scratch_cmd.Params.T0[0] *= kSSAAScale;
         scratch_cmd.Params.T0[1] *= kSSAAScale;
@@ -161,7 +165,7 @@ namespace Vinifera::Gfx
         scratch_cmd.Params.T3[0] *= kSSAAScale;
         scratch_cmd.Params.T3[1] *= kSSAAScale;
         Issue_Cmd(device, scratch_cmd,
-                  kUnitScratchPhysicalWidth, kUnitScratchPhysicalHeight,
+                  scratch.Get_Active_Width(), scratch.Get_Active_Height(),
                   /*is_sidebar*/ false);
     }
 

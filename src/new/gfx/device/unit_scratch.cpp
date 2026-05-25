@@ -12,10 +12,12 @@
 #include "unit_scratch.h"
 
 #include "debughandler.h"
+#include "extension_globals.h"  // RuleExtension — read for active-SSAA gate
 #include "gfx_utils.h"
 #include "graphics_device.h"
 #include "rect.h"
 #include "render_target_2d.h"
+#include "rulesext.h"
 #include "states.h"
 #include "texture2d.h"
 
@@ -135,10 +137,12 @@ namespace Vinifera::Gfx
 
         /**
          *  SSAA color target — RTV + SRV via RenderTarget2D, single-sample
-         *  at physical resolution (logical × kUnitScratchSSAA). Voxels
-         *  render here at the oversampled resolution; the composite blit
-         *  reads this SRV through a LinearClamp sampler so 2×2 scratch
-         *  texels downsample-average into one scene pixel.
+         *  at backing resolution (logical × kUnitScratchMaxSSAA). Allocated
+         *  once at the worst-case (max SSAA) size so the rule
+         *  `[AudioVisual] SmoothVoxels=` can toggle the active SSAA factor
+         *  at runtime without reallocating; when active < max, the unit
+         *  renders into the top-left active region and the composite blit
+         *  reads only that region.
          */
         ScratchRT = new RenderTarget2D();
         if (ScratchRT == nullptr) {
@@ -146,8 +150,8 @@ namespace Vinifera::Gfx
             return false;
         }
         if (!ScratchRT->Initialize(device,
-                                   kUnitScratchPhysicalWidth,
-                                   kUnitScratchPhysicalHeight,
+                                   kUnitScratchBackingWidth,
+                                   kUnitScratchBackingHeight,
                                    DXGI_FORMAT_R8G8B8A8_UNORM)) {
             DEBUG_ERROR("UnitScratch: scratch RT init failed.\n");
             Release_Targets();
@@ -155,13 +159,13 @@ namespace Vinifera::Gfx
         }
 
         /**
-         *  Depth at physical resolution to match the color RT. Single-
+         *  Depth at backing resolution to match the color RT. Single-
          *  sample D32_FLOAT, BIND_DEPTH_STENCIL only — depth is never
          *  sampled or resolved.
          */
         D3D11_TEXTURE2D_DESC td = {};
-        td.Width      = kUnitScratchPhysicalWidth;
-        td.Height     = kUnitScratchPhysicalHeight;
+        td.Width      = kUnitScratchBackingWidth;
+        td.Height     = kUnitScratchBackingHeight;
         td.MipLevels  = 1;
         td.ArraySize  = 1;
         td.Format     = DXGI_FORMAT_D32_FLOAT;
@@ -231,12 +235,26 @@ namespace Vinifera::Gfx
         ctx->RSGetViewports(&SavedVPCount, &SavedVP);
 
         /**
-         *  Bind the SSAA scratch RT/DSV at physical resolution. Clear color
-         *  to fully transparent (0,0,0,0) and depth to 1.0 (far). Voxel
-         *  cmds rendered into this RT use viewport-and-T-scaled coordinates
-         *  (see VoxelQueue::Flush_Composite_Group) so the unit's logical
-         *  footprint fills the full physical viewport — the composite blit
-         *  then linear-downsamples it back to logical size in scene space.
+         *  Sample `[AudioVisual] SmoothVoxels=` to set the active SSAA
+         *  factor for this unit. SmoothVoxels=on → 2× SSAA + splat (full
+         *  AA path). SmoothVoxels=off → 1× SSAA + POINTLIST voxels
+         *  (vanilla look; splatting gated separately via VEF_SPLAT in
+         *  Build_Section_Params). Refreshing per-unit lets the rule
+         *  toggle live without reallocating the backing texture.
+         */
+        const bool smooth = (RuleExtension != nullptr && RuleExtension->IsSmoothVoxels);
+        CurrentSsaa = smooth ? kUnitScratchMaxSSAA : 1;
+
+        /**
+         *  Bind the SSAA scratch RT/DSV at backing resolution. Clear only
+         *  the active top-left region (the rest is leftover from prior
+         *  frames and unread by End_Unit_Composite's src rect anyway, so
+         *  there's no observable difference) — use a full RTV clear for
+         *  simplicity; one extra ROP across 768 KB / frame isn't worth
+         *  a partial-clear shader. Voxel cmds use viewport-and-T-scaled
+         *  coordinates (see Issue_Cmd_To_Scratch) so the unit's logical
+         *  footprint fills the active region; the composite PS then
+         *  4-tap-downsamples it back to logical size in scene space.
          */
         ID3D11RenderTargetView* rtv = ScratchRT->Get_RTV();
         ctx->OMSetRenderTargets(1, &rtv, DepthDSV);
@@ -245,8 +263,8 @@ namespace Vinifera::Gfx
         ctx->ClearDepthStencilView(DepthDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
         D3D11_VIEWPORT vp = {};
-        vp.Width    = (float)kUnitScratchPhysicalWidth;
-        vp.Height   = (float)kUnitScratchPhysicalHeight;
+        vp.Width    = (float)Get_Active_Width();
+        vp.Height   = (float)Get_Active_Height();
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
         ctx->RSSetViewports(1, &vp);
@@ -298,6 +316,7 @@ namespace Vinifera::Gfx
 
         UnitCompositeEffect::Params p = {};
         p.Alpha = alpha;
+        p.Ssaa  = CurrentSsaa;
         CompositeFx.Set_Params(device, p);
 
         const RectF dst {
@@ -308,8 +327,8 @@ namespace Vinifera::Gfx
         };
         const RectF src {
             0.0f, 0.0f,
-            (float)kUnitScratchPhysicalWidth,
-            (float)kUnitScratchPhysicalHeight
+            (float)Get_Active_Width(),
+            (float)Get_Active_Height()
         };
         const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 

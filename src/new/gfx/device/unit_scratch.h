@@ -57,34 +57,36 @@ namespace Vinifera::Gfx
     inline const Point2D kUnitScratchOrigin(kUnitScratchOriginX, kUnitScratchOriginY);
 
     /**
-     *  SSAA factor for the scratch. The backing color + depth textures are
-     *  allocated at `(kUnitScratchWidth*kUnitScratchSSAA)` ×
-     *  `(kUnitScratchHeight*kUnitScratchSSAA)` and the voxel queue scales
-     *  the per-section screen-space transforms by this factor when issuing
-     *  to the scratch. The composite blit then linear-downsamples the
-     *  oversampled scratch into a logical-size quad in scene space — each
-     *  scene pixel ends up averaged over `SSAA²` scratch samples, which
-     *  AAs splat silhouettes AND smooths VPL-ramp banding between
-     *  adjacent voxels for free.
+     *  Backing-storage SSAA factor — the color + depth textures are
+     *  allocated once at `(kUnitScratchWidth × kUnitScratchHeight)`
+     *  multiplied by this. The *active* SSAA per Begin_Unit may be lower
+     *  (currently gated by `[AudioVisual] SmoothVoxels=` — 2 when on,
+     *  1 when off). When the active factor is less than the max, the
+     *  unit renders into the top-left `(W*active × H*active)` region
+     *  of the backing texture and the composite blit reads only that
+     *  region. Keeping max=2 even when active=1 lets us toggle the
+     *  rule live without reallocating the scratch.
      *
-     *  2× is the right default — 4× quadruples PS cost across the whole
-     *  unit footprint for a barely-perceptible improvement at 256² logical.
+     *  2 is the right default — 4× would quadruple PS cost across the
+     *  whole unit footprint for a barely-perceptible improvement at
+     *  256² logical.
      */
-    constexpr int kUnitScratchSSAA = 2;
-    constexpr int kUnitScratchPhysicalWidth  = kUnitScratchWidth  * kUnitScratchSSAA;
-    constexpr int kUnitScratchPhysicalHeight = kUnitScratchHeight * kUnitScratchSSAA;
+    constexpr int kUnitScratchMaxSSAA      = 2;
+    constexpr int kUnitScratchBackingWidth  = kUnitScratchWidth  * kUnitScratchMaxSSAA;
+    constexpr int kUnitScratchBackingHeight = kUnitScratchHeight * kUnitScratchMaxSSAA;
 
 
     /**
-     *  Effect that samples the scratch RT as a plain RGBA texture and pre-
-     *  multiplies by a unit-level alpha for the final composite blend.
+     *  Effect that samples the scratch RT and resolves it to scene size.
+     *  The PS does an explicit 4-tap SSAA resolve with a majority-opaque
+     *  rule (see unit_composite.hlsl) — keeps silhouettes pixel-aligned
+     *  while smoothing interior color transitions.
+     *
      *  Bind layout:
-     *    t0 — scratch RT SRV
-     *    s0 — linear-clamp sampler (the composite downsamples the SSAA
-     *         scratch to logical-size; bilinear box-filters 2×2 scratch
-     *         samples into one scene pixel)
+     *    t0 — scratch RT SRV (backing-size, top-left active region)
+     *    s0 — point-clamp sampler (unused; PS uses Load())
      *    b0 — SpriteCB (ProjMtx from SpriteBatch)
-     *    b1 — UnitCompositeCB (alpha + unused)
+     *    b1 — UnitCompositeCB (alpha + active SSAA factor)
      */
     class UnitCompositeEffect : public Effect
     {
@@ -92,7 +94,8 @@ namespace Vinifera::Gfx
         struct Params
         {
             float Alpha;
-            float _Pad[3];
+            int   Ssaa;     // active SSAA stride for the 4-tap PS (1 → 1-tap pass-through; 2 → 2×2 block resolve)
+            float _Pad[2];
         };
 
         bool Initialize(GraphicsDevice& device);
@@ -116,10 +119,25 @@ namespace Vinifera::Gfx
         bool Is_Initialized() const { return Initialized; }
 
         /**
-         *  Bind the scratch RTV+DSV with the SSAA-physical viewport
-         *  (kUnitScratchPhysicalWidth × kUnitScratchPhysicalHeight), clear
-         *  color to transparent and depth to 1.0. Saves the active RT/DSV
-         *  bindings so `End_Unit_Composite` can restore them.
+         *  Active SSAA factor for the current Begin_Unit/End_Unit_Composite
+         *  scope. Set by Begin_Unit from `[AudioVisual] SmoothVoxels=`
+         *  (1 when off, 2 when on). Read by `VoxelQueue::Issue_Cmd_To_Scratch`
+         *  and `SpriteQueue::Render_Sprite_To_Scratch_Immediate` to size
+         *  their screen-space scaling, and by `End_Unit_Composite` to size
+         *  the composite blit's source rect + Ssaa CB field.
+         */
+        int Get_Active_SSAA()   const { return CurrentSsaa; }
+        int Get_Active_Width()  const { return kUnitScratchWidth  * CurrentSsaa; }
+        int Get_Active_Height() const { return kUnitScratchHeight * CurrentSsaa; }
+
+        /**
+         *  Bind the scratch RTV+DSV with the active SSAA viewport
+         *  (Get_Active_Width × Get_Active_Height), clear color to
+         *  transparent and depth to 1.0. Saves the active RT/DSV
+         *  bindings so `End_Unit_Composite` can restore them. The
+         *  active SSAA factor is sampled from RulesExtension here, so
+         *  toggling `[AudioVisual] SmoothVoxels=` takes effect on the
+         *  next unit without recreating the scratch.
          */
         bool Begin_Unit(GraphicsDevice& device);
 
@@ -157,15 +175,18 @@ namespace Vinifera::Gfx
 
         /**
          *  SSAA color target — voxels render here at
-         *  `kUnitScratchPhysicalWidth × kUnitScratchPhysicalHeight`. Single-
+         *  `kUnitScratchBackingWidth × kUnitScratchBackingHeight`. Single-
          *  sample so it can be bound as a regular SRV at composite time
-         *  without a resolve step. The composite blit downsamples to
-         *  logical size via the LinearClamp sampler.
+         *  without a resolve step. When the active SSAA is less than the
+         *  max (rule-toggled SmoothVoxels=off case), only the top-left
+         *  `Get_Active_Width × Get_Active_Height` region is rendered and
+         *  read; the remainder of the backing texture is leftover from
+         *  prior frames and gets ignored by the composite blit's src rect.
          */
         RenderTarget2D*           ScratchRT  = nullptr;
 
         /**
-         *  SSAA depth — same physical resolution as the color RT (required
+         *  SSAA depth — same backing resolution as the color RT (required
          *  by D3D11 to bind both at OM). Single-sample D32_FLOAT. Consumed
          *  only inside the scratch render; never resolved or sampled.
          */
@@ -176,6 +197,14 @@ namespace Vinifera::Gfx
         UnitCompositeEffect       CompositeFx;
 
         bool                      Initialized = false;
+
+        /**
+         *  Active SSAA factor for the current Begin_Unit scope. Refreshed
+         *  from `RuleExtension->IsSmoothVoxels` on each Begin_Unit. Default
+         *  matches the max so the first frame before a unit is rendered
+         *  still has a sane value.
+         */
+        int                       CurrentSsaa = kUnitScratchMaxSSAA;
 
         /**
          *  Saved bindings restored by `End_Unit_Composite`. Captured at
