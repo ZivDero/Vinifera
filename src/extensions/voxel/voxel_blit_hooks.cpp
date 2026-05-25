@@ -556,35 +556,53 @@ namespace
         const int frame_hi = (single_layer >= 0) ? (single_layer + 1) : layer_count;
 
         /**
-         *  Decide whether this draw goes through the composite (scratch RT)
-         *  path. Composite avoids per-pixel depth-blend compounding for
-         *  units where multiple voxels rasterize to the same screen pixel
-         *  (multi-section) and for translucent units where any compounding
-         *  would push effective alpha toward fully opaque.
+         *  Every non-predator voxel object goes through the composite
+         *  (scratch RT) path. Inside the 256x256 scratch the per-voxel z
+         *  gradient + WriteLessEqual gives correct front-to-back sorting
+         *  within the unit (so you don't see through to the back voxels);
+         *  the final composite blit to the scene RT is a single-depth quad
+         *  with `TestLessEqual_NoWrite`, so the whole voxel object sorts
+         *  as one piece against buildings — no half-clipping along the
+         *  building silhouette regardless of section count or alpha.
          *
-         *  Composite trigger: section count > 1 OR alpha < 1.
+         *  Bullets / debris / single-section units share the same routing.
+         *  Cost is one extra blit per voxel object; the scratch is reused
+         *  across the frame so there's no per-object allocation.
          *
-         *  Bullets / debris / single-section opaque voxels stay on the fast
-         *  batched path (no scratch RT overhead).
-         *
-         *  Predator units don't currently use the scratch path — the warp
-         *  pipeline samples SceneCopy directly. If we re-enable predator
-         *  later this routing may need to merge.
+         *  Predator units bypass scratch — the distortion shader samples
+         *  SceneCopy in scene-space pixel coords and that breaks if it
+         *  runs inside a scratch-local viewport.
          */
-        const int draw_section_count = frame_hi - frame_lo;
-        const bool is_composite = !is_predator
-                               && (draw_section_count > 1 || alpha < 0.9999f);
+        const bool is_composite = !is_predator;
 
         int unit_group_id = -1;
         if (is_composite) {
             /**
-             *  Compute the unit's scene-side depth from its drawpoint Y,
-             *  same math used by single-voxel rendering. This is the
-             *  depth the composite blit tests against scene depth so the
-             *  unit gets occluded by closer geometry.
+             *  Composite blit depth at the unit's scene-space drawpoint Y.
+             *  `point.Y` is TacticalRect-relative; the scene RT covers the
+             *  full LogicalSurface (incl. tabs + sidebar), so we shift by
+             *  TacticalRect.Y to land in the same coordinate system tile
+             *  depth (Tile_Base_Depth_From_Visual_Y) uses. Without the
+             *  shift the blit sits ~16 px too deep and the TestLessEqual
+             *  in End_Unit_Composite rejects every pixel against terrain.
+             *
+             *  `z_adjust` mirrors vanilla's Get_Z_Adjustment() — negative
+             *  for cell-elevated objects (flying units, bullets above
+             *  ground) so they sort at the ground cell beneath rather
+             *  than where their raised drawpoint Y happens to land.
+             *
+             *  The 16 px bias clears the half-tile gap between the unit's
+             *  drawpoint and `tile_bottom_y` so the unit's lower extent
+             *  survives the LessEqual against terrain. Matches the
+             *  Composite_Process_Deferred path used by EightBitSurface
+             *  composites (turreted units).
              */
+            const float drawpoint_scene_y = static_cast<float>(point.Y) + (float)TacticalRect.Y;
+            constexpr float kCompositeDepthBiasPixels = 16.0f;
             const float unit_depth = std::clamp(
-                1.0f - static_cast<float>(point.Y) * kPixelToDepth - 1.0e-4f,
+                1.0f - drawpoint_scene_y * kPixelToDepth
+                     + static_cast<float>(z_adjust) * kPixelToDepth
+                     - kCompositeDepthBiasPixels * kPixelToDepth,
                 1.0e-4f, 0.9999f);
             VoxelUnitGroup group;
             group.Drawpoint  = point;
